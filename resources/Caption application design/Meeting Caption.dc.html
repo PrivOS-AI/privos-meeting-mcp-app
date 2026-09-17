@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas">
+  <link rel="stylesheet" href="_ds/privos-design-system-b108436a-350e-48b0-abeb-76a4df1cb0af/colors_and_type.css">
+  <script src="_ds/privos-design-system-b108436a-350e-48b0-abeb-76a4df1cb0af/_ds_bundle.js"></script>
+  <style>
+    body { margin:0; background:#E9ECF0; font-family:'Montserrat',system-ui,sans-serif; color:#001930; }
+    a { color:#3C82E6; text-decoration:none; } a:hover { color:#2563C9; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+    @keyframes wave { 0%,100% { transform:scaleY(.35); } 50% { transform:scaleY(1); } }
+    @keyframes blink { 0%,49% { opacity:1; } 50%,100% { opacity:0; } }
+  </style>
+</helmet>
+
+<section style="padding:40px 48px 64px; display:flex; flex-direction:column; gap:28px;">
+  <div style="display:flex; align-items:baseline; gap:16px;">
+    <div style="font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#38475B;">Turn 1</div>
+    <div style="font-size:15px; font-weight:500; color:#38475B;">Meeting Caption · Live caption screens (<a href="#1a">1a</a>, <a href="#1b">1b</a>) · Meeting detail <a href="#1c">1c</a> · History <a href="#1d">1d</a> · Settings <a href="#1e">1e</a></div>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:40px; align-items:flex-start;">
+
+    <!-- ================= 1a — Live caption, light, transcript-first ================= -->
+    <div id="1a" data-screen-label="1a Live caption — light" style="display:flex; flex-direction:column; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:12px; font-weight:700; color:#fff; background:#001930; border-radius:6px; padding:3px 8px;">1a</span>
+        <span style="font-size:13px; font-weight:600; color:#38475B;">Live caption — Transcript-first · light</span>
+      </div>
+      <div style="width:1440px; height:900px; background:#F4F6F8; border-radius:16px; box-shadow:0 12px 28px rgba(0,25,48,.14); overflow:hidden; display:grid; grid-template-columns:64px 1fr; grid-template-rows:60px 1fr 72px;">
+
+        <!-- rail -->
+        <div style="grid-row:1 / span 3; background:#001930; display:flex; flex-direction:column; align-items:center; padding:14px 0; gap:6px;">
+          <img src="assets/brand/favicon-white.svg" style="width:30px; height:30px; margin-bottom:14px;">
+          <div style="width:40px; height:40px; border-radius:10px; background:rgba(60,130,230,.22); display:grid; place-items:center; box-shadow:inset 3px 0 0 #3C82E6;"><img src="assets/icons/microphone.svg" style="width:20px; height:20px; filter:invert(1);"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/history.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/bookmark.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/search.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="flex:1;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/settings.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(160deg,#FFC814 8%,#DCDCDC 78%); display:grid; place-items:center; font-size:12px; font-weight:700; color:#001930;">HL</div>
+        </div>
+
+        <!-- top bar -->
+        <div style="background:#fff; border-bottom:1px solid #ECEEF1; display:flex; align-items:center; padding:0 24px; gap:16px;">
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="display:flex; align-items:center; gap:8px; height:24px;"><sc-if value="{{ editA }}" hint-placeholder-val="{{ false }}"><input value="{{ title }}" onChange="{{ onTitleChange }}" onKeyDown="{{ onTitleKey }}" onBlur="{{ stopEdit }}" autoFocus="{{ true }}" size="{{ titleSize }}" style="font-family:'Montserrat',system-ui,sans-serif; font-size:15px; font-weight:700; letter-spacing:-.01em; color:#001930; background:#fff; border:1px solid #3C82E6; box-shadow:0 0 0 3px rgba(60,130,230,.15); border-radius:6px; padding:2px 8px; outline:none; min-width:0; width:auto;"></sc-if><sc-if value="{{ viewA }}" hint-placeholder-val="{{ true }}"><span style="font-size:15px; font-weight:700; letter-spacing:-.01em;">{{ title }}</span><img src="assets/icons/edit.svg" onClick="{{ startEditA }}" style="width:16px; height:16px; opacity:.5; cursor:pointer;" style-hover="opacity:1;"></sc-if></div>
+            <div style="font-size:12px; color:#6A7584; font-weight:500;">17 Sep 2026 · From 09:30 · 4 speakers</div>
+          </div>
+          <div style="flex:1;"></div>
+          <div style="display:flex; align-items:center; gap:2px; background:#E6E8EB; border-radius:999px; padding:3px;">
+            <div style="display:flex; align-items:center; gap:6px; background:#fff; color:#001930; border-radius:999px; padding:5px 12px; font-size:12px; font-weight:600; box-shadow:0 1px 2px rgba(0,25,48,.08);"><img src="assets/icons/file-text.svg" style="width:14px; height:14px;"> Transcript</div>
+            <div style="display:flex; align-items:center; gap:6px; color:#38475B; border-radius:999px; padding:5px 12px; font-size:12px; font-weight:600;"><img src="assets/icons/text-font-size.svg" style="width:14px; height:14px; opacity:.7;"> Stage</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; background:#FBE7E7; color:#DB4B4B; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600;">{{ recDot }} RECORDING <span style="font-family:'JetBrains Mono',monospace; font-weight:500;">{{ timer }}</span></div>
+          <div style="display:flex; align-items:center; gap:6px; border:1px solid #CDD1D6; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600;"><img src="assets/icons/translate.svg" style="width:16px; height:16px;"> EN <span style="color:#9BA3AD;">→</span> VI</div>
+          <div style="display:flex; align-items:center; gap:6px; border:1px solid #CDD1D6; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600;"><img src="assets/icons/person-multiple.svg" style="width:16px; height:16px;"> 4</div>
+          <div style="display:flex; align-items:center; gap:6px; background:#3C82E6; color:#fff; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;"><img src="assets/icons/share.svg" style="width:16px; height:16px; filter:invert(1);"> Share</div>
+        </div>
+
+        <!-- body -->
+        <div style="display:grid; grid-template-columns:1fr 340px; min-height:0;">
+          <!-- transcript -->
+          <div style="padding:24px 32px; overflow:hidden; display:flex; flex-direction:column; gap:20px; position:relative;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#6A7584;">Live transcript</div>
+              <div style="flex:1; height:1px; background:#E6E8EB;"></div>
+              <div style="font-size:12px; color:#6A7584; font-weight:500;">Auto-scroll</div>
+              <div style="width:32px; height:18px; border-radius:999px; background:#3C82E6; position:relative;"><div style="position:absolute; top:2px; left:16px; width:14px; height:14px; border-radius:50%; background:#fff;"></div></div>
+            </div>
+            <sc-for list="{{ lines }}" as="l" hint-placeholder-count="4">
+              <div style="display:grid; grid-template-columns:36px 1fr; gap:14px;">
+                <div style="width:36px; height:36px; border-radius:50%; display:grid; place-items:center; font-size:12px; font-weight:700; color:#fff; background:{{ l.color }};">{{ l.initials }}</div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="display:inline-flex; align-items:center; gap:4px; font-size:13px; font-weight:700; border-radius:6px; padding:2px 6px; margin-left:-6px;" style-hover="background:rgba(60,130,230,.08);">{{ l.name }} <img src="assets/icons/chevron-down.svg" style="width:12px; height:12px; opacity:.5;"></span>
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#9BA3AD;">{{ l.time }}</span>
+                    <sc-if value="{{ l.marked }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:#E5A800; background:#FFF6DE; border-radius:999px; padding:2px 8px;"><img src="assets/icons/bookmark.svg" style="width:12px; height:12px; filter:invert(62%) sepia(80%) saturate(1200%) hue-rotate(5deg);"> Bookmarked</span></sc-if>
+                  </div>
+                  <div style="font-size:16px; line-height:1.55; font-weight:500; color:#001930; text-wrap:pretty;">{{ l.vi }}</div>
+                  <sc-if value="{{ showTranslation }}" hint-placeholder-val="{{ true }}"><div style="font-size:14px; line-height:1.5; font-weight:500; color:#6A7584; text-wrap:pretty;">{{ l.en }}</div></sc-if>
+                </div>
+              </div>
+            </sc-for>
+            <!-- partial / in-progress -->
+            <div style="display:grid; grid-template-columns:36px 1fr; gap:14px;">
+              <div style="width:36px; height:36px; border-radius:50%; display:grid; place-items:center; font-size:12px; font-weight:700; color:#fff; background:#38475B;">TL</div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; align-items:center; gap:10px; position:relative;">
+                  <span style="display:inline-flex; align-items:center; gap:4px; font-size:13px; font-weight:700; border-radius:6px; padding:2px 6px; margin-left:-6px; background:rgba(60,130,230,.12); box-shadow:0 0 0 2px rgba(60,130,230,.35);">Taylor Lin <img src="assets/icons/chevron-down.svg" style="width:12px; height:12px; opacity:.7;"></span>
+                  <span style="font-size:11px; color:#3C82E6; font-weight:600;">speaking…</span>
+                  <!-- speaker picker (open) -->
+                  <div style="position:absolute; left:-6px; bottom:calc(100% + 8px); width:300px; background:#fff; border:1px solid #ECEEF1; border-radius:12px; box-shadow:0 12px 28px rgba(0,25,48,.14), 0 4px 10px rgba(0,25,48,.08); padding:8px; display:flex; flex-direction:column; gap:2px; z-index:5;">
+                    <div style="padding:8px 10px 6px; font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#6A7584;">Who is speaking?</div>
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; background:rgba(60,130,230,.12);"><div style="width:24px; height:24px; border-radius:50%; background:#3C82E6; display:grid; place-items:center; font-size:10px; font-weight:700; color:#fff;">TL</div><span style="font-size:13px; font-weight:600; flex:1;">Taylor Lin</span><span style="font-size:11px; color:#6A7584; font-weight:500;">Voice #1 · 92%</span><img src="assets/icons/checkmark.svg" style="width:16px; height:16px; filter:invert(48%) sepia(90%) saturate(1800%) hue-rotate(200deg);"></div>
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px;" style-hover="background:rgba(60,130,230,.06);"><div style="width:24px; height:24px; border-radius:50%; background:#1F9E6F; display:grid; place-items:center; font-size:10px; font-weight:700; color:#fff;">QH</div><span style="font-size:13px; font-weight:600; flex:1;">Quinn Harris</span><span style="font-size:11px; color:#6A7584; font-weight:500;">Voice #2</span></div>
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px;" style-hover="background:rgba(60,130,230,.06);"><div style="width:24px; height:24px; border-radius:50%; background:#E5A800; display:grid; place-items:center; font-size:10px; font-weight:700; color:#001930;">MA</div><span style="font-size:13px; font-weight:600; flex:1;">Mia Adams</span><span style="font-size:11px; color:#6A7584; font-weight:500;">Voice #3</span></div>
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px;" style-hover="background:rgba(60,130,230,.06);"><div style="width:24px; height:24px; border-radius:50%; background:#38475B; display:grid; place-items:center; font-size:10px; font-weight:700; color:#fff;">HL</div><span style="font-size:13px; font-weight:600; flex:1;">Henry Lowe</span><span style="font-size:11px; color:#6A7584; font-weight:500;">Voice #4</span></div>
+                    <div style="height:1px; background:#ECEEF1; margin:4px 0;"></div>
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600; color:#38475B;" style-hover="background:rgba(60,130,230,.06);"><img src="assets/icons/text-font-size.svg" style="width:16px; height:16px; opacity:.7;"> Rename speaker…</div>
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600; color:#38475B;" style-hover="background:rgba(60,130,230,.06);"><img src="assets/icons/add.svg" style="width:16px; height:16px; opacity:.7;"> Add new speaker</div>
+                    <div style="height:1px; background:#ECEEF1; margin:4px 0;"></div>
+                    <div style="display:flex; align-items:center; gap:10px; padding:6px 10px 4px;"><span style="font-size:12px; color:#6A7584; font-weight:500; flex:1; line-height:1.4;">Apply to every line of this voice</span><div style="width:32px; height:18px; border-radius:999px; background:#3C82E6; position:relative;"><div style="position:absolute; top:2px; left:16px; width:14px; height:14px; border-radius:50%; background:#fff;"></div></div></div>
+                  </div>
+                </div>
+                <div style="font-size:16px; line-height:1.55; font-weight:500; color:#38475B;">So we're settling on the client demo for Thursday, and as for the API documentation{{ cursor }}</div>
+              </div>
+            </div>
+            <div style="position:absolute; left:0; right:0; bottom:0; height:48px; background:linear-gradient(180deg, rgba(244,246,248,0), #F4F6F8);"></div>
+          </div>
+
+          <!-- right panel -->
+          <div style="background:#fff; border-left:1px solid #ECEEF1; display:flex; flex-direction:column; min-height:0;">
+            <div style="display:flex; gap:4px; padding:12px 16px 0; border-bottom:1px solid #ECEEF1;">
+              <div style="padding:8px 12px; font-size:13px; font-weight:600; color:#3C82E6; box-shadow:inset 0 -2px 0 #3C82E6;">Summary</div>
+              <div style="padding:8px 12px; font-size:13px; font-weight:600; color:#6A7584;">Action items <span style="background:#E7F0FD; color:#3C82E6; border-radius:999px; padding:1px 7px; font-size:11px;">3</span></div>
+              <div style="padding:8px 12px; font-size:13px; font-weight:600; color:#6A7584;">Bookmarks <span style="background:#E6E8EB; color:#38475B; border-radius:999px; padding:1px 7px; font-size:11px;">2</span></div>
+            </div>
+            <div style="padding:20px 16px; display:flex; flex-direction:column; gap:16px; overflow:hidden;">
+              <div style="border:1px solid #ECEEF1; border-radius:12px; padding:16px; position:relative; overflow:hidden; background:#fff; box-shadow:0 1px 3px rgba(0,25,48,.08);">
+                <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,#FFC814,#DCDCDC);"></div>
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;"><img src="assets/icons/sparkle.svg" style="width:16px; height:16px;"><span style="font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:#38475B;">AI summary · updated 12s ago</span></div>
+                <div style="font-size:14px; line-height:1.55; font-weight:500; color:#001930; text-wrap:pretty;">The team reviewed sprint 38 progress. Backend finished 80% of the contacts API; frontend is 1 day behind due to the data-table redesign. Agreed to run an internal demo before the client demo.</div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#6A7584;">Decisions</div>
+                <div style="display:flex; gap:10px; align-items:flex-start; font-size:13px; line-height:1.5; font-weight:500;"><img src="assets/icons/checkmark-circle.svg" style="width:16px; height:16px; margin-top:2px; filter:invert(45%) sepia(60%) saturate(500%) hue-rotate(110deg);"> Move the client demo to Thursday 19 Sep</div>
+                <div style="display:flex; gap:10px; align-items:flex-start; font-size:13px; line-height:1.5; font-weight:500;"><img src="assets/icons/checkmark-circle.svg" style="width:16px; height:16px; margin-top:2px; filter:invert(45%) sepia(60%) saturate(500%) hue-rotate(110deg);"> Keep the new data-table design, no rollback</div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#6A7584;">Detected action items</div>
+                <sc-for list="{{ actions }}" as="a" hint-placeholder-count="3">
+                  <div style="display:grid; grid-template-columns:18px 1fr auto; gap:10px; align-items:start; padding:10px 12px; border:1px solid #ECEEF1; border-radius:10px;">
+                    <img src="assets/icons/checkbox-unchecked.svg" style="width:18px; height:18px;">
+                    <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:13px; font-weight:600; line-height:1.4;">{{ a.text }}</span><span style="font-size:12px; color:#6A7584;">{{ a.owner }} · {{ a.due }}</span></div>
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#9BA3AD;">{{ a.at }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- bottom control bar -->
+        <div style="background:#fff; border-top:1px solid #ECEEF1; display:flex; align-items:center; padding:0 24px; gap:14px;">
+          <div style="display:flex; align-items:center; gap:10px; border:1px solid #CDD1D6; border-radius:999px; padding:6px 14px 6px 10px;">
+            <img src="assets/icons/microphone.svg" style="width:18px; height:18px;">
+            <span style="font-size:13px; font-weight:600;">Browser microphone</span>
+            {{ wave }}
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; border:1px solid #CDD1D6; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;"><img src="assets/icons/text-font-size.svg" style="width:16px; height:16px;"> Font size</div>
+          <div style="flex:1;"></div>
+          <div style="display:flex; align-items:center; gap:6px; border:1px solid #CDD1D6; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;"><img src="assets/icons/bookmark-add.svg" style="width:16px; height:16px;"> Bookmark <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#9BA3AD; background:#E6E8EB; border-radius:4px; padding:1px 5px;">B</span></div>
+          <div style="display:flex; align-items:center; gap:6px; border:1px solid #CDD1D6; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;"><img src="assets/icons/pause.svg" style="width:16px; height:16px;"> Pause</div>
+          <div style="display:flex; align-items:center; gap:6px; background:#DB4B4B; color:#fff; border-radius:999px; padding:8px 16px; font-size:13px; font-weight:600;"><img src="assets/icons/record-stop.svg" style="width:16px; height:16px; filter:invert(1);"> End</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 1b — Live caption, dark, stage mode ================= -->
+    <div id="1b" data-screen-label="1b Live caption — dark stage" style="display:flex; flex-direction:column; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:12px; font-weight:700; color:#fff; background:#001930; border-radius:6px; padding:3px 8px;">1b</span>
+        <span style="font-size:13px; font-weight:600; color:#38475B;">Live caption — Stage mode · dark (projected in the room)</span>
+      </div>
+      <div style="width:1440px; height:900px; background:#001930; border-radius:16px; box-shadow:0 12px 28px rgba(0,25,48,.3); overflow:hidden; position:relative; display:flex; flex-direction:column; background-image:radial-gradient(rgba(255,255,255,.06) 1px, transparent 1px); background-size:28px 28px;">
+        <img src="assets/brand/favicon-white.svg" style="position:absolute; right:-120px; bottom:-160px; width:620px; opacity:.04;">
+        <!-- top -->
+        <div style="display:flex; align-items:center; padding:20px 32px; gap:16px; position:relative;">
+          <img src="assets/brand/logo-white.svg" style="height:22px;">
+          <div style="width:1px; height:20px; background:rgba(255,255,255,.18);"></div>
+          <div style="display:flex; align-items:center; gap:8px; height:24px;"><sc-if value="{{ editB }}" hint-placeholder-val="{{ false }}"><input value="{{ title }}" onChange="{{ onTitleChange }}" onKeyDown="{{ onTitleKey }}" onBlur="{{ stopEdit }}" autoFocus="{{ true }}" size="{{ titleSize }}" style="font-family:'Montserrat',system-ui,sans-serif; font-size:14px; font-weight:700; letter-spacing:-.01em; color:#fff; background:rgba(255,255,255,.08); border:1px solid #3C82E6; box-shadow:0 0 0 3px rgba(60,130,230,.15); border-radius:6px; padding:2px 8px; outline:none; min-width:0; width:auto;"></sc-if><sc-if value="{{ viewB }}" hint-placeholder-val="{{ true }}"><span style="font-size:14px; font-weight:600; color:#fff;">{{ title }}</span><img src="assets/icons/edit.svg" onClick="{{ startEditB }}" style="width:16px; height:16px; filter:invert(1); opacity:.6; cursor:pointer;" style-hover="opacity:1;"></sc-if></div>
+          <div style="flex:1;"></div>
+          <div style="display:flex; align-items:center; gap:2px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:3px;">
+            <div style="display:flex; align-items:center; gap:6px; color:#9BA3AD; border-radius:999px; padding:5px 12px; font-size:12px; font-weight:600;"><img src="assets/icons/file-text.svg" style="width:14px; height:14px; filter:invert(1); opacity:.6;"> Transcript</div>
+            <div style="display:flex; align-items:center; gap:6px; background:#fff; color:#001930; border-radius:999px; padding:5px 12px; font-size:12px; font-weight:600;"><img src="assets/icons/text-font-size.svg" style="width:14px; height:14px;"> Stage</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; color:#fff; border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600;">{{ recDot }} REC <span style="font-family:'JetBrains Mono',monospace; font-weight:500; color:#9BA3AD;">{{ timer }}</span></div>
+          <div style="display:flex; align-items:center; gap:6px; color:#fff; border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600;"><img src="assets/icons/translate.svg" style="width:16px; height:16px; filter:invert(1);"> EN → VI</div>
+          <div style="display:flex; align-items:center; gap:6px; color:#fff; border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600;"><img src="assets/icons/volume.svg" style="width:16px; height:16px; filter:invert(1);"> ElevenLabs Scribe</div>
+        </div>
+
+        <!-- stage -->
+        <div style="flex:1; display:grid; grid-template-columns:1fr 340px; gap:32px; padding:24px 48px 24px 64px; min-height:0; position:relative;">
+          <div style="display:flex; flex-direction:column; justify-content:flex-end; gap:36px; min-width:0;">
+            <div style="display:flex; flex-direction:column; gap:8px; opacity:.32;">
+              <div style="font-size:13px; font-weight:600; color:#9BA3AD;">Mia Adams</div>
+              <div style="font-size:24px; line-height:1.4; font-weight:500; color:#fff; text-wrap:pretty;">Frontend is about a day behind because the data-table design changed mid-sprint.</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px; opacity:.6;">
+              <div style="font-size:13px; font-weight:600; color:#9BA3AD;">Quinn Harris</div>
+              <div style="font-size:24px; line-height:1.4; font-weight:500; color:#fff; text-wrap:pretty;">No problem — backend has finished 80% of the contacts API, we can make it up on integration.</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:28px; height:28px; border-radius:50%; background:#3C82E6; display:grid; place-items:center; font-size:11px; font-weight:700; color:#fff;">TL</div>
+                <div style="display:inline-flex; align-items:center; gap:4px; font-size:14px; font-weight:700; color:#fff; border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:3px 10px;">Taylor Lin <img src="assets/icons/chevron-down.svg" style="width:12px; height:12px; filter:invert(1); opacity:.7;"></div>
+                <div style="font-size:12px; font-weight:600; color:#6BA3F0;">speaking</div>
+              </div>
+              <div style="font-size:{{ stageSize }}; line-height:1.3; font-weight:700; letter-spacing:-.02em; color:#fff; text-wrap:pretty;">So we're settling on the client demo for Thursday, and as for the API documentation{{ cursor }}</div>
+              <sc-if value="{{ showTranslation }}" hint-placeholder-val="{{ true }}">
+                <div style="font-size:22px; line-height:1.45; font-weight:500; color:#DCDCDC; text-wrap:pretty; padding-left:16px; border-left:2px solid #FFC814;">Vậy mình chốt là demo cho khách vào thứ Năm, còn phần tài liệu API thì…</div>
+              </sc-if>
+            </div>
+          </div>
+
+          <!-- side panel — same structure as 1a (Summary / Action items / Bookmarks), dark -->
+          <div style="background:#06223A; border:1px solid rgba(255,255,255,.10); border-radius:14px; display:flex; flex-direction:column; min-height:0; overflow:hidden;">
+            <div style="display:flex; gap:2px; padding:12px 12px 0; border-bottom:1px solid rgba(255,255,255,.10); white-space:nowrap;">
+              <div style="padding:8px 8px; font-size:13px; font-weight:600; color:#6BA3F0; box-shadow:inset 0 -2px 0 #3C82E6;">Summary</div>
+              <div style="padding:8px 8px; font-size:13px; font-weight:600; color:#9BA3AD;">Action items <span style="background:rgba(60,130,230,.25); color:#6BA3F0; border-radius:999px; padding:1px 7px; font-size:11px;">3</span></div>
+              <div style="padding:8px 8px; font-size:13px; font-weight:600; color:#9BA3AD;">Bookmarks <span style="background:rgba(255,255,255,.10); color:#DCDCDC; border-radius:999px; padding:1px 7px; font-size:11px;">2</span></div>
+            </div>
+            <div style="padding:16px; display:flex; flex-direction:column; gap:16px; overflow:hidden;">
+              <div style="border:1px solid rgba(255,255,255,.10); border-radius:12px; padding:14px; position:relative; overflow:hidden; background:#0C2A45;">
+                <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,#FFC814,#DCDCDC);"></div>
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><img src="assets/icons/sparkle.svg" style="width:16px; height:16px; filter:invert(1);"><span style="font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:#9BA3AD;">AI summary · 12s ago</span></div>
+                <div style="font-size:13px; line-height:1.55; font-weight:500; color:#fff; text-wrap:pretty;">The team reviewed sprint 38 progress. Backend finished 80% of the contacts API; frontend is 1 day behind due to the data-table redesign. Agreed to run an internal demo before the client demo.</div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#9BA3AD;">Decisions</div>
+                <div style="display:flex; gap:10px; align-items:flex-start; font-size:13px; line-height:1.5; font-weight:500; color:#fff;"><img src="assets/icons/checkmark-circle.svg" style="width:16px; height:16px; margin-top:2px; filter:invert(1);"> Move the client demo to Thursday 19 Sep</div>
+                <div style="display:flex; gap:10px; align-items:flex-start; font-size:13px; line-height:1.5; font-weight:500; color:#fff;"><img src="assets/icons/checkmark-circle.svg" style="width:16px; height:16px; margin-top:2px; filter:invert(1);"> Keep the new data-table design</div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#9BA3AD;">Detected action items</div>
+                <sc-for list="{{ actions }}" as="a" hint-placeholder-count="3">
+                  <div style="display:grid; grid-template-columns:18px 1fr auto; gap:10px; align-items:start; padding:10px 12px; border:1px solid rgba(255,255,255,.10); border-radius:10px;">
+                    <img src="assets/icons/checkbox-unchecked.svg" style="width:18px; height:18px; filter:invert(1); opacity:.7;">
+                    <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:13px; font-weight:600; line-height:1.4; color:#fff;">{{ a.text }}</span><span style="font-size:12px; color:#9BA3AD;">{{ a.owner }} · {{ a.due }}</span></div>
+                    <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#6A7584;">{{ a.at }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- floating controls -->
+        <div style="display:flex; justify-content:center; padding:0 0 28px; position:relative;">
+          <div style="display:flex; align-items:center; gap:8px; background:rgba(0,25,48,.7); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:8px; box-shadow:0 12px 28px rgba(0,25,48,.4);">
+            <div style="display:flex; align-items:center; gap:8px; color:#fff; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;"><img src="assets/icons/microphone.svg" style="width:18px; height:18px; filter:invert(1);"> Microphone</div>
+            <div style="width:1px; height:20px; background:rgba(255,255,255,.14);"></div>
+            <div style="display:flex; align-items:center; gap:8px; color:#fff; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;"><img src="assets/icons/text-font-size.svg" style="width:18px; height:18px; filter:invert(1);"> A</div>
+            <div style="display:flex; align-items:center; gap:8px; color:#fff; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;"><img src="assets/icons/bookmark-add.svg" style="width:18px; height:18px; filter:invert(1);"> Bookmark</div>
+            <div style="display:flex; align-items:center; gap:8px; color:#fff; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;"><img src="assets/icons/pause.svg" style="width:18px; height:18px; filter:invert(1);"></div>
+            <div style="display:flex; align-items:center; gap:8px; background:linear-gradient(180deg,#FFC814,#DCDCDC); color:#001930; border-radius:999px; padding:9px 18px; font-size:13px; font-weight:700; box-shadow:0 0 0 1px rgba(255,200,20,.4), 0 6px 24px rgba(255,200,20,.22);"><img src="assets/icons/record-stop.svg" style="width:16px; height:16px;"> End &amp; summarize</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 1c — Meeting detail ================= -->
+    <div id="1c" data-screen-label="1c Meeting detail" style="display:flex; flex-direction:column; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:12px; font-weight:700; color:#fff; background:#001930; border-radius:6px; padding:3px 8px;">1c</span>
+        <span style="font-size:13px; font-weight:600; color:#38475B;">Meeting detail — after the meeting</span>
+      </div>
+      <div style="width:1440px; height:900px; background:#F4F6F8; border-radius:16px; box-shadow:0 12px 28px rgba(0,25,48,.14); overflow:hidden; display:grid; grid-template-columns:64px 1fr; grid-template-rows:60px 1fr;">
+        <div style="grid-row:1 / span 2; background:#001930; display:flex; flex-direction:column; align-items:center; padding:14px 0; gap:6px;">
+          <img src="assets/brand/favicon-white.svg" style="width:30px; height:30px; margin-bottom:14px;">
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/microphone.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; background:rgba(60,130,230,.22); display:grid; place-items:center; box-shadow:inset 3px 0 0 #3C82E6;"><img src="assets/icons/history.svg" style="width:20px; height:20px; filter:invert(1);"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/bookmark.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/search.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="flex:1;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/settings.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(160deg,#FFC814 8%,#DCDCDC 78%); display:grid; place-items:center; font-size:12px; font-weight:700; color:#001930;">HL</div>
+        </div>
+        <div style="background:#fff; border-bottom:1px solid #ECEEF1; display:flex; align-items:center; padding:0 24px; gap:12px;">
+          <img src="assets/icons/arrow-left.svg" style="width:20px; height:20px;">
+          <span style="font-size:13px; color:#6A7584; font-weight:500;">History</span><span style="color:#9BA3AD;">/</span>
+          <span style="font-size:13px; font-weight:600;">{{ title }}</span>
+          <div style="flex:1;"></div>
+          <div style="display:flex; align-items:center; gap:6px; border:1px solid #CDD1D6; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;"><img src="assets/icons/arrow-export.svg" style="width:16px; height:16px;"> Export SRT / DOCX</div>
+          <div style="display:flex; align-items:center; gap:6px; border:1px solid #CDD1D6; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;"><img src="assets/icons/chat.svg" style="width:16px; height:16px;"> Send to Chat room</div>
+          <div style="display:flex; align-items:center; gap:6px; background:#3C82E6; color:#fff; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;"><img src="assets/icons/share.svg" style="width:16px; height:16px; filter:invert(1);"> Share</div>
+        </div>
+        <div style="padding:28px 32px; display:grid; grid-template-columns:1fr 380px; gap:28px; min-height:0; overflow:hidden;">
+          <div style="display:flex; flex-direction:column; gap:20px; min-height:0;">
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; align-items:center; gap:12px; height:36px;"><sc-if value="{{ editC }}" hint-placeholder-val="{{ false }}"><input value="{{ title }}" onChange="{{ onTitleChange }}" onKeyDown="{{ onTitleKey }}" onBlur="{{ stopEdit }}" autoFocus="{{ true }}" size="{{ titleSize }}" style="font-family:'Montserrat',system-ui,sans-serif; font-size:30px; font-weight:700; letter-spacing:-.01em; color:#001930; background:#fff; border:1px solid #3C82E6; box-shadow:0 0 0 3px rgba(60,130,230,.15); border-radius:6px; padding:2px 8px; outline:none; min-width:0; width:auto;"></sc-if><sc-if value="{{ viewC }}" hint-placeholder-val="{{ true }}"><span style="font-size:30px; font-weight:700; letter-spacing:-.015em; line-height:1.15;">{{ title }}</span><img src="assets/icons/edit.svg" onClick="{{ startEditC }}" style="width:20px; height:20px; opacity:.5; cursor:pointer;" style-hover="opacity:1;"></sc-if></div>
+              <div style="display:flex; align-items:center; gap:16px; font-size:13px; color:#6A7584; font-weight:500;">
+                <span style="display:flex; align-items:center; gap:6px;"><img src="assets/icons/calendar.svg" style="width:16px; height:16px; opacity:.6;"> 17 Sep 2026 · From 09:30</span>
+                <span style="display:flex; align-items:center; gap:6px;"><img src="assets/icons/clock.svg" style="width:16px; height:16px; opacity:.6;"> 42 min</span>
+                <span style="display:flex; align-items:center; gap:6px;"><img src="assets/icons/person-multiple.svg" style="width:16px; height:16px; opacity:.6;"> Taylor Lin, Quinn Harris, Mia Adams, Henry Lowe</span>
+                <span style="display:flex; align-items:center; gap:6px; color:#1F9E6F;"><img src="assets/icons/shield-keyhole.svg" style="width:16px; height:16px; filter:invert(45%) sepia(60%) saturate(500%) hue-rotate(110deg);"> Transcript stored on PrivOS</span>
+              </div>
+            </div>
+            <!-- player -->
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:14px; box-shadow:0 1px 3px rgba(0,25,48,.08);">
+              <div style="width:36px; height:36px; border-radius:50%; background:#3C82E6; display:grid; place-items:center;"><img src="assets/icons/play.svg" style="width:18px; height:18px; filter:invert(1);"></div>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#38475B;">14:20</span>
+              <div style="flex:1; height:4px; border-radius:2px; background:#E6E8EB; position:relative;">
+                <div style="position:absolute; left:0; top:0; height:4px; width:34%; border-radius:2px; background:#3C82E6;"></div>
+                <div style="position:absolute; left:34%; top:-4px; width:12px; height:12px; border-radius:50%; background:#fff; border:2px solid #3C82E6; margin-left:-6px;"></div>
+                <div style="position:absolute; left:18%; top:-3px; width:2px; height:10px; background:#E5A800;"></div>
+                <div style="position:absolute; left:61%; top:-3px; width:2px; height:10px; background:#E5A800;"></div>
+              </div>
+              <span style="font-family:'JetBrains Mono',monospace; font-size:12px; color:#9BA3AD;">42:08</span>
+              <div style="border:1px solid #CDD1D6; border-radius:999px; padding:4px 10px; font-size:12px; font-weight:600;">1.0×</div>
+            </div>
+            <!-- search -->
+            <div style="display:flex; gap:10px; align-items:center;">
+              <div style="flex:1; display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #3C82E6; box-shadow:0 0 0 3px rgba(60,130,230,.15); border-radius:10px; padding:10px 14px;">
+                <img src="assets/icons/search.svg" style="width:18px; height:18px;">
+                <span style="font-size:14px; font-weight:500;">demo</span>
+                <span style="width:1px; height:16px; background:#3C82E6;"></span>
+                <div style="flex:1;"></div>
+                <span style="font-size:12px; color:#6A7584; font-weight:500;">3 results</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px; border:1px solid #CDD1D6; border-radius:999px; padding:9px 14px; font-size:13px; font-weight:600; background:#fff;"><img src="assets/icons/filter.svg" style="width:16px; height:16px;"> Speakers</div>
+              <div style="display:flex; align-items:center; gap:6px; border:1px solid #CDD1D6; border-radius:999px; padding:9px 14px; font-size:13px; font-weight:600; background:#fff;"><img src="assets/icons/translate.svg" style="width:16px; height:16px;"> EN + VI</div>
+            </div>
+            <!-- transcript -->
+            <div style="display:flex; flex-direction:column; gap:18px; overflow:hidden; position:relative; flex:1;">
+              <sc-for list="{{ lines }}" as="l" hint-placeholder-count="4">
+                <div style="display:grid; grid-template-columns:36px 1fr; gap:14px;">
+                  <div style="width:36px; height:36px; border-radius:50%; display:grid; place-items:center; font-size:12px; font-weight:700; color:#fff; background:{{ l.color }};">{{ l.initials }}</div>
+                  <div style="display:flex; flex-direction:column; gap:6px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <span style="font-size:13px; font-weight:700;">{{ l.name }}</span>
+                      <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#3C82E6;">{{ l.time }}</span>
+                      <sc-if value="{{ l.marked }}" hint-placeholder-val="{{ false }}"><img src="assets/icons/bookmark.svg" style="width:14px; height:14px; filter:invert(62%) sepia(80%) saturate(1200%) hue-rotate(5deg);"></sc-if>
+                    </div>
+                    <div style="font-size:15px; line-height:1.55; font-weight:500; color:#001930; text-wrap:pretty;">{{ l.viPre }}<mark style="background:#FFF6DE; color:#001930; border-radius:3px; padding:0 2px;">{{ l.viHit }}</mark>{{ l.viPost }}</div>
+                    <div style="font-size:13px; line-height:1.5; font-weight:500; color:#6A7584; text-wrap:pretty;">{{ l.en }}</div>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="position:absolute; left:0; right:0; bottom:0; height:56px; background:linear-gradient(180deg, rgba(244,246,248,0), #F4F6F8);"></div>
+            </div>
+          </div>
+
+          <!-- right: AI summary -->
+          <div style="display:flex; flex-direction:column; gap:16px; min-height:0; overflow:hidden;">
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:14px; padding:20px; position:relative; overflow:hidden; box-shadow:0 1px 3px rgba(0,25,48,.08); display:flex; flex-direction:column; gap:12px;">
+              <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,#FFC814,#DCDCDC);"></div>
+              <div style="display:flex; align-items:center; gap:8px;"><img src="assets/icons/sparkle.svg" style="width:18px; height:18px;"><span style="font-size:16px; font-weight:700; letter-spacing:-.01em;">AI summary</span><div style="flex:1;"></div><img src="assets/icons/copy.svg" style="width:16px; height:16px; opacity:.6;"></div>
+              <div style="font-size:14px; line-height:1.6; font-weight:500; color:#001930; text-wrap:pretty;">The team reviewed sprint 38 progress. Backend finished 80% of the contacts API; frontend is 1 day behind due to the data-table redesign. Agreed: internal demo Wednesday, client demo Thursday 19 Sep. Main risk: API v2 docs not yet complete.</div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <span style="font-size:12px; font-weight:600; color:#38475B; background:#E6E8EB; border-radius:999px; padding:3px 10px;">sprint 38</span>
+                <span style="font-size:12px; font-weight:600; color:#38475B; background:#E6E8EB; border-radius:999px; padding:3px 10px;">client demo</span>
+                <span style="font-size:12px; font-weight:600; color:#38475B; background:#E6E8EB; border-radius:999px; padding:3px 10px;">API v2</span>
+              </div>
+            </div>
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:14px; padding:20px; box-shadow:0 1px 3px rgba(0,25,48,.08); display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; align-items:center; gap:8px;"><span style="font-size:16px; font-weight:700; letter-spacing:-.01em;">Action items</span><span style="background:#E7F0FD; color:#3C82E6; border-radius:999px; padding:1px 8px; font-size:12px; font-weight:600;">3</span><div style="flex:1;"></div><span style="font-size:12px; color:#3C82E6; font-weight:600;">Push to Smart List</span></div>
+              <sc-for list="{{ actions }}" as="a" hint-placeholder-count="3">
+                <div style="display:grid; grid-template-columns:18px 1fr auto; gap:10px; align-items:start; padding:10px 0; border-top:1px solid #ECEEF1;">
+                  <img src="assets/icons/checkbox-unchecked.svg" style="width:18px; height:18px;">
+                  <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:13px; font-weight:600; line-height:1.4;">{{ a.text }}</span><span style="font-size:12px; color:#6A7584;">{{ a.owner }} · {{ a.due }}</span></div>
+                  <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#3C82E6;">{{ a.at }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:14px; padding:20px; box-shadow:0 1px 3px rgba(0,25,48,.08); display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; align-items:center; gap:8px;"><img src="assets/icons/bookmark.svg" style="width:18px; height:18px;"><span style="font-size:16px; font-weight:700; letter-spacing:-.01em;">Bookmarks</span><span style="background:#E6E8EB; color:#38475B; border-radius:999px; padding:1px 8px; font-size:12px; font-weight:600;">2</span></div>
+              <div style="display:flex; gap:10px; font-size:13px; font-weight:500; line-height:1.5;"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#3C82E6; margin-top:3px;">07:42</span><span>Decision to move the client demo to Thursday</span></div>
+              <div style="display:flex; gap:10px; font-size:13px; font-weight:500; line-height:1.5;"><span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#3C82E6; margin-top:3px;">25:10</span><span>Keep the new data-table design</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 1d — History ================= -->
+    <div id="1d" data-screen-label="1d History" style="display:flex; flex-direction:column; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:12px; font-weight:700; color:#fff; background:#001930; border-radius:6px; padding:3px 8px;">1d</span>
+        <span style="font-size:13px; font-weight:600; color:#38475B;">Meeting history</span>
+      </div>
+      <div style="width:1440px; height:900px; background:#F4F6F8; border-radius:16px; box-shadow:0 12px 28px rgba(0,25,48,.14); overflow:hidden; display:grid; grid-template-columns:64px 1fr; grid-template-rows:60px 1fr;">
+        <div style="grid-row:1 / span 2; background:#001930; display:flex; flex-direction:column; align-items:center; padding:14px 0; gap:6px;">
+          <img src="assets/brand/favicon-white.svg" style="width:30px; height:30px; margin-bottom:14px;">
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/microphone.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; background:rgba(60,130,230,.22); display:grid; place-items:center; box-shadow:inset 3px 0 0 #3C82E6;"><img src="assets/icons/history.svg" style="width:20px; height:20px; filter:invert(1);"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/bookmark.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/search.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="flex:1;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/settings.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(160deg,#FFC814 8%,#DCDCDC 78%); display:grid; place-items:center; font-size:12px; font-weight:700; color:#001930;">HL</div>
+        </div>
+        <div style="background:#fff; border-bottom:1px solid #ECEEF1; display:flex; align-items:center; padding:0 24px; gap:12px;">
+          <span style="font-size:15px; font-weight:700;">Meeting history</span>
+          <div style="flex:1;"></div>
+          <div style="display:flex; align-items:center; gap:8px; background:linear-gradient(180deg,#FFC814,#DCDCDC); color:#001930; border-radius:999px; padding:9px 18px; font-size:13px; font-weight:700;"><img src="assets/icons/record.svg" style="width:16px; height:16px;"> Start recording</div>
+        </div>
+        <div style="padding:24px 32px; display:flex; flex-direction:column; gap:16px; overflow:hidden;">
+          <!-- search caption + AI toggle -->
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; gap:10px; align-items:center;">
+              <div style="flex:1; display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #3C82E6; box-shadow:0 0 0 3px rgba(60,130,230,.15); border-radius:12px; padding:12px 16px;">
+                <img src="assets/icons/sparkle.svg" style="width:18px; height:18px; filter:invert(48%) sepia(90%) saturate(1800%) hue-rotate(200deg);">
+                <span style="font-size:15px; font-weight:500;">what did we promise the client about the demo date?</span>
+                <span style="width:1px; height:18px; background:#3C82E6;"></span>
+                <div style="flex:1;"></div>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#9BA3AD; background:#E6E8EB; border-radius:4px; padding:1px 5px;">⌘K</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #CDD1D6; border-radius:999px; padding:9px 14px;">
+                <span style="font-size:13px; font-weight:600; color:#38475B;">Keyword</span>
+                <div style="width:36px; height:20px; border-radius:999px; background:#3C82E6; position:relative;"><div style="position:absolute; top:2px; left:18px; width:16px; height:16px; border-radius:50%; background:#fff;"></div></div>
+                <span style="display:flex; align-items:center; gap:4px; font-size:13px; font-weight:600; color:#3C82E6;"><img src="assets/icons/sparkle.svg" style="width:14px; height:14px; filter:invert(48%) sepia(90%) saturate(1800%) hue-rotate(200deg);"> Ask AI</span>
+              </div>
+            </div>
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:12px; padding:14px 18px; display:grid; grid-template-columns:1fr auto; gap:16px; align-items:start; position:relative; overflow:hidden; box-shadow:0 1px 3px rgba(0,25,48,.08);">
+              <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,#FFC814,#DCDCDC);"></div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="font-size:14px; line-height:1.5; font-weight:500; text-wrap:pretty;">The team <mark style="background:#FFF6DE; color:#001930; border-radius:3px; padding:0 2px;">committed to a client demo on Thursday 19 Sep</mark>, after the internal demo on Wednesday. Earlier, in the Vietbank sync on 14 Sep, the date mentioned was "end of next week".</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:#3C82E6; background:#E7F0FD; border-radius:999px; padding:3px 10px;">Sprint 38 sync · <span style="font-family:'JetBrains Mono',monospace; font-weight:500;">14:13</span></span>
+                  <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:#3C82E6; background:#E7F0FD; border-radius:999px; padding:3px 10px;">Vietbank client sync · <span style="font-family:'JetBrains Mono',monospace; font-weight:500;">32:05</span></span>
+                </div>
+              </div>
+              <span style="font-size:12px; color:#6A7584; font-weight:500; white-space:nowrap;">2 meetings · 0.8s</span>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:16px;">
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:4px;"><span style="font-size:12px; color:#6A7584; font-weight:600;">This week</span><span style="font-size:28px; font-weight:700; letter-spacing:-.02em;">7 <span style="font-size:13px; color:#6A7584; font-weight:500; letter-spacing:0;">meetings</span></span></div>
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:4px;"><span style="font-size:12px; color:#6A7584; font-weight:600;">Recorded</span><span style="font-size:28px; font-weight:700; letter-spacing:-.02em;">5h 12m</span></div>
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:4px;"><span style="font-size:12px; color:#6A7584; font-weight:600;">Open action items</span><span style="font-size:28px; font-weight:700; letter-spacing:-.02em; color:#3C82E6;">11</span></div>
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:4px;"><span style="font-size:12px; color:#6A7584; font-weight:600;">Bookmarked</span><span style="font-size:28px; font-weight:700; letter-spacing:-.02em; display:flex; align-items:center; gap:8px;"><img src="assets/icons/bookmark.svg" style="width:22px; height:22px;"> 9</span></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="font-size:13px; font-weight:600; color:#fff; background:#001930; border-radius:999px; padding:6px 14px;">All</div>
+            <div style="font-size:13px; font-weight:600; color:#38475B; border:1px solid #CDD1D6; border-radius:999px; padding:6px 14px;">Has action items</div>
+            <div style="font-size:13px; font-weight:600; color:#38475B; border:1px solid #CDD1D6; border-radius:999px; padding:6px 14px;">Bookmarked</div>
+            <div style="font-size:13px; font-weight:600; color:#38475B; border:1px solid #CDD1D6; border-radius:999px; padding:6px 14px;">Shared with me</div>
+            <div style="flex:1;"></div>
+            <div style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:#38475B;"><img src="assets/icons/arrow-up-down.svg" style="width:16px; height:16px;"> Newest</div>
+          </div>
+          <div style="background:#fff; border:1px solid #ECEEF1; border-radius:14px; overflow:hidden; box-shadow:0 1px 3px rgba(0,25,48,.08);">
+            <div style="display:grid; grid-template-columns:1fr 160px 120px 140px 130px 40px; gap:16px; padding:10px 20px; border-bottom:1px solid #ECEEF1; font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#6A7584;">
+              <span>Meeting</span><span>Speakers</span><span>Duration</span><span>Action items</span><span>Status</span><span></span>
+            </div>
+            <sc-for list="{{ meetings }}" as="m" hint-placeholder-count="6">
+              <div style="display:grid; grid-template-columns:1fr 160px 120px 140px 130px 40px; gap:16px; align-items:center; padding:14px 20px; border-bottom:1px solid #ECEEF1;" style-hover="background:rgba(60,130,230,.06);">
+                <div style="display:flex; flex-direction:column; gap:3px;"><span style="font-size:14px; font-weight:600;">{{ m.title }}</span><span style="font-size:12px; color:#6A7584; font-weight:500;">{{ m.date }}</span></div>
+                <div style="display:flex;">
+                  <sc-for list="{{ m.people }}" as="p" hint-placeholder-count="3">
+                    <div style="width:26px; height:26px; border-radius:50%; border:2px solid #fff; margin-left:-6px; display:grid; place-items:center; font-size:9px; font-weight:700; color:#fff; background:{{ p.color }};">{{ p.i }}</div>
+                  </sc-for>
+                </div>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color:#38475B;">{{ m.dur }}</span>
+                <span style="font-size:13px; font-weight:600; color:#38475B;">{{ m.actions }}</span>
+                <span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:{{ m.statusColor }}; background:{{ m.statusBg }}; border-radius:999px; padding:3px 10px; width:fit-content;">{{ m.status }}</span>
+                <img src="assets/icons/more.svg" style="width:18px; height:18px; opacity:.5;">
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 1e — Settings ================= -->
+    <div id="1e" data-screen-label="1e Settings" style="display:flex; flex-direction:column; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:12px; font-weight:700; color:#fff; background:#001930; border-radius:6px; padding:3px 8px;">1e</span>
+        <span style="font-size:13px; font-weight:600; color:#38475B;">Settings — language, microphone, privacy</span>
+      </div>
+      <div style="width:1440px; height:900px; background:#F4F6F8; border-radius:16px; box-shadow:0 12px 28px rgba(0,25,48,.14); overflow:hidden; display:grid; grid-template-columns:64px 1fr; grid-template-rows:60px 1fr;">
+        <div style="grid-row:1 / span 2; background:#001930; display:flex; flex-direction:column; align-items:center; padding:14px 0; gap:6px;">
+          <img src="assets/brand/favicon-white.svg" style="width:30px; height:30px; margin-bottom:14px;">
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/microphone.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/history.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/bookmark.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; display:grid; place-items:center;"><img src="assets/icons/search.svg" style="width:20px; height:20px; filter:invert(1); opacity:.7;"></div>
+          <div style="flex:1;"></div>
+          <div style="width:40px; height:40px; border-radius:10px; background:rgba(60,130,230,.22); display:grid; place-items:center; box-shadow:inset 3px 0 0 #3C82E6;"><img src="assets/icons/settings.svg" style="width:20px; height:20px; filter:invert(1);"></div>
+          <div style="width:32px; height:32px; border-radius:50%; background:linear-gradient(160deg,#FFC814 8%,#DCDCDC 78%); display:grid; place-items:center; font-size:12px; font-weight:700; color:#001930;">HL</div>
+        </div>
+        <div style="background:#fff; border-bottom:1px solid #ECEEF1; display:flex; align-items:center; padding:0 24px; gap:12px;">
+          <span style="font-size:15px; font-weight:700;">Settings</span>
+          <div style="flex:1;"></div>
+          <span style="font-size:12px; color:#6A7584; font-weight:500;">Version 3.2.0 · Auto-saved</span>
+        </div>
+        <div style="padding:20px 32px; display:grid; grid-template-columns:240px 1fr; gap:28px; min-height:0; overflow:hidden;">
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; background:rgba(60,130,230,.12); color:#3C82E6; font-size:13px; font-weight:600; box-shadow:inset 3px 0 0 #3C82E6;"><img src="assets/icons/globe.svg" style="width:18px; height:18px; filter:invert(48%) sepia(90%) saturate(1800%) hue-rotate(200deg);"> Language &amp; translation</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; font-size:13px; font-weight:600; color:#38475B;"><img src="assets/icons/volume.svg" style="width:18px; height:18px; opacity:.7;"> Speech recognition (ElevenLabs)</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; font-size:13px; font-weight:600; color:#38475B;"><img src="assets/icons/microphone.svg" style="width:18px; height:18px; opacity:.7;"> Microphone (browser)</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; font-size:13px; font-weight:600; color:#38475B;"><img src="assets/icons/person-multiple.svg" style="width:18px; height:18px; opacity:.7;"> Speaker identification</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; font-size:13px; font-weight:600; color:#38475B;"><img src="assets/icons/sparkle.svg" style="width:18px; height:18px; opacity:.7;"> AI summary</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; font-size:13px; font-weight:600; color:#38475B;"><img src="assets/icons/shield-keyhole.svg" style="width:18px; height:18px; opacity:.7;"> Privacy &amp; storage</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; font-size:13px; font-weight:600; color:#38475B;"><img src="assets/icons/text-font-size.svg" style="width:18px; height:18px; opacity:.7;"> Caption display</div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:20px; max-width:760px;">
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:14px; box-shadow:0 1px 3px rgba(0,25,48,.08); overflow:hidden;">
+              <div style="padding:18px 22px; border-bottom:1px solid #ECEEF1; display:flex; flex-direction:column; gap:4px;"><span style="font-size:16px; font-weight:700; letter-spacing:-.01em;">Language &amp; translation</span><span style="font-size:13px; color:#6A7584; font-weight:500;">Recognition language and the parallel translation shown under each line.</span></div>
+              <div style="display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:16px 22px; border-bottom:1px solid #ECEEF1;">
+                <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">Primary spoken language</span><span style="font-size:12px; color:#6A7584;">Auto-detects when a speaker switches language</span></div>
+                <div style="display:flex; align-items:center; gap:8px; border:1px solid #CDD1D6; border-radius:8px; padding:8px 12px; font-size:13px; font-weight:600; min-width:200px;">English<div style="flex:1;"></div><img src="assets/icons/chevron-down.svg" style="width:16px; height:16px;"></div>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:16px 22px;">
+                <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">Bilingual translation</span><span style="font-size:12px; color:#6A7584;">Shows a translation under each line, ~1.5s delay</span></div>
+                <div style="display:flex; align-items:center; gap:12px;"><div style="display:flex; align-items:center; gap:8px; border:1px solid #CDD1D6; border-radius:8px; padding:8px 12px; font-size:13px; font-weight:600; min-width:160px;">Tiếng Việt<div style="flex:1;"></div><img src="assets/icons/chevron-down.svg" style="width:16px; height:16px;"></div><div style="width:40px; height:22px; border-radius:999px; background:#3C82E6; position:relative;"><div style="position:absolute; top:2px; left:20px; width:18px; height:18px; border-radius:50%; background:#fff;"></div></div></div>
+              </div>
+
+            </div>
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:14px; box-shadow:0 1px 3px rgba(0,25,48,.08); overflow:hidden;">
+              <div style="padding:18px 22px; border-bottom:1px solid #ECEEF1; display:flex; align-items:center; gap:10px;"><img src="assets/icons/volume.svg" style="width:18px; height:18px;"><span style="font-size:16px; font-weight:700; letter-spacing:-.01em;">Speech recognition — ElevenLabs API</span><div style="flex:1;"></div><span style="display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:#1F9E6F; background:#E4F5EE; border-radius:999px; padding:3px 10px;"><span style="width:6px; height:6px; border-radius:50%; background:#1F9E6F;"></span> Connected</span></div>
+              <div style="display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:14px 22px; border-bottom:1px solid #ECEEF1;">
+                <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">API key</span><span style="font-size:12px; color:#6A7584;">Stored encrypted on the PrivOS server. Admins only.</span></div>
+                <div style="display:flex; align-items:center; gap:8px;"><div style="display:flex; align-items:center; gap:8px; border:1px solid #CDD1D6; border-radius:8px; padding:8px 12px; font-family:'JetBrains Mono',monospace; font-size:13px; color:#38475B; min-width:260px;">sk_••••••••••••••••••••7f3a<div style="flex:1;"></div><img src="assets/icons/copy.svg" style="width:16px; height:16px; opacity:.6;"></div><div style="border:1px solid #CDD1D6; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;">Test</div></div>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:16px 22px; border-bottom:1px solid #ECEEF1;">
+                <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">Model</span><span style="font-size:12px; color:#6A7584;">Realtime speech-to-text · 5h 12m / 50h used this month</span></div>
+                <div style="display:flex; align-items:center; gap:8px; border:1px solid #CDD1D6; border-radius:8px; padding:8px 12px; font-size:13px; font-weight:600; min-width:200px;">Scribe v1 (realtime)<div style="flex:1;"></div><img src="assets/icons/chevron-down.svg" style="width:16px; height:16px;"></div>
+              </div>
+            </div>
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:14px; box-shadow:0 1px 3px rgba(0,25,48,.08); overflow:hidden;">
+              <div style="padding:18px 22px; border-bottom:1px solid #ECEEF1; display:flex; flex-direction:column; gap:4px;"><span style="font-size:16px; font-weight:700; letter-spacing:-.01em;">Microphone (browser)</span><span style="font-size:13px; color:#6A7584; font-weight:500;">The web app uses the browser microphone on the opener's device. The device is chosen when recording starts, not fixed here.</span></div>
+              <div style="display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:16px 22px;">
+                <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">Microphone permission in this browser</span><span style="font-size:12px; color:#6A7584;">Chrome · privos.local — allowed</span></div>
+                <div style="display:flex; align-items:center; gap:12px;">{{ wave }}<div style="border:1px solid #CDD1D6; border-radius:999px; padding:8px 14px; font-size:13px; font-weight:600;">Test microphone</div></div>
+              </div>
+            </div>
+            <div style="background:#fff; border:1px solid #ECEEF1; border-radius:14px; box-shadow:0 1px 3px rgba(0,25,48,.08); overflow:hidden; position:relative;">
+              <div style="position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,#FFC814,#DCDCDC);"></div>
+              <div style="padding:18px 22px; border-bottom:1px solid #ECEEF1; display:flex; align-items:center; gap:10px;"><img src="assets/icons/shield-keyhole.svg" style="width:18px; height:18px;"><span style="font-size:16px; font-weight:700; letter-spacing:-.01em;">Privacy &amp; storage</span><div style="flex:1;"></div><span style="font-size:12px; font-weight:600; color:#38475B; background:#E6E8EB; border-radius:999px; padding:3px 10px;">Audio → ElevenLabs · transcript stored on PrivOS</span></div>
+              <div style="display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:16px 22px; border-bottom:1px solid #ECEEF1;">
+                <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">Keep original audio recording</span><span style="font-size:12px; color:#6A7584;">Off: keep transcript only, delete audio after processing</span></div>
+                <div style="width:40px; height:22px; border-radius:999px; background:#CDD1D6; position:relative;"><div style="position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:#fff;"></div></div>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:16px 22px;">
+                <div style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">Auto-delete transcripts after</span><span style="font-size:12px; color:#6A7584;">Applies to meetings that are not pinned</span></div>
+                <div style="display:flex; align-items:center; gap:8px; border:1px solid #CDD1D6; border-radius:8px; padding:8px 12px; font-size:13px; font-weight:600; min-width:160px;">90 days<div style="flex:1;"></div><img src="assets/icons/chevron-down.svg" style="width:16px; height:16px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showTranslation&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Caption&quot;},&quot;stageCaptionSize&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;small&quot;,&quot;medium&quot;,&quot;large&quot;],&quot;default&quot;:&quot;medium&quot;,&quot;tsType&quot;:&quot;'small'|'medium'|'large'&quot;,&quot;section&quot;:&quot;Caption&quot;}}">
+class Component extends DCLogic {
+  state = { sec: 14 * 60 + 20, title: 'Sprint 38 sync — Product team', editing: null };
+  componentDidMount() { this.t = setInterval(() => this.setState(s => ({ sec: s.sec + 1 })), 1000); }
+  componentWillUnmount() { clearInterval(this.t); }
+  renderVals() {
+    const p = this.props;
+    const s = this.state.sec, mm = String(Math.floor(s / 60)).padStart(2, '0'), ss = String(s % 60).padStart(2, '0');
+    const h = React.createElement;
+    const bars = (color) => h('div', { style: { display: 'flex', alignItems: 'center', gap: 2, height: 16 } },
+      [0, 1, 2, 3, 4].map(i => h('div', { key: i, style: { width: 3, height: 16, borderRadius: 2, background: color, transformOrigin: 'center', animation: `wave ${0.7 + i * 0.13}s ease-in-out ${i * 0.1}s infinite` } })));
+    const lines = [
+      { initials: 'QH', color: '#1F9E6F', name: 'Quinn Harris', time: '14:02', vi: 'Backend has finished about 80% of the contacts API; room-scoped permissions are still pending review.', en: 'Backend đã hoàn thành khoảng 80% API danh bạ, còn phần phân quyền theo phòng thì đang chờ review.', viPre: 'Backend has finished about 80% of the contacts API; room-scoped permissions are still pending review.', viHit: '', viPost: '' },
+      { initials: 'MA', color: '#E5A800', name: 'Mia Adams', time: '14:09', vi: 'Frontend is about a day behind because the data-table design changed mid-sprint. I suggest we keep the new one.', en: 'Frontend đang chậm khoảng một ngày vì thiết kế bảng dữ liệu đổi giữa sprint. Mình đề xuất giữ bản mới.', viPre: 'Frontend is about a day behind because the data-table design changed mid-sprint. I suggest we keep the new one.', viHit: '', viPost: '' },
+      { initials: 'HL', color: '#38475B', name: 'Henry Lowe', time: '14:13', marked: true, vi: 'Agreed. Then before the client demo we should run an internal demo on Wednesday.', en: 'Đồng ý. Vậy trước khi demo cho khách mình nên có một buổi demo nội bộ vào thứ Tư.', viPre: 'Agreed. Then before the client ', viHit: 'demo', viPost: ' we should run an internal demo on Wednesday.' },
+      { initials: 'QH', color: '#1F9E6F', name: 'Quinn Harris', time: '14:17', vi: "I'll try to finish the API v2 docs before Wednesday so frontend can integrate in time.", en: 'Tài liệu API v2 mình sẽ cố xong trước thứ Tư để bên frontend tích hợp kịp.', viPre: "I'll try to finish the API v2 docs before Wednesday so frontend can integrate in time.", viHit: '', viPost: '' },
+    ];
+    const actions = [
+      { text: 'Send the demo schedule to the client', owner: 'Taylor Lin', due: 'Tue 18 Sep', at: '07:42' },
+      { text: 'Finish API v2 documentation', owner: 'Quinn Harris', due: 'Wed 19 Sep', at: '14:17' },
+      { text: 'Update the data table to the new design', owner: 'Mia Adams', due: 'Wed 19 Sep', at: '14:09' },
+    ];
+    const P = (i, color) => ({ i, color });
+    const meetings = [
+      { title: 'Sprint 38 sync — Product team', date: 'Today · From 09:30', people: [P('TL', '#3C82E6'), P('QH', '#1F9E6F'), P('MA', '#E5A800'), P('HL', '#38475B')], dur: '42:08', actions: '3 open', status: 'Summarized', statusColor: '#1F9E6F', statusBg: '#E4F5EE' },
+      { title: 'Q3 infrastructure security review', date: 'Yesterday · From 15:00', people: [P('HL', '#38475B'), P('NV', '#2563C9'), P('TL', '#3C82E6')], dur: '1:05:30', actions: '5 open', status: 'Summarized', statusColor: '#1F9E6F', statusBg: '#E4F5EE' },
+      { title: 'Backend candidate interview — round 2', date: '15 Sep · · From 10:00', people: [P('QH', '#1F9E6F'), P('HL', '#38475B')], dur: '48:12', actions: '—', status: 'Private', statusColor: '#38475B', statusBg: '#E6E8EB' },
+      { title: 'Vietbank client sync', date: '14 Sep · · From 14:00', people: [P('TL', '#3C82E6'), P('MA', '#E5A800'), P('KH', '#6A7584')], dur: '55:41', actions: '2 open', status: 'Processing', statusColor: '#E5A800', statusBg: '#FFF6DE' },
+      { title: 'Sprint 37 retro', date: '12 Sep · · From 16:30', people: [P('TL', '#3C82E6'), P('QH', '#1F9E6F'), P('MA', '#E5A800'), P('HL', '#38475B')], dur: '38:20', actions: '1 open', status: 'Summarized', statusColor: '#1F9E6F', statusBg: '#E4F5EE' },
+      { title: 'MCP Apps module kickoff', date: '11 Sep · · From 09:00', people: [P('HL', '#38475B'), P('NV', '#2563C9')], dur: '1:12:04', actions: '0 open', status: 'Summarized', statusColor: '#1F9E6F', statusBg: '#E4F5EE' },
+    ];
+    const sizes = { small: '30px', medium: '38px', large: '46px' };
+    const ed = this.state.editing;
+    const startEdit = (k) => () => this.setState({ editing: k });
+    return {
+      title: this.state.title,
+      titleSize: Math.max(this.state.title.length + 2, 12),
+      editA: ed === 'a', viewA: ed !== 'a', editB: ed === 'b', viewB: ed !== 'b', editC: ed === 'c', viewC: ed !== 'c',
+      startEditA: startEdit('a'), startEditB: startEdit('b'), startEditC: startEdit('c'),
+      onTitleChange: (e) => this.setState({ title: e.target.value }),
+      onTitleKey: (e) => { if (e.key === 'Enter' || e.key === 'Escape') this.setState({ editing: null }); },
+      stopEdit: () => this.setState({ editing: null }),
+      timer: `${mm}:${ss}`,
+      recDot: h('span', { style: { width: 8, height: 8, borderRadius: '50%', background: '#DB4B4B', display: 'inline-block', animation: 'pulse 1.2s ease-in-out infinite' } }),
+      cursor: h('span', { style: { display: 'inline-block', width: 2, height: '1em', background: '#3C82E6', verticalAlign: 'text-bottom', marginLeft: 3, animation: 'blink 1s step-end infinite' } }),
+      wave: bars('#3C82E6'),
+      waveDark: bars('#6BA3F0'),
+      showTranslation: p.showTranslation ?? true,
+      stageSize: sizes[p.stageCaptionSize ?? 'medium'],
+      lines, actions, meetings,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+{
+  "app.title": "Meeting Agent",
+
+  "rail.new": "New meeting",
+  "rail.history": "History",
+  "rail.bookmarks": "Bookmarks",
+  "rail.search": "Search",
+  "rail.settings": "Settings",
+
+  "topbar.title": "Meeting Agent",
+  "topbar.theme.toggle": "Toggle light/dark theme",
+  "topbar.language.label": "Language",
+
+  "screen.new.title": "Start a meeting",
+  "screen.new.subtitle": "Record and generate live captions for the meeting happening in this room.",
+
+  "screen.live.title": "No meeting is recording",
+  "screen.live.subtitle": "Once a meeting starts recording, its live captions will appear here.",
+
+  "screen.detail.title": "No meeting selected",
+  "screen.detail.subtitle": "Pick a meeting from history to view its transcript and summary.",
+
+  "screen.history.title": "No meetings yet",
+  "screen.history.subtitle": "Meetings recorded in this room will show up here.",
+
+  "screen.settings.title": "Settings",
+  "screen.settings.subtitle": "Manage the speech-to-text provider and storage preferences.",
+
+  "banner.botCredential.notConfigured": "The installation bot is not configured yet. Some features will not work until an admin sets it up.",
+  "banner.botCredential.invalid": "The installation bot's credential is invalid. Please contact an admin.",
+  "banner.botCredential.hub-unreachable": "Could not reach the Hub to check the installation bot. Please try again later.",
+  "banner.dismiss": "Dismiss notification"
+}

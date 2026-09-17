@@ -1,0 +1,2 @@
+- [Soniox STT switch](meeting-agent-soniox-switch.md) — single-vendor Soniox rt+async, ElevenLabs fallback-only behind a P1 A/B gate, new Phase 5 live naming
+- [Plan file conventions](meeting-agent-plan-file-conventions.md) — Vietnamese prose/English identifiers, ≤260 lines per file, mandatory consistency sweep

@@ -1,0 +1,33 @@
+{
+  "app.title": "Meeting Agent",
+
+  "rail.new": "Cuộc họp mới",
+  "rail.history": "Lịch sử",
+  "rail.bookmarks": "Đánh dấu",
+  "rail.search": "Tìm kiếm",
+  "rail.settings": "Cài đặt",
+
+  "topbar.title": "Meeting Agent",
+  "topbar.theme.toggle": "Đổi giao diện sáng/tối",
+  "topbar.language.label": "Ngôn ngữ",
+
+  "screen.new.title": "Bắt đầu một cuộc họp",
+  "screen.new.subtitle": "Ghi âm và tạo phụ đề trực tiếp cho cuộc họp đang diễn ra trong phòng này.",
+
+  "screen.live.title": "Chưa có cuộc họp đang ghi",
+  "screen.live.subtitle": "Khi một cuộc họp bắt đầu ghi, phụ đề trực tiếp sẽ hiện ở đây.",
+
+  "screen.detail.title": "Chưa chọn cuộc họp",
+  "screen.detail.subtitle": "Chọn một cuộc họp từ lịch sử để xem transcript và tóm tắt.",
+
+  "screen.history.title": "Chưa có cuộc họp nào",
+  "screen.history.subtitle": "Các cuộc họp đã ghi trong phòng này sẽ xuất hiện ở đây.",
+
+  "screen.settings.title": "Cài đặt",
+  "screen.settings.subtitle": "Quản lý nhà cung cấp nhận diện giọng nói và tuỳ chọn lưu trữ.",
+
+  "banner.botCredential.notConfigured": "Bot cài đặt chưa được cấu hình. Một số tính năng sẽ không hoạt động cho tới khi quản trị viên thiết lập.",
+  "banner.botCredential.invalid": "Thông tin xác thực của bot cài đặt không hợp lệ. Vui lòng liên hệ quản trị viên.",
+  "banner.botCredential.hub-unreachable": "Không thể kết nối tới Hub để kiểm tra bot cài đặt. Vui lòng thử lại sau.",
+  "banner.dismiss": "Đóng thông báo"
+}

@@ -1,0 +1,50 @@
+{
+  "name": "ai.privos.meeting-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "title": "Meeting Agent",
+  "description": "Ứng dụng MCP PrivOS ghi âm cuộc họp offline: live caption song ngữ kèm nhãn người nói, nhận diện người nói bằng voiceprint, tóm tắt bằng Hub AI và lưu transcript vào PrivOS Files.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/techcomthanh/meeting-agent"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "PRIVOS_TRANSPORT=relay PRIVOS_DEV_UI=1 tsx src/server/index.ts",
+    "start": "tsx src/server/index.ts",
+    "start:standalone": "NODE_ENV=production npm start",
+    "pair": "tsx scripts/pair.ts",
+    "build": "vite build && tsx scripts/generate-manifest.ts && npm run manifest:lint",
+    "manifest:lint": "node scripts/lint-manifest.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "preflight": "tsx scripts/preflight.ts",
+    "package": "bash scripts/package-source.sh",
+    "verify:fast-pr": "npm run typecheck && npm run test && npm run build && npm run preflight"
+  },
+  "dependencies": {
+    "@privos_ai/app-server": "^0.8.4",
+    "dotenv": "^17.3.1",
+    "express": "^4.21.2",
+    "tsx": "^4.19.2",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@privos_ai/app-react": "^0.5.0",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/ws": "^8.18.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vitest": "^2.1.8"
+  }
+}

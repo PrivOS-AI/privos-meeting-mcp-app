@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 3,
+  "kind": "mcp-app",
+  "name": "ai.privos.meeting-agent",
+  "version": "0.1.0",
+  "title": "Meeting Agent",
+  "description": "Ứng dụng MCP PrivOS ghi âm cuộc họp offline: live caption song ngữ kèm nhãn người nói, nhận diện người nói bằng voiceprint, tóm tắt bằng Hub AI và lưu transcript vào PrivOS Files.",
+  "icon": "/public/icon.svg",
+  "author": { "name": "PrivOS AI", "email": "dev@privos.ai", "url": "https://privos.ai" },
+  "homepage": "https://privos.ai",
+  "repository": "https://github.com/techcomthanh/meeting-agent",
+  "port": 3012,
+  "stateless": false,
+  "capabilities": { "verifiedActor": true },
+  "agentBot": { "name": "Trợ lý Cuộc họp", "slug": "tro-ly-cuoc-hop" },
+  "resources": { "memoryMb": 2048, "cpus": 2, "tmpSizeMb": 2048 },
+  "dataPolicy": {
+    "version": "2026-09-17",
+    "externalProcessing": true,
+    "retention": "Audio của người tham dự được stream và upload sang nhà cung cấp STT đang chọn trong Settings (Soniox: realtime zero-retention, async tự xoá sau 30 ngày; hoặc ElevenLabs). Transcript và tóm tắt được xử lý bởi Hub AI trong workspace và lưu trong Files của phòng; audio gốc xoá sau xử lý nếu không bật Keep original audio."
+  },
+  "permissions": [
+    {
+      "scope": "basic:information",
+      "requirement": "required",
+      "context": "room",
+      "executionContext": "both",
+      "feature": "core.context",
+      "reason": "Xác định người dùng và phòng đang mở để nạp đúng dữ liệu cuộc họp."
+    },
+    {
+      "scope": "files:read",
+      "requirement": "required",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.files.read",
+      "reason": "Đọc và stream lại audio, transcript và tóm tắt đã lưu trong Files của phòng."
+    },
+    {
+      "scope": "files:write",
+      "requirement": "required",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.files.write",
+      "reason": "Upload các part audio, audio ghép, transcript và tóm tắt vào Files của phòng."
+    },
+    {
+      "scope": "db:schema:read",
+      "requirement": "required",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.db.schema.read",
+      "reason": "Kiểm tra schema các collection App DB trước khi đăng ký."
+    },
+    {
+      "scope": "db:schema:write",
+      "requirement": "required",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.db.schema.write",
+      "reason": "Đăng ký các collection App DB (cuộc họp, người nói, hồ sơ giọng, job xử lý)."
+    },
+    {
+      "scope": "db:read",
+      "requirement": "required",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.db.read",
+      "reason": "Đọc danh sách cuộc họp, người nói và trạng thái job để hiển thị."
+    },
+    {
+      "scope": "db:write",
+      "requirement": "required",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.db.write",
+      "reason": "Ghi cuộc họp, người nói, hồ sơ giọng đã mã hoá, action item và trạng thái job."
+    },
+    {
+      "scope": "sandbox:generate",
+      "requirement": "required",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.ai.summary",
+      "reason": "Tóm tắt và dịch theo lô bằng Hub AI, không gửi transcript ra bên thứ ba."
+    },
+    {
+      "scope": "rooms:read",
+      "requirement": "optional",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.rooms.read",
+      "reason": "Hiển thị danh sách thành viên phòng khi gán tên người nói.",
+      "degradedBehavior": "Người dùng gõ tên tự do thay vì chọn từ danh sách thành viên."
+    },
+    {
+      "scope": "lists:read",
+      "requirement": "optional",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.lists.read",
+      "reason": "Đọc Smart List để đẩy action item.",
+      "degradedBehavior": "Ẩn nút Push to Smart List."
+    },
+    {
+      "scope": "lists:write",
+      "requirement": "optional",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.lists.write",
+      "reason": "Tạo và ghi item vào Smart List \"Meeting action items\".",
+      "degradedBehavior": "Ẩn nút Push to Smart List."
+    },
+    {
+      "scope": "bot:room:join",
+      "requirement": "optional",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.bot.join",
+      "reason": "meeting_bootstrap thêm bot cài đặt vào phòng để ghi Files.",
+      "degradedBehavior": "Nhờ quản trị viên thêm bot vào phòng thủ công; xử lý tạm dừng tới khi bot vào phòng."
+    },
+    {
+      "scope": "bot:identity:read",
+      "requirement": "optional",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.bot.identity",
+      "reason": "Đọc danh tính bot để kiểm tra credential và hiển thị trạng thái.",
+      "degradedBehavior": "Banner hướng dẫn cấu hình credential bot."
+    }
+  ],
+  "tools": [
+    {
+      "name": "meeting_agent",
+      "title": "Meeting Agent",
+      "description": "Mở ứng dụng ghi âm và xem lại cuộc họp trong phòng này.",
+      "inputSchema": { "type": "object", "properties": { "roomId": { "type": "string" } } },
+      "_meta": {
+        "ui": {
+          "resourceUri": "ui://meeting-agent/app.html",
+          "hideAiChat": true,
+          "permissions": ["microphone", "screen-wake-lock"],
+          "csp": {
+            "connect-src": ["wss://stt-rt.soniox.com", "wss://api.elevenlabs.io", "<PRIVOS_FILES_ORIGIN>"],
+            "media-src": ["<PRIVOS_FILES_ORIGIN>"]
+          }
+        }
+      }
+    },
+    {
+      "name": "meeting_agent_bot_credential_check",
+      "title": "Kiểm tra credential bot",
+      "description": "Kiểm tra thông tin xác thực của bot cài đặt với Hub.",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "meeting_bootstrap",
+      "title": "Khởi tạo dữ liệu phòng",
+      "description": "Đăng ký schema App DB, ghi nhận phòng và đảm bảo bot là thành viên phòng.",
+      "inputSchema": { "type": "object", "required": ["roomId"], "properties": { "roomId": { "type": "string" } } }
+    },
+    {
+      "name": "meeting_stt_status",
+      "title": "Trạng thái nhận dạng giọng nói",
+      "description": "Trạng thái của cả hai nhà cung cấp STT để quản trị viên so sánh.",
+      "inputSchema": { "type": "object", "properties": {} }
+    }
+  ],
+  "env": [
+    { "key": "PORT", "description": "Cổng nghe của app (mặc định 3012).", "required": false, "secret": false, "default": "3012" },
+    { "key": "SONIOX_API_KEY", "description": "Khoá API Soniox. Bắt buộc nếu Soniox là nhà cung cấp đang chọn.", "required": false, "secret": true },
+    { "key": "ELEVENLABS_API_KEY", "description": "Khoá API ElevenLabs. Bắt buộc nếu ElevenLabs là nhà cung cấp đang chọn.", "required": false, "secret": true },
+    { "key": "STT_REALTIME_PROVIDER", "description": "Nhà cung cấp realtime mặc định: soniox | elevenlabs.", "required": false, "secret": false, "default": "soniox" },
+    { "key": "STT_ASYNC_PROVIDER", "description": "Nhà cung cấp async mặc định: soniox | elevenlabs.", "required": false, "secret": false, "default": "soniox" },
+    { "key": "SONIOX_RT_MODEL", "description": "Model realtime của Soniox.", "required": false, "secret": false, "default": "stt-rt-v5" },
+    { "key": "SONIOX_ASYNC_MODEL", "description": "Model async của Soniox.", "required": false, "secret": false, "default": "stt-async-v5" },
+    { "key": "ELEVENLABS_REALTIME_MODEL", "description": "Model realtime của ElevenLabs.", "required": false, "secret": false, "default": "scribe_v2_realtime" },
+    { "key": "ELEVENLABS_BATCH_MODEL", "description": "Model batch của ElevenLabs.", "required": false, "secret": false, "default": "scribe_v2" },
+    { "key": "ELEVENLABS_DIARIZATION_THRESHOLD", "description": "Ngưỡng diarization của elevenlabs-batch.", "required": false, "secret": false, "default": "0.22" },
+    { "key": "SONIOX_TEMP_KEY_TTL_SEC", "description": "expires_in_seconds của khoá tạm Soniox (≤ 3600).", "required": false, "secret": false, "default": "900" },
+    { "key": "LIVE_MAX_CONCURRENT_RECORDINGS", "description": "Trần phiên realtime đồng thời toàn workspace, áp chung cả hai provider.", "required": false, "secret": false, "default": "8" },
+    { "key": "LIVE_UPLOAD_RETRY_WINDOW_MIN", "description": "Số phút giữ part chưa upload trong RAM để retry.", "required": false, "secret": false, "default": "15" },
+    { "key": "SPEAKER_MODEL_PATH", "description": "Đường dẫn model ONNX embedding người nói (tải lúc deploy).", "required": true, "secret": false, "default": "models/3dspeaker_speaker-embedding_advanced.onnx" },
+    { "key": "SPEAKER_MATCH_THRESHOLD", "description": "Ngưỡng cosine liên phiên.", "required": false, "secret": false, "default": "0.5" },
+    { "key": "SPEAKER_MIN_SEGMENT_SEC", "description": "Độ dài segment tối thiểu để embedding.", "required": false, "secret": false, "default": "2" },
+    { "key": "SPEAKER_ENROL_TARGET_SEC", "description": "Tổng thời lượng mục tiêu để enrol một hồ sơ.", "required": false, "secret": false, "default": "25" },
+    { "key": "SPEAKER_SESSION_MATCH_THRESHOLD", "description": "Ngưỡng khớp session speaker trong phiên (P5).", "required": false, "secret": false, "default": "0.40" },
+    { "key": "SPEAKER_SESSION_MERGE_THRESHOLD", "description": "Ngưỡng gộp session speaker trong phiên (P5).", "required": false, "secret": false, "default": "0.60" },
+    { "key": "LIVE_MIN_SPEECH_SEC", "description": "Tối thiểu giây nói trước khi thử match profile.", "required": false, "secret": false, "default": "8" },
+    { "key": "LIVE_CHUNK_OVERLAP_SEC", "description": "Overlap ring buffer giữa hai chunk live.", "required": false, "secret": false, "default": "8" },
+    { "key": "VOICEPRINT_ENC_KEY", "description": "Khoá AES-256-GCM 32 byte base64. MẤT KHOÁ = MẤT TOÀN BỘ VOICEPRINT — bắt buộc backup.", "required": true, "secret": true },
+    { "key": "SUMMARY_MODEL", "description": "Model Hub AI dùng để tóm tắt.", "required": false, "secret": false },
+    { "key": "PRIVOS_FILES_ORIGIN", "description": "Origin của presigned download từ Files (khai trong CSP connect-src/media-src).", "required": true, "secret": false },
+    { "key": "MEETING_DATA_DIR", "description": "Thư mục scratch khi decode audio để embedding.", "required": false, "secret": false, "default": "./data" },
+    { "key": "MEETING_JOB_CONCURRENCY", "description": "Số job xử lý chạy song song.", "required": false, "secret": false, "default": "1" },
+    { "key": "MEETING_JOB_TIMEOUT_MS", "description": "Timeout mỗi job xử lý.", "required": false, "secret": false, "default": "3600000" },
+    { "key": "PRIVOS_AGENT_BOT_USER_ID", "description": "User id của bot cài đặt (Admin → Apps → Settings).", "required": true, "secret": false },
+    { "key": "PRIVOS_AGENT_BOT_CREDENTIAL", "description": "Token xác thực Hub của bot cài đặt. Chỉ quản trị viên cấp/xoay vòng.", "required": true, "secret": true },
+    { "key": "ALLOW_UNVERIFIED_ACTOR", "description": "Chỉ dev: cho phép tool-call với actor chưa verify. Production luôn fail closed.", "required": false, "secret": false }
+  ]
+}

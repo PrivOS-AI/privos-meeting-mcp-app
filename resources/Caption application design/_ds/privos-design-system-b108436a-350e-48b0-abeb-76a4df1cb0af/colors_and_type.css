@@ -1,0 +1,161 @@
+/* ============================================================
+   PrivOS — Design Tokens: Color + Type
+   "Lean to Scale"
+   Import this file to inherit the full PrivOS visual language.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;1,500;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ---------- BRAND CORE ---------- */
+  --privos-gold:        #FFC814;  /* Main brand */
+  --privos-gold-soft:   #FFD957;
+  --privos-gold-deep:   #E5A800;
+  --privos-blue:        #3C82E6;  /* Secondary / interactive */
+  --privos-blue-soft:   #6BA3F0;
+  --privos-blue-deep:   #2563C9;
+  --privos-navy:        #001930;  /* Sub / canvas ground */
+  --privos-silver:      #DCDCDC;  /* Gradient terminus */
+  --privos-ink:         #080D0F;  /* Icon + text ink */
+
+  /* Signature gradient (gold -> silver) */
+  --privos-gradient:        linear-gradient(90deg, #FFC814 0%, #DCDCDC 100%);
+  --privos-gradient-vert:   linear-gradient(180deg, #FFC814 0%, #DCDCDC 100%); /* top -> bottom, for buttons */
+  --privos-gradient-diag:   linear-gradient(135deg, #FFC814 0%, #DCDCDC 100%);
+  --privos-gradient-iconry: linear-gradient(160deg, #FFC814 8%, #DCDCDC 78%); /* matches favicon mark */
+
+  /* ---------- NAVY NEUTRAL SCALE (monochromatic, 500 = brand navy) ---------- */
+  --navy-50:  #E6E8EB;
+  --navy-100: #CDD1D6;
+  --navy-200: #9BA3AD;
+  --navy-300: #6A7584;
+  --navy-400: #38475B;
+  --navy-500: #001930;  /* brand sub / navy */
+  --navy-600: #001426;
+  --navy-700: #000F1D;
+  --navy-800: #000A13;
+  --navy-900: #00050A;
+  /* Lifted dark surfaces (for layering on the navy ground) */
+  --navy-surface: #06223A;
+  --navy-raised:  #0C2A45;
+  --white:    #FFFFFF;
+
+  /* ---------- SEMANTIC: LIGHT SURFACES (default product UI) ---------- */
+  --bg-canvas:    #F4F6F8;
+  --bg-surface:   #FFFFFF;
+  --bg-raised:    #FFFFFF;
+  --bg-sunken:    var(--navy-50);
+  --bg-hover:     rgba(60,130,230,0.06);
+  --bg-active:    rgba(60,130,230,0.12);
+
+  --fg-1: var(--navy-500);   /* primary text — brand navy */
+  --fg-2: var(--navy-400);   /* secondary text */
+  --fg-3: var(--navy-300);   /* tertiary / captions */
+  --fg-inverse: #FFFFFF;
+  --fg-link: var(--privos-blue);
+
+  --border-1: #ECEEF1;       /* hairline */
+  --border-2: var(--navy-100);   /* default */
+  --border-strong: var(--navy-200);
+  --border-focus: var(--privos-blue);
+
+  /* ---------- SEMANTIC: DARK SURFACES (marketing / hero / app shell) ---------- */
+  --bg-dark-canvas:  var(--navy-500);
+  --bg-dark-surface: var(--navy-surface);
+  --bg-dark-raised:  var(--navy-raised);
+  --fg-dark-1: #FFFFFF;
+  --fg-dark-2: var(--navy-200);
+  --fg-dark-3: var(--navy-300);
+  --border-dark: rgba(255,255,255,0.10);
+  --border-dark-strong: rgba(255,255,255,0.18);
+
+  /* ---------- STATUS ---------- */
+  --status-success: #1F9E6F;
+  --status-success-bg: #E4F5EE;
+  --status-warning: #E5A800;
+  --status-warning-bg: #FFF6DE;
+  --status-danger:  #DB4B4B;
+  --status-danger-bg: #FBE7E7;
+  --status-info:    var(--privos-blue);
+  --status-info-bg: #E7F0FD;
+
+  /* ---------- ELEVATION (cool navy-cast shadows) ---------- */
+  --shadow-xs: 0 1px 2px rgba(0,25,48,0.06);
+  --shadow-sm: 0 1px 3px rgba(0,25,48,0.08), 0 1px 2px rgba(0,25,48,0.05);
+  --shadow-md: 0 4px 12px rgba(0,25,48,0.10), 0 2px 4px rgba(0,25,48,0.06);
+  --shadow-lg: 0 12px 28px rgba(0,25,48,0.14), 0 4px 10px rgba(0,25,48,0.08);
+  --shadow-xl: 0 24px 60px rgba(0,25,48,0.20);
+  --shadow-glow-gold: 0 0 0 1px rgba(255,200,20,0.40), 0 6px 24px rgba(255,200,20,0.22);
+  --shadow-glow-blue: 0 0 0 1px rgba(60,130,230,0.35), 0 6px 24px rgba(60,130,230,0.22);
+
+  /* ---------- RADII ---------- */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* ---------- SPACING (4px base) ---------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* ---------- TYPE FAMILIES ---------- */
+  --font-display: 'Montserrat', system-ui, -apple-system, sans-serif;
+  --font-body:    'Montserrat', system-ui, -apple-system, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Weights — PrivOS restricts Montserrat to 500 / 600 / 700 */
+  --weight-medium:  500;
+  --weight-semibold: 600;
+  --weight-bold:    700;
+
+  /* ---------- TYPE SCALE (Montserrat, weights 500/600/700 only) ---------- */
+  --display-1-size: 72px;  --display-1-line: 1.02; --display-1-track: -0.03em; --display-1-weight: 700;
+  --display-2-size: 56px;  --display-2-line: 1.04; --display-2-track: -0.025em; --display-2-weight: 700;
+  --h1-size: 40px;  --h1-line: 1.10; --h1-track: -0.02em;  --h1-weight: 700;
+  --h2-size: 30px;  --h2-line: 1.15; --h2-track: -0.015em; --h2-weight: 700;
+  --h3-size: 22px;  --h3-line: 1.25; --h3-track: -0.01em;  --h3-weight: 600;
+  --h4-size: 18px;  --h4-line: 1.30; --h4-track: -0.005em; --h4-weight: 600;
+  --body-lg-size: 18px; --body-lg-line: 1.55;
+  --body-size: 15px;    --body-line: 1.6;
+  --body-sm-size: 13px; --body-sm-line: 1.5;
+  --caption-size: 12px; --caption-line: 1.4;
+  --overline-size: 11px; --overline-line: 1.2; --overline-track: 0.14em;
+  --mono-size: 13px;    --mono-line: 1.6;
+}
+
+/* ============================================================
+   SEMANTIC ELEMENT DEFAULTS
+   ============================================================ */
+.privos-display-1 { font-family: var(--font-display); font-weight: var(--display-1-weight); font-size: var(--display-1-size); line-height: var(--display-1-line); letter-spacing: var(--display-1-track); }
+.privos-display-2 { font-family: var(--font-display); font-weight: var(--display-2-weight); font-size: var(--display-2-size); line-height: var(--display-2-line); letter-spacing: var(--display-2-track); }
+.privos-h1 { font-family: var(--font-display); font-weight: var(--h1-weight); font-size: var(--h1-size); line-height: var(--h1-line); letter-spacing: var(--h1-track); }
+.privos-h2 { font-family: var(--font-display); font-weight: var(--h2-weight); font-size: var(--h2-size); line-height: var(--h2-line); letter-spacing: var(--h2-track); }
+.privos-h3 { font-family: var(--font-display); font-weight: var(--h3-weight); font-size: var(--h3-size); line-height: var(--h3-line); letter-spacing: var(--h3-track); }
+.privos-h4 { font-family: var(--font-display); font-weight: var(--h4-weight); font-size: var(--h4-size); line-height: var(--h4-line); letter-spacing: var(--h4-track); }
+.privos-body-lg { font-family: var(--font-body); font-weight: 500; font-size: var(--body-lg-size); line-height: var(--body-lg-line); }
+.privos-body { font-family: var(--font-body); font-weight: 500; font-size: var(--body-size); line-height: var(--body-line); }
+.privos-body-sm { font-family: var(--font-body); font-weight: 500; font-size: var(--body-sm-size); line-height: var(--body-sm-line); }
+.privos-caption { font-family: var(--font-body); font-weight: 500; font-size: var(--caption-size); line-height: var(--caption-line); color: var(--fg-3); }
+.privos-overline { font-family: var(--font-body); font-weight: 600; font-size: var(--overline-size); line-height: var(--overline-line); letter-spacing: var(--overline-track); text-transform: uppercase; }
+.privos-mono { font-family: var(--font-mono); font-weight: 400; font-size: var(--mono-size); line-height: var(--mono-line); }
+
+/* Gradient text helper — the signature gold->silver wash */
+.privos-gradient-text {
+  background: var(--privos-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}

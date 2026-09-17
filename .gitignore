@@ -1,0 +1,26 @@
+node_modules/
+dist/
+dist-source/
+*.tsbuildinfo
+# App runtime data (decoded audio temp, job scratch). Anchored so it never
+# matches src/ui/data/.
+/data/
+# ONNX speaker-embedding model(s), fetched at deploy time — never committed.
+/models/
+.env
+.env.*
+!.env.example
+*.local
+.DS_Store
+# Written by `npm run pair` (SDK's DEFAULT_STANDALONE_IDENTITY_FILE) — a live
+# dispatch-trust credential, never committed.
+/privos-standalone-identity.json
+/privos-standalone-identity.json.*
+/.recyclebin/
+
+# Local agent infrastructure (symlinks to .privos) — not app source
+/.privos/
+/.agents
+/.claude
+/.gemini
+/.privos-agent-sdk
