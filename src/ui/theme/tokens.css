@@ -174,7 +174,11 @@
   --ma-fg-1: #ffffff;
   --ma-fg-2: var(--navy-200);
   --ma-fg-3: var(--navy-300);
-  --ma-fg-inverse: var(--navy-500);
+  /* NOTE: --ma-fg-inverse is NOT overridden here. It is only ever used as the
+     label/icon color on saturated brand/status backgrounds (brand-blue,
+     gold-deep, green, danger) that keep the same color in both themes, so it
+     must stay white — matching the design where brand buttons/avatars/chips
+     always carry white text. Flipping it to navy made those buttons look dark. */
   --ma-link: var(--privos-blue-soft);
 
   --ma-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
