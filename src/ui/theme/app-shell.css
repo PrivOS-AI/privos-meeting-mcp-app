@@ -63,6 +63,22 @@
   background: var(--bg-active);
 }
 
+/* Dark mode: idle rail icons at --ma-fg-3 (#6A7584) are too dim on the dark
+   navy surface; lift idle/hover/active for legible contrast (WCAG ~AA). */
+[data-theme='dark'] .ma-rail__item {
+  color: var(--navy-200);
+}
+
+[data-theme='dark'] .ma-rail__item:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .ma-rail__item--active {
+  color: var(--privos-blue-soft);
+  background: rgba(107, 163, 240, 0.18);
+}
+
 .ma-rail__spacer {
   flex: 1;
 }
