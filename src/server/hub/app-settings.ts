@@ -4,26 +4,15 @@
  * Writes to settings are backend-only (workspace-admin tools); reads are used by
  * the provider registry and status tools.
  */
-import { AppDbBotClient } from './app-db-bot-client.js';
+import { extractDbRecords, type AppDbBotClient, type DbRow } from './app-db-bot-client.js';
 
-interface SettingRecord {
-  _id: string;
+interface SettingRecord extends DbRow {
   key: string;
   valueJson: string;
 }
 
 function extractRecords(result: unknown): SettingRecord[] {
-  const container = result as { items?: unknown; records?: unknown; data?: unknown } | unknown[];
-  const arr = Array.isArray(container)
-    ? container
-    : Array.isArray((container as { items?: unknown }).items)
-      ? (container as { items: unknown[] }).items
-      : Array.isArray((container as { records?: unknown }).records)
-        ? (container as { records: unknown[] }).records
-        : Array.isArray((container as { data?: unknown }).data)
-          ? (container as { data: unknown[] }).data
-          : [];
-  return arr.filter((r): r is SettingRecord => Boolean(r) && typeof (r as SettingRecord).key === 'string');
+  return extractDbRecords(result).filter((r): r is SettingRecord => typeof r.key === 'string');
 }
 
 /** Read one setting, parsed from JSON, or `undefined` when unset. */

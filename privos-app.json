@@ -165,6 +165,47 @@
       "title": "Trạng thái nhận dạng giọng nói",
       "description": "Trạng thái của cả hai nhà cung cấp STT để quản trị viên so sánh.",
       "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "meeting_realtime_token",
+      "title": "Lấy token phụ đề trực tiếp",
+      "description": "Mint token realtime ngắn hạn cho SDK phụ đề trực tiếp của nhà cung cấp STT đang chọn.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["roomId", "meetingId"],
+        "properties": { "roomId": { "type": "string" }, "meetingId": { "type": "string" } }
+      }
+    },
+    {
+      "name": "meeting_chunk_ready",
+      "title": "Báo phần ghi âm sẵn sàng",
+      "description": "Nhận và kiểm tra các turn của một phần ghi âm vừa upload xong (hàng đợi xử lý ở Phase 5).",
+      "inputSchema": {
+        "type": "object",
+        "required": ["roomId", "meetingId", "seq", "durationMs", "segments"],
+        "properties": {
+          "roomId": { "type": "string" },
+          "meetingId": { "type": "string" },
+          "seq": { "type": "number" },
+          "durationMs": { "type": "number" },
+          "segments": { "type": "array", "items": { "type": "object" } }
+        }
+      }
+    },
+    {
+      "name": "meeting_translate",
+      "title": "Dịch phụ đề trực tiếp",
+      "description": "Dịch một lô dòng phụ đề đã chốt bằng Hub AI khi nhà cung cấp STT không dịch song ngữ trực tiếp.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["roomId", "meetingId", "target", "segments"],
+        "properties": {
+          "roomId": { "type": "string" },
+          "meetingId": { "type": "string" },
+          "target": { "type": "string" },
+          "segments": { "type": "array", "items": { "type": "object" } }
+        }
+      }
     }
   ],
   "env": [

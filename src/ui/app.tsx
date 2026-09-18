@@ -17,7 +17,9 @@ import { HistoryScreen } from './screens/history-screen.js';
 import { LiveScreen } from './screens/live-screen.js';
 import { MeetingDetailScreen } from './screens/meeting-detail-screen.js';
 import { NewMeetingScreen } from './screens/new-meeting-screen.js';
+import { RecoveryBanner } from './screens/recovery-banner.js';
 import { SettingsScreen } from './screens/settings-screen.js';
+import { RecordingStoreProvider } from './stores/recording-store.js';
 
 export type Route = 'new' | 'live' | 'detail' | 'history' | 'settings';
 
@@ -55,19 +57,22 @@ export function App() {
   }, [app, context.roomId]);
 
   return (
-    <div className="ma-app">
-      <AppRail current={route} onNavigate={setRoute} />
-      <div className="ma-app__column">
-        <TopBar title={t(TITLE_KEY_BY_ROUTE[route])} />
-        <BotCredentialBanner />
-        <main className="ma-body">
-          {route === 'new' ? <NewMeetingScreen /> : null}
-          {route === 'live' ? <LiveScreen /> : null}
-          {route === 'detail' ? <MeetingDetailScreen /> : null}
-          {route === 'history' ? <HistoryScreen /> : null}
-          {route === 'settings' ? <SettingsScreen /> : null}
-        </main>
+    <RecordingStoreProvider>
+      <div className="ma-app">
+        <AppRail current={route} onNavigate={setRoute} />
+        <div className="ma-app__column">
+          <TopBar title={t(TITLE_KEY_BY_ROUTE[route])} />
+          <BotCredentialBanner />
+          <RecoveryBanner />
+          <main className={route === 'live' ? 'ma-body ma-body--live' : 'ma-body'}>
+            {route === 'new' ? <NewMeetingScreen onStarted={() => setRoute('live')} /> : null}
+            {route === 'live' ? <LiveScreen onEnded={() => setRoute('new')} /> : null}
+            {route === 'detail' ? <MeetingDetailScreen /> : null}
+            {route === 'history' ? <HistoryScreen /> : null}
+            {route === 'settings' ? <SettingsScreen /> : null}
+          </main>
+        </div>
       </div>
-    </div>
+    </RecordingStoreProvider>
   );
 }

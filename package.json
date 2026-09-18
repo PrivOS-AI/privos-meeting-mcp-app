@@ -27,7 +27,9 @@
     "verify:fast-pr": "npm run typecheck && npm run test && npm run build && npm run preflight"
   },
   "dependencies": {
+    "@elevenlabs/client": "^1.25.0",
     "@privos_ai/app-server": "^0.8.4",
+    "@soniox/speech-to-text-web": "^1.4.0",
     "dotenv": "^17.3.1",
     "express": "^4.21.2",
     "tsx": "^4.19.2",

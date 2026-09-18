@@ -11,6 +11,39 @@ import type { CollectionSchema } from '../../shared/app-db-schema.js';
 import { SCHEMAS } from '../../shared/app-db-schema.js';
 import { callAppPlatformTool } from './bot-tool-call.js';
 
+/** One App DB row — every collection carries at least `_id`. */
+export interface DbRow {
+  _id: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Normalize a `mcpapp.db.query` result into a record array. The Hub's shape is
+ * not pinned by a shared type on our side, so this accepts every envelope
+ * observed in the field (`records`, `items`, `data`, or a bare array) and an
+ * optional `total` count. Shared by `AppDbBotClient.getById` and
+ * `app-settings.ts` so the tolerant-parsing logic exists exactly once.
+ */
+export function extractDbRecords(result: unknown): DbRow[] {
+  const container = result as { items?: unknown; records?: unknown; data?: unknown } | unknown[];
+  const arr = Array.isArray(container)
+    ? container
+    : Array.isArray((container as { records?: unknown }).records)
+      ? (container as { records: unknown[] }).records
+      : Array.isArray((container as { items?: unknown }).items)
+        ? (container as { items: unknown[] }).items
+        : Array.isArray((container as { data?: unknown }).data)
+          ? (container as { data: unknown[] }).data
+          : [];
+  return arr.filter((r): r is DbRow => Boolean(r) && typeof (r as DbRow)._id === 'string');
+}
+
+/** Total record count for a query result, falling back to the returned page length. */
+export function extractDbTotal(result: unknown): number {
+  const total = (result as { total?: unknown } | undefined)?.total;
+  return typeof total === 'number' ? total : extractDbRecords(result).length;
+}
+
 /** Room-less scopes never send a roomId; room scopes require the bound one. */
 export class AppDbBotClient {
   constructor(private readonly roomId?: string) {}
@@ -55,6 +88,19 @@ export class AppDbBotClient {
 
   async query(collection: string, scope: 'global' | 'room', args: Record<string, unknown> = {}): Promise<unknown> {
     return callAppPlatformTool('mcpapp.db.query', { collection, ...args }, 'db:read', this.roomArg(scope));
+  }
+
+  /**
+   * Fetch one row by id via `query` (there is no dedicated `mcpapp.db.get` on
+   * the bot-credential surface). Returns `null` when absent instead of
+   * throwing, so authz checks can turn a miss into a clear `AppError`.
+   */
+  async getById(collection: string, scope: 'global' | 'room', id: string): Promise<DbRow | null> {
+    const result = await this.query(collection, scope, {
+      where: [{ field: '_id', op: '==', value: id }],
+      limit: 1,
+    });
+    return extractDbRecords(result)[0] ?? null;
   }
 }
 
