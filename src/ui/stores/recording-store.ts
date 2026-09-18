@@ -17,6 +17,7 @@ import { addBookmark, createMeeting, updateRecordingMeeting } from '../data/meet
 import { ensureMeetingFolder } from '../data/meeting-folder.js';
 import { MeetingClock } from '../data/meeting-clock.js';
 import { MediaRecorderService } from '../data/media-recorder-service.js';
+import { startHostMicStream } from '../data/host-mic-stream.js';
 import { listParts, notifyChunkReady, uploadPart } from '../data/meeting-part-upload.js';
 import { PartUploadQueue } from '../data/part-upload-queue.js';
 import { createRealtimeClient, type CaptionEvent, type CaptionStatus, type LiveTurn, type RealtimeConnection } from '../data/realtime-client.js';
@@ -154,6 +155,8 @@ export class RecordingStore {
   private listeners = new Set<() => void>();
 
   private stream: MediaStream | null = null;
+  /** Releases the active capture (host-brokered stop, or getUserMedia track stop). */
+  private micStop: (() => void) | null = null;
   private recorder: MediaRecorderService | null = null;
   private uploadQueue: PartUploadQueue | null = null;
   private clock: MeetingClock | null = null;
@@ -177,6 +180,38 @@ export class RecordingStore {
     return this.stream;
   }
 
+  /**
+   * Acquire the mic as a MediaStream, host-brokered first (works in the opaque
+   * origin) and falling back to direct getUserMedia only when the host predates
+   * brokered devices. Sets `this.micStop` to the matching release. Throws a
+   * DOMException whose `name` the start screen maps to a user-facing message.
+   */
+  private async acquireMicStream(): Promise<MediaStream> {
+    const host = await startHostMicStream(this.app, { sampleRate: 16000, echoCancellation: true, noiseSuppression: true });
+    if (host.kind === 'stream') {
+      this.micStop = host.stop;
+      return host.stream;
+    }
+    if (host.kind === 'denied') {
+      // Map the host denial to a DOMException name the UI already classifies.
+      const name =
+        host.reason === 'not_declared' ? 'NotSupportedError' : host.reason === 'unavailable' ? 'NotFoundError' : 'NotAllowedError';
+      throw new DOMException(`Microphone denied by host: ${host.reason}`, name);
+    }
+    // Older host without brokered capture — direct getUserMedia (only succeeds
+    // if this frame is not opaque-origin).
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new DOMException('Microphone API unavailable in this context', 'NotSupportedError');
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
+    });
+    this.micStop = () => {
+      for (const track of stream.getTracks()) track.stop();
+    };
+    return stream;
+  }
+
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -197,16 +232,12 @@ export class RecordingStore {
 
   async startRecording(input: StartRecordingInput): Promise<void> {
     try {
-      // In the opaque iframe the mic API only exists when the host granted the
-      // app `allow="microphone"`. Without the grant `navigator.mediaDevices` is
-      // undefined; raise a typed error so the UI reports "mic not available in
-      // this view" instead of a raw TypeError blaming the device.
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new DOMException('Microphone API unavailable in this context', 'NotSupportedError');
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
-      });
+      // This document runs in an opaque origin, where the browser refuses
+      // `getUserMedia` even with `allow="microphone"` delegated. Capture through
+      // the host (it records under its own origin) and rebuild a MediaStream the
+      // recorder + realtime SDK can consume. An older host without brokered mic
+      // returns `unsupported` — only then fall back to direct getUserMedia.
+      const stream = await this.acquireMicStream();
       this.stream = stream;
 
       this.wakeLock = new ScreenWakeLock({ onChange: (wakeLock) => this.setState({ wakeLock }) });
@@ -275,6 +306,10 @@ export class RecordingStore {
 
       await this.startRealtime(meetingId, input.translationEnabled);
     } catch (error) {
+      // Release the mic if it opened before a later start step failed, so the
+      // host capture (and its browser indicator) does not leak.
+      this.micStop?.();
+      this.micStop = null;
       this.setState({ status: 'error', error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
@@ -453,6 +488,8 @@ export class RecordingStore {
     this.translateBuffer?.dispose();
     if (this.timer) clearInterval(this.timer);
     await this.wakeLock?.release();
+    this.micStop?.(); // release the host capture (or getUserMedia tracks)
+    this.micStop = null;
 
     // Give the upload queue a chance to drain the final part(s) before moving on.
     this.uploadQueue?.retry();
