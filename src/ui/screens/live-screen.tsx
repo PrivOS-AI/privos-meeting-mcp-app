@@ -2,9 +2,10 @@
  * The live recording screen: toggles between 1a (light Transcript) and 1b
  * (dark Stage). Both share the same `RecordingStore` state and footer.
  */
-import { useState } from 'react';
-import { usePrivosContext } from '@privos_ai/app-react';
+import { useEffect, useState } from 'react';
+import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
+import { BookmarksPanel } from '../components/bookmarks-panel.js';
 import { CapacityNotice } from '../components/capacity-notice.js';
 import { CaptionLine } from '../components/caption-line.js';
 import { DegradedLabelsNotice } from '../components/degraded-labels-notice.js';
@@ -16,6 +17,7 @@ import { MicLevelMeter } from '../components/mic-level-meter.js';
 import { RecIndicator } from '../components/rec-indicator.js';
 import { RecordingFooter } from '../components/recording-footer.js';
 import { StageCaption } from '../components/stage-caption.js';
+import { deleteBookmark, listBookmarks, type BookmarkRecord } from '../data/bookmark-read-model.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 import { useRecordingState, useRecordingStore, type StageCaptionSize } from '../stores/recording-store.js';
 
@@ -139,7 +141,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
         {footer}
       </div>
       <aside className="ma-live__side">
-        <LiveSidePanel />
+        <LiveSidePanel meetingId={state.meetingId} bookmarkAtSec={state.bookmarkAtSec} />
       </aside>
     </div>
   );
@@ -147,14 +149,42 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
 
 type SideTab = 'summary' | 'actions' | 'bookmarks';
 
-function LiveSidePanel() {
+interface LiveSidePanelProps {
+  meetingId: string | null;
+  /** Changes every time a bookmark is added during this session — the trigger to refetch the list below. */
+  bookmarkAtSec?: number;
+}
+
+/**
+ * Summary/action items only exist once processing finishes (P6 backend
+ * writes them from the finished transcript), so those two tabs stay the
+ * "available after the meeting ends" placeholder during a live session.
+ * Bookmarks, in contrast, are written live (`recording-store.ts#addBookmark`)
+ * and worth showing immediately — reuses P7's `bookmarks-panel.tsx`.
+ */
+function LiveSidePanel({ meetingId, bookmarkAtSec }: LiveSidePanelProps) {
+  const app = usePrivosApp();
   const { t } = useI18n();
   const [tab, setTab] = useState<SideTab>('summary');
+  const [bookmarks, setBookmarks] = useState<BookmarkRecord[]>([]);
   const TABS: Array<{ id: SideTab; icon: 'sparkle' | 'checkmark-circle' | 'bookmark'; labelKey: string }> = [
     { id: 'summary', icon: 'sparkle', labelKey: 'recording.side.summary' },
     { id: 'actions', icon: 'checkmark-circle', labelKey: 'recording.side.actions' },
     { id: 'bookmarks', icon: 'bookmark', labelKey: 'recording.side.bookmarks' },
   ];
+
+  useEffect(() => {
+    if (!meetingId || tab !== 'bookmarks') return;
+    listBookmarks(app, meetingId)
+      .then(setBookmarks)
+      .catch(() => setBookmarks([]));
+  }, [app, meetingId, tab, bookmarkAtSec]);
+
+  async function removeBookmark(id: string): Promise<void> {
+    await deleteBookmark(app, id);
+    setBookmarks((prev) => prev.filter((b) => b.id !== id));
+  }
+
   return (
     <div className="ma-side-panel">
       <div className="ma-side-panel__tabs" role="tablist">
@@ -173,7 +203,7 @@ function LiveSidePanel() {
         ))}
       </div>
       <div className="ma-side-panel__body">
-        <p className="ma-side-panel__empty">{t('recording.side.emptyAfterEnd')}</p>
+        {tab === 'bookmarks' ? <BookmarksPanel bookmarks={bookmarks} onDelete={(id) => void removeBookmark(id)} /> : <p className="ma-side-panel__empty">{t('recording.side.emptyAfterEnd')}</p>}
       </div>
     </div>
   );

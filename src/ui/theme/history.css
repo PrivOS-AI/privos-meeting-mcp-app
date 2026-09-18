@@ -1,0 +1,273 @@
+/*
+ * Screen 1d — History: stat cards, filter chips, status badge, search box,
+ * row menu, and the history table itself. Split out to keep each theme file
+ * under ~200 lines (repo convention).
+ */
+
+.ma-history-screen {
+  padding: var(--space-6);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.ma-history-screen__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.ma-history-screen__start {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--privos-gradient);
+  color: var(--navy-500);
+  border: none;
+  border-radius: var(--ma-radius-pill);
+  padding: var(--space-2) var(--space-5);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.ma-history-screen__stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.ma-history-screen__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.ma-history-screen__sort {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  background: var(--ma-surface);
+  color: var(--ma-fg-1);
+}
+
+.ma-history-screen__error {
+  color: var(--ma-status-danger);
+  margin-bottom: var(--space-3);
+}
+
+.ma-history-screen__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ma-history-screen__load-more {
+  display: block;
+  margin: var(--space-5) auto 0;
+  background: none;
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-2) var(--space-6);
+}
+
+/* ---------- stat-card ---------- */
+
+.ma-stat-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--ma-surface);
+  border: 1px solid var(--ma-border-1);
+  border-radius: var(--ma-radius-md);
+  padding: var(--space-4);
+}
+
+.ma-stat-card--warning .ma-stat-card__value {
+  color: var(--ma-status-warning);
+}
+
+.ma-stat-card__icon {
+  color: var(--ma-fg-3);
+}
+
+.ma-stat-card__value {
+  font-size: var(--h4-size);
+  font-weight: var(--weight-semibold);
+  margin: 0;
+  font-family: var(--ma-font-mono);
+}
+
+.ma-stat-card__label {
+  margin: 0;
+  color: var(--ma-fg-3);
+  font-size: var(--caption-size);
+}
+
+/* ---------- filter-chips ---------- */
+
+.ma-filter-chips {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.ma-filter-chips__chip {
+  background: var(--ma-surface);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-pill);
+  padding: var(--space-1) var(--space-4);
+  min-height: auto;
+  font-size: var(--body-sm-size);
+}
+
+.ma-filter-chips__chip--active {
+  background: var(--ma-brand-blue);
+  color: var(--ma-fg-inverse);
+  border-color: var(--ma-brand-blue);
+}
+
+/* ---------- status-badge ---------- */
+
+.ma-status-badge {
+  display: inline-block;
+  border-radius: var(--ma-radius-pill);
+  padding: 2px var(--space-3);
+  font-size: var(--caption-size);
+  font-weight: var(--weight-medium);
+}
+
+.ma-status-badge--success {
+  background: var(--ma-status-success-bg);
+  color: var(--ma-status-success);
+}
+
+.ma-status-badge--warning {
+  background: var(--ma-status-warning-bg);
+  color: var(--ma-status-warning);
+}
+
+.ma-status-badge--danger {
+  background: var(--ma-status-danger-bg);
+  color: var(--ma-status-danger);
+}
+
+.ma-status-badge--neutral {
+  background: var(--ma-bg-canvas);
+  color: var(--ma-fg-3);
+}
+
+/* ---------- search-box ---------- */
+
+.ma-search-box {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--ma-surface);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-2) var(--space-3);
+  flex: 1;
+  max-width: 420px;
+}
+
+.ma-search-box__input {
+  border: none;
+  outline: none;
+  background: none;
+  flex: 1;
+  color: var(--ma-fg-1);
+  font-size: var(--body-size);
+}
+
+/* ---------- meeting-row-menu ---------- */
+
+.ma-row-menu {
+  position: relative;
+}
+
+.ma-row-menu__trigger {
+  background: none;
+  border: none;
+  min-height: auto;
+  padding: var(--space-1);
+}
+
+.ma-row-menu__list {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 10;
+  background: var(--ma-surface-raised);
+  border: 1px solid var(--ma-border-1);
+  border-radius: var(--ma-radius-sm);
+  box-shadow: var(--ma-shadow-md);
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1);
+  min-width: 160px;
+}
+
+.ma-row-menu__list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: var(--space-2);
+  min-height: auto;
+  border-radius: var(--ma-radius-sm);
+}
+
+.ma-row-menu__list button:hover {
+  background: var(--bg-hover);
+}
+
+.ma-row-menu__danger {
+  color: var(--ma-status-danger);
+}
+
+/* ---------- meeting-history-row ---------- */
+
+.ma-history-row td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--ma-border-1);
+  vertical-align: middle;
+}
+
+.ma-history-row__title {
+  cursor: pointer;
+}
+
+.ma-history-row__title-text {
+  display: block;
+  font-weight: var(--weight-medium);
+}
+
+.ma-history-row__date {
+  display: block;
+  color: var(--ma-fg-3);
+  font-size: var(--caption-size);
+}
+
+.ma-history-row__avatars {
+  display: flex;
+  align-items: center;
+}
+
+.ma-history-row__avatars > * + * {
+  margin-left: -8px;
+}
+
+.ma-history-row__avatar-overflow {
+  margin-left: var(--space-2);
+  color: var(--ma-fg-3);
+  font-size: var(--caption-size);
+}
+
+.ma-history-row__duration,
+.ma-history-row__actions-count {
+  font-family: var(--ma-font-mono);
+}

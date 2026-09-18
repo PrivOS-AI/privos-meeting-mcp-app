@@ -9,6 +9,13 @@
  * plan.md's field-ownership table (e.g. `meetings.status:'recording'`,
  * `partCount`, `bookmarks`) — see `meeting-draft-repository.ts`, the only
  * caller of the write methods.
+ *
+ * Phase 7 adds `delete` (user-owned rows only — `meeting-read-model.ts`'s
+ * `deleteMeeting`, gated client-side to `ownerUserId`) and `aggregate`
+ * (`meeting-stats.ts`'s `sum(durationSec)` — avoids paging every record just
+ * to total a number). Both mirror `mcpapp.db.*` tools documented in
+ * `privos-dev-docs/mcp-app-platform/apis/tools-database.md` and already used
+ * server-side by `AppDbBotClient` (`delete`) — same tool names, user context.
  */
 import { parseToolResult } from '@privos_ai/app-react';
 import type { McpApp } from '@privos_ai/app-react';
@@ -64,5 +71,20 @@ export class AppDbClient {
 
   async update(collection: string, id: string, data: Record<string, unknown>): Promise<void> {
     await callTool(this.app, 'mcpapp.db.update', { collection, id, data });
+  }
+
+  async delete(collection: string, id: string): Promise<void> {
+    await callTool(this.app, 'mcpapp.db.delete', { collection, id });
+  }
+
+  /** `op:'count'|'sum'|'avg'|'min'|'max'`; `result` is a single number, or `{_id, result}[]` when `groupBy` is given. */
+  async aggregate(input: {
+    collection: string;
+    op: 'count' | 'sum' | 'avg' | 'min' | 'max';
+    field?: string;
+    where?: DbWhereClause[];
+    groupBy?: string;
+  }): Promise<{ result: number | Array<{ _id: unknown; result: number }> }> {
+    return callTool(this.app, 'mcpapp.db.aggregate', input);
   }
 }

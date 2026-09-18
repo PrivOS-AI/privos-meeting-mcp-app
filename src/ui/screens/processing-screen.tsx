@@ -7,14 +7,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { parseToolResult, usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
+import { ActionItemsCard } from '../components/action-items-card.js';
 import { Icon } from '../components/icon.js';
 import { ResolveSpeakersModal, type UnresolvedSpeaker } from '../components/resolve-speakers-modal.js';
+import { SaveToFilesModal } from '../components/save-to-files-modal.js';
+import { SendToChatButton } from '../components/send-to-chat-button.js';
+import { SummaryCard } from '../components/summary-card.js';
+import { listActionItems, type ActionItemRecord } from '../data/action-item-read-model.js';
+import { getMeeting, type MeetingReadModel } from '../data/meeting-read-model.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 import { useRecordingState } from '../stores/recording-store.js';
 
 export interface ProcessingScreenProps {
   onDone(): void;
+  /** Phase-07: lets "Xem chi tiết" jump straight to the meeting detail screen instead of History. */
+  onOpenMeeting(meetingId: string): void;
 }
+
+const SAVE_TO_FILES_ARTIFACTS: Array<{ labelKey: string; key: keyof MeetingReadModel }> = [
+  { labelKey: 'saveToFiles.audio', key: 'audioFileId' },
+  { labelKey: 'saveToFiles.transcriptJson', key: 'transcriptJsonFileId' },
+  { labelKey: 'saveToFiles.transcriptMd', key: 'transcriptMdFileId' },
+  { labelKey: 'saveToFiles.transcriptSrt', key: 'srtFileId' },
+  { labelKey: 'saveToFiles.summary', key: 'summaryFileId' },
+];
 
 const STEPS = ['download', 'decode', 'transcribe', 'segment', 'embed', 'summarize', 'write', 'cleanup'] as const;
 type Step = (typeof STEPS)[number];
@@ -51,7 +67,7 @@ function stepState(index: number, status: MeetingStatusResult | null): 'done' | 
   return 'pending';
 }
 
-export function ProcessingScreen({ onDone }: ProcessingScreenProps) {
+export function ProcessingScreen({ onDone, onOpenMeeting }: ProcessingScreenProps) {
   const { t } = useI18n();
   const app = usePrivosApp();
   const context = usePrivosContext();
@@ -62,6 +78,24 @@ export function ProcessingScreen({ onDone }: ProcessingScreenProps) {
   const [elapsedSec, setElapsedSec] = useState(0);
   const startedAtRef = useRef(Date.now());
   const [resolveModalDismissed, setResolveModalDismissed] = useState(false);
+
+  // Phase 6/7: once the job completes, load the finished meeting record + action items and auto-open the
+  // "Save to Files" confirmation once (dismissible) — phase-06 § Implementation Steps 12: "kết thúc → mở save-to-files-modal".
+  const [completedMeeting, setCompletedMeeting] = useState<MeetingReadModel | null>(null);
+  const [completedActionItems, setCompletedActionItems] = useState<ActionItemRecord[]>([]);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const saveModalOpenedRef = useRef(false);
+
+  async function loadCompletedMeeting(): Promise<void> {
+    if (!meetingId) return;
+    try {
+      const [record, items] = await Promise.all([getMeeting(app, meetingId), listActionItems(app, meetingId)]);
+      setCompletedMeeting(record);
+      setCompletedActionItems(items);
+    } catch (error) {
+      console.error('Loading the completed meeting for the processing screen failed', error);
+    }
+  }
 
   useEffect(() => {
     if (!meetingId) return undefined;
@@ -112,6 +146,16 @@ export function ProcessingScreen({ onDone }: ProcessingScreenProps) {
     .map((s) => ({ speakerId: s.speakerId, totalSpeakSec: s.totalSpeakSec, displayName: s.displayName, confidence: s.confidence }));
   const showResolveModal = status?.status === 'completed' && unresolvedSpeakers.length > 0 && !resolveModalDismissed;
 
+  useEffect(() => {
+    // Deliberately depends only on `status?.status` (not `loadCompletedMeeting`, which closes over stable
+    // `app`/`meetingId`) — the guard ref already makes this run-once, but a wider dependency array would
+    // otherwise refetch every 3s poll tick while still `completed`.
+    if (status?.status !== 'completed' || saveModalOpenedRef.current) return;
+    saveModalOpenedRef.current = true;
+    void loadCompletedMeeting();
+    setShowSaveModal(true);
+  }, [status?.status]);
+
   return (
     <div className="ma-processing">
       <h2 className="ma-processing__title">{t('processing.title')}</h2>
@@ -141,9 +185,51 @@ export function ProcessingScreen({ onDone }: ProcessingScreenProps) {
         </div>
       ) : null}
 
+      {status?.status === 'completed' && completedMeeting ? (
+        <div className="ma-processing__completed">
+          <SummaryCard
+            roomId={context.roomId}
+            meetingId={completedMeeting._id}
+            summaryText={completedMeeting.summaryText}
+            keyTopics={completedMeeting.keyTopics}
+            summaryError={completedMeeting.summaryError}
+            onRegenerated={() => void loadCompletedMeeting()}
+          />
+          <ActionItemsCard
+            roomId={context.roomId}
+            meetingTitle={completedMeeting.title ?? ''}
+            items={completedActionItems}
+            onChanged={() => void loadCompletedMeeting()}
+          />
+          <div className="ma-processing__completed-actions">
+            <SendToChatButton
+              roomId={context.roomId}
+              meetingId={completedMeeting._id}
+              hasSummary={Boolean(completedMeeting.summaryText)}
+              sentToChatAt={completedMeeting.sentToChatAt}
+              onSent={() => void loadCompletedMeeting()}
+            />
+            <button type="button" onClick={() => onOpenMeeting(completedMeeting._id)}>
+              {t('processing.openDetail')}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <button type="button" className="ma-processing__done" onClick={onDone}>
         {t('processing.backToHistory')}
       </button>
+
+      {showSaveModal && completedMeeting ? (
+        <SaveToFilesModal
+          title={completedMeeting.title ?? ''}
+          meetingId={completedMeeting._id}
+          startedAt={completedMeeting.startedAt}
+          folderId={completedMeeting.folderId}
+          artifacts={SAVE_TO_FILES_ARTIFACTS.map((a) => ({ labelKey: a.labelKey, fileId: completedMeeting[a.key] as string | undefined }))}
+          onClose={() => setShowSaveModal(false)}
+        />
+      ) : null}
 
       {showResolveModal && meetingId && context.roomId ? (
         <ResolveSpeakersModal

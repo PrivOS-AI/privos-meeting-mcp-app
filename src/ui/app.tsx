@@ -38,6 +38,14 @@ export function App() {
   const app = usePrivosApp();
   const context = usePrivosContext();
   const [route, setRoute] = useState<Route>('new');
+  // History → detail navigation carries the picked meeting id; owned here (not in RecordingStore) since it has
+  // nothing to do with the in-progress recording state machine (phase-07 § Related Code Files: `app.tsx` route `detail/:meetingId`).
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
+
+  function openMeeting(meetingId: string): void {
+    setSelectedMeetingId(meetingId);
+    setRoute('detail');
+  }
 
   // Bootstrap runs once per mount, guarded by a ref rather than an effect
   // dependency array: `roomId` can change identity across re-renders while the
@@ -69,9 +77,9 @@ export function App() {
           <main className={route === 'live' ? 'ma-body ma-body--live' : 'ma-body'}>
             {route === 'new' ? <NewMeetingScreen onStarted={() => setRoute('live')} /> : null}
             {route === 'live' ? <LiveScreen onEnded={() => setRoute('processing')} /> : null}
-            {route === 'processing' ? <ProcessingScreen onDone={() => setRoute('history')} /> : null}
-            {route === 'detail' ? <MeetingDetailScreen /> : null}
-            {route === 'history' ? <HistoryScreen /> : null}
+            {route === 'processing' ? <ProcessingScreen onDone={() => setRoute('history')} onOpenMeeting={openMeeting} /> : null}
+            {route === 'detail' && selectedMeetingId ? <MeetingDetailScreen meetingId={selectedMeetingId} onBack={() => setRoute('history')} /> : null}
+            {route === 'history' ? <HistoryScreen onStartRecording={() => setRoute('new')} onOpenMeeting={openMeeting} /> : null}
             {route === 'settings' ? <SettingsScreen /> : null}
           </main>
         </div>

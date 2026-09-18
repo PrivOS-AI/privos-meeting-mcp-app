@@ -1,0 +1,264 @@
+/*
+ * Phase 6 UI — summary card, action items card, save-to-files modal,
+ * send-to-chat button. Split out to keep each theme file under ~200 lines
+ * (repo convention, see speaker-identity.css's header).
+ */
+
+.ma-summary-card,
+.ma-action-items-card {
+  background: var(--ma-surface);
+  border: 1px solid var(--ma-border-1);
+  border-radius: var(--ma-radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.ma-summary-card__header,
+.ma-action-items-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.ma-summary-card__title,
+.ma-action-items-card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--body-size);
+}
+
+.ma-summary-card__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.ma-summary-card__action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: none;
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-1) var(--space-3);
+  min-height: auto;
+  font-size: var(--body-sm-size);
+}
+
+.ma-summary-card__error,
+.ma-action-items-card__error {
+  color: var(--ma-status-danger);
+  font-size: var(--body-sm-size);
+  margin: 0 0 var(--space-2);
+}
+
+.ma-summary-card__text {
+  white-space: pre-wrap;
+  color: var(--ma-fg-2);
+}
+
+.ma-summary-card__empty,
+.ma-action-items-card__empty {
+  color: var(--ma-fg-3);
+  font-size: var(--body-sm-size);
+}
+
+.ma-summary-card__topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  list-style: none;
+  padding: 0;
+  margin: var(--space-3) 0 0;
+}
+
+.ma-summary-card__topics li {
+  background: var(--ma-bg-canvas);
+  border-radius: var(--ma-radius-pill);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--caption-size);
+}
+
+.ma-action-items-card__push {
+  background: var(--ma-brand-blue);
+  color: var(--ma-fg-inverse);
+  border: none;
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-1) var(--space-3);
+  min-height: auto;
+  font-size: var(--body-sm-size);
+}
+
+.ma-action-items-card__result {
+  color: var(--ma-status-success);
+  font-size: var(--caption-size);
+  margin: 0 0 var(--space-2);
+}
+
+.ma-action-items-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ma-action-items-card__row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.ma-action-items-card__checkbox {
+  background: none;
+  border: none;
+  min-height: auto;
+  padding: 2px;
+}
+
+.ma-action-items-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ma-action-items-card__task--done {
+  text-decoration: line-through;
+  color: var(--ma-fg-3);
+}
+
+.ma-action-items-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--caption-size);
+  color: var(--ma-fg-3);
+  margin-top: var(--space-1);
+}
+
+.ma-action-items-card__at {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  min-height: auto;
+  padding: 0;
+  color: var(--ma-link);
+  font-family: var(--ma-font-mono);
+}
+
+.ma-action-items-card__pushed {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ma-status-success);
+}
+
+/* ---------- save-to-files-modal ---------- */
+
+.ma-save-to-files__path {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--ma-font-mono);
+  font-size: var(--body-sm-size);
+  color: var(--ma-fg-2);
+  margin: var(--space-2) 0 var(--space-4);
+}
+
+.ma-save-to-files__list {
+  list-style: none;
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ma-save-to-files__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--ma-border-1);
+}
+
+.ma-save-to-files__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--ma-fg-3);
+  font-size: var(--body-sm-size);
+}
+
+.ma-save-to-files__status--saved {
+  color: var(--ma-status-success);
+}
+
+.ma-save-to-files__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.ma-save-to-files__open,
+.ma-save-to-files__close {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-2) var(--space-5);
+}
+
+.ma-save-to-files__open {
+  background: var(--ma-brand-blue);
+  color: var(--ma-fg-inverse);
+  border: none;
+}
+
+.ma-save-to-files__close {
+  background: none;
+  border: 1px solid var(--ma-border-2);
+}
+
+/* ---------- send-to-chat-button ---------- */
+
+.ma-send-to-chat {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.ma-send-to-chat__button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--ma-brand-blue);
+  color: var(--ma-fg-inverse);
+  border: none;
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-2) var(--space-4);
+}
+
+.ma-send-to-chat__error {
+  color: var(--ma-status-danger);
+  font-size: var(--caption-size);
+}
+
+.ma-processing__completed {
+  margin-top: var(--space-6);
+  text-align: left;
+  max-width: 560px;
+  margin-inline: auto;
+}
+
+.ma-processing__completed-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}

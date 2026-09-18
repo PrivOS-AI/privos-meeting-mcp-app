@@ -34,3 +34,13 @@ monospace`); nhúng woff2 base64 nếu cần đúng brand (ghi lại nếu chấ
 
 `vi` mặc định, `en` fallback; mọi chuỗi UI qua `t()`. Ngôn ngữ mở đầu: lựa chọn đã lưu
 → `navigator.language` → `vi`.
+
+## Search — "Ask AI" v1 (P7)
+
+Design gốc có ô search kèm toggle sparkle "Ask AI". **v1 không gọi LLM**: search là
+keyword thuần trên `title` + `summaryText` (history, `keyword-search.ts#searchMeetings`)
+và trên `segment.text` (meeting detail, `#searchTranscript`), bỏ dấu tiếng Việt bằng
+`foldDiacritics`. `search-box.tsx` triển khai ở P7 **không** render riêng toggle
+sparkle — một ô tìm kiếm duy nhất đã phủ cả hai nguồn (title/summary hoặc transcript)
+nên không có "chế độ AI" thứ hai để bật/tắt. RAG thực thụ (semantic search có gọi Hub
+AI) là v2, chưa lên kế hoạch.
