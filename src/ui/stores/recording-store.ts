@@ -197,6 +197,13 @@ export class RecordingStore {
 
   async startRecording(input: StartRecordingInput): Promise<void> {
     try {
+      // In the opaque iframe the mic API only exists when the host granted the
+      // app `allow="microphone"`. Without the grant `navigator.mediaDevices` is
+      // undefined; raise a typed error so the UI reports "mic not available in
+      // this view" instead of a raw TypeError blaming the device.
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new DOMException('Microphone API unavailable in this context', 'NotSupportedError');
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
       });

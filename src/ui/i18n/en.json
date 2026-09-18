@@ -40,6 +40,8 @@
   "screen.new.starting": "Requesting microphone access…",
   "screen.new.micDenied": "The browser denied microphone access. Grant mic permission for this page and try again.",
   "screen.new.micError": "Could not access the microphone. Check your device and try again.",
+  "screen.new.micUnavailable": "This app hasn't been granted microphone access in this room. Ask a workspace admin to approve the app's microphone permission, then reload.",
+  "screen.new.startFailed": "Microphone is fine, but the meeting couldn't be started. Please try again.",
 
   "recording.keepAwake.notice": "Turn off screen auto-lock/sleep while recording — the Hub has not granted this app the screen-wake-lock permission yet.",
   "recording.capacity.notice": "The system is at its maximum concurrent recordings, live captions are temporarily unavailable — recording continues and speaker names will arrive after processing.",

@@ -52,8 +52,18 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
       await store.startRecording({ title: title.trim() || t('screen.new.untitled'), language, translationEnabled });
       onStarted();
     } catch (error) {
+      // Keep the raw cause for diagnosis; the on-screen text is classified below.
+      console.error('startRecording failed', error);
       const name = error instanceof DOMException ? error.name : '';
-      setMicError(name === 'NotAllowedError' ? t('screen.new.micDenied') : t('screen.new.micError'));
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        setMicError(t('screen.new.micDenied')); // user/policy denied the mic prompt
+      } else if (name === 'NotSupportedError') {
+        setMicError(t('screen.new.micUnavailable')); // iframe not granted allow="microphone"
+      } else if (name) {
+        setMicError(t('screen.new.micError')); // NotFound/NotReadable — real device fault
+      } else {
+        setMicError(t('screen.new.startFailed')); // mic was fine; a later start step failed
+      }
     } finally {
       setStarting(false);
     }

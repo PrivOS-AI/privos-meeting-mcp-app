@@ -40,6 +40,8 @@
   "screen.new.starting": "Đang xin quyền micro…",
   "screen.new.micDenied": "Trình duyệt từ chối quyền micro. Vui lòng cấp quyền micro cho trang này rồi thử lại.",
   "screen.new.micError": "Không thể truy cập micro. Kiểm tra thiết bị rồi thử lại.",
+  "screen.new.micUnavailable": "Ứng dụng chưa được cấp quyền micro trong phòng này. Nhờ quản trị viên workspace duyệt quyền micro cho ứng dụng rồi tải lại trang.",
+  "screen.new.startFailed": "Micro vẫn hoạt động, nhưng không khởi tạo được cuộc họp. Vui lòng thử lại.",
 
   "recording.keepAwake.notice": "Tắt tự động tắt màn hình/sleep trong lúc ghi — Hub chưa cấp quyền giữ màn hình sáng cho ứng dụng này.",
   "recording.capacity.notice": "Hệ thống đang ghi tối đa số cuộc họp cho phép, phụ đề trực tiếp tạm không khả dụng — bản ghi vẫn chạy và tên người nói sẽ có sau khi xử lý.",
