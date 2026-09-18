@@ -442,8 +442,8 @@ export class RecordingStore {
       const raw = await this.app.callServerTool({ name: 'meeting_process', arguments: { roomId: this.ctx.roomId, meetingId } });
       parseToolResult(raw);
     } catch (error) {
-      // meeting_process lands in P3 — a missing tool here must not block the flow.
-      console.warn('meeting_process failed (expected until Phase 3 ships it):', error);
+      // The processing screen shows its own retry button — a failed enqueue here must not block navigation to it.
+      console.warn('meeting_process failed (retry is available on the processing screen):', error);
     }
 
     this.setState({ status: 'done' });

@@ -45,6 +45,19 @@ export interface TranscribeInput {
   audioPath: string;
   languageHints?: string[];
   enableSpeakerDiarization?: boolean;
+  /** Cooperative cancellation for the job timeout / an aborted retry (P3). Optional so pre-P3 callers still compile. */
+  signal?: AbortSignal;
+  /**
+   * Soniox-only: persist provider-side ids the MOMENT they exist (before the
+   * first poll), so a job that dies mid-flight can be cleaned up or resumed
+   * without a second upload/charge (plan.md S2-12).
+   */
+  onProviderIds?: (ids: { providerFileId?: string; providerTranscriptionId?: string }) => Promise<void> | void;
+  /** Soniox-only: correlates this attempt with the vendor's own dashboard/logs. Not used for server-side lookup — no documented list-by-reference API. */
+  clientReferenceId?: string;
+  /** Soniox-only: resume a previous attempt instead of re-uploading — set from `processing_jobs.providerFileId`/`providerTranscriptionId` on retry. */
+  resumeProviderFileId?: string;
+  resumeProviderTranscriptionId?: string;
 }
 
 /** Capabilities a realtime provider advertises to the UI. */

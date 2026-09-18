@@ -70,5 +70,21 @@
 
   "recovery.banner.message": "Khôi phục bản ghi chưa hoàn tất ({count} phần)",
   "recovery.banner.finish": "Hoàn tất & xử lý",
-  "recovery.banner.cancel": "Huỷ"
+  "recovery.banner.cancel": "Huỷ",
+
+  "processing.title": "Đang xử lý cuộc họp",
+  "processing.provider": "Nhà cung cấp: {provider}",
+  "processing.step.download": "Tải & ghép phần ghi âm",
+  "processing.step.decode": "Giải mã âm thanh",
+  "processing.step.transcribe": "Nhận dạng giọng nói",
+  "processing.step.segment": "Chia đoạn theo người nói",
+  "processing.step.embed": "Nhận diện người nói",
+  "processing.step.summarize": "Tóm tắt bằng Hub AI",
+  "processing.step.write": "Ghi transcript vào Files",
+  "processing.step.cleanup": "Dọn dẹp",
+  "processing.elapsed": "Đã chạy {sec} giây",
+  "processing.stale": "Job đã dừng — có thể do máy chủ khởi động lại.",
+  "processing.failed": "Xử lý thất bại.",
+  "processing.retry": "Xử lý lại",
+  "processing.backToHistory": "Về Lịch sử"
 }

@@ -17,15 +17,17 @@ import { HistoryScreen } from './screens/history-screen.js';
 import { LiveScreen } from './screens/live-screen.js';
 import { MeetingDetailScreen } from './screens/meeting-detail-screen.js';
 import { NewMeetingScreen } from './screens/new-meeting-screen.js';
+import { ProcessingScreen } from './screens/processing-screen.js';
 import { RecoveryBanner } from './screens/recovery-banner.js';
 import { SettingsScreen } from './screens/settings-screen.js';
 import { RecordingStoreProvider } from './stores/recording-store.js';
 
-export type Route = 'new' | 'live' | 'detail' | 'history' | 'settings';
+export type Route = 'new' | 'live' | 'processing' | 'detail' | 'history' | 'settings';
 
 const TITLE_KEY_BY_ROUTE: Record<Route, string> = {
   new: 'screen.new.title',
   live: 'screen.live.title',
+  processing: 'processing.title',
   detail: 'screen.detail.title',
   history: 'screen.history.title',
   settings: 'screen.settings.title',
@@ -66,7 +68,8 @@ export function App() {
           <RecoveryBanner />
           <main className={route === 'live' ? 'ma-body ma-body--live' : 'ma-body'}>
             {route === 'new' ? <NewMeetingScreen onStarted={() => setRoute('live')} /> : null}
-            {route === 'live' ? <LiveScreen onEnded={() => setRoute('new')} /> : null}
+            {route === 'live' ? <LiveScreen onEnded={() => setRoute('processing')} /> : null}
+            {route === 'processing' ? <ProcessingScreen onDone={() => setRoute('history')} /> : null}
             {route === 'detail' ? <MeetingDetailScreen /> : null}
             {route === 'history' ? <HistoryScreen /> : null}
             {route === 'settings' ? <SettingsScreen /> : null}

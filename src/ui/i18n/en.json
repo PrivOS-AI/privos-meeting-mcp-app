@@ -70,5 +70,21 @@
 
   "recovery.banner.message": "Recover unfinished recording ({count} parts)",
   "recovery.banner.finish": "Finish & process",
-  "recovery.banner.cancel": "Cancel"
+  "recovery.banner.cancel": "Cancel",
+
+  "processing.title": "Processing meeting",
+  "processing.provider": "Provider: {provider}",
+  "processing.step.download": "Download & concat parts",
+  "processing.step.decode": "Decode audio",
+  "processing.step.transcribe": "Speech recognition",
+  "processing.step.segment": "Split into speaker segments",
+  "processing.step.embed": "Speaker identification",
+  "processing.step.summarize": "Summarize with Hub AI",
+  "processing.step.write": "Write transcript to Files",
+  "processing.step.cleanup": "Cleanup",
+  "processing.elapsed": "Running for {sec}s",
+  "processing.stale": "The job has stopped — the server may have restarted.",
+  "processing.failed": "Processing failed.",
+  "processing.retry": "Retry",
+  "processing.backToHistory": "Back to History"
 }

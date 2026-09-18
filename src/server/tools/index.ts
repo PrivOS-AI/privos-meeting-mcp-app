@@ -8,9 +8,12 @@
 import { botCredentialCheckTool } from './bot-credential-check-tool.js';
 import { bootstrapTool } from './bootstrap-tool.js';
 import { chunkReadyTool } from './chunk-ready-tool.js';
+import { processTool } from './process-tool.js';
 import { realtimeTokenTool } from './realtime-token-tool.js';
 import { registerTool } from './registry.js';
+import { statusTool } from './status-tool.js';
 import { sttStatusTool } from './stt-status-tool.js';
+import { summarizeTool } from './summarize-tool.js';
 import { translateTool } from './translate-tool.js';
 
 export function registerAllTools(): void {
@@ -20,4 +23,7 @@ export function registerAllTools(): void {
   registerTool(realtimeTokenTool);
   registerTool(chunkReadyTool);
   registerTool(translateTool);
+  registerTool(processTool);
+  registerTool(statusTool);
+  registerTool(summarizeTool);
 }

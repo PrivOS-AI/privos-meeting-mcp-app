@@ -15,6 +15,7 @@ import { serveApp, RuntimeModeError } from '@privos_ai/app-server';
 
 import { assertProviderKeysAtBoot } from './env.js';
 import { checkAgentBotCredential } from './hub/agent-bot-credential-check.js';
+import { startupSweep } from './jobs/startup-sweep.js';
 import { createManifest, buildRelayAppDescriptor, manifest } from './manifest.js';
 import { createMcpHandler } from './mcp-handler.js';
 import { repoRoot } from './paths.js';
@@ -59,7 +60,15 @@ async function start(): Promise<void> {
 
   const handle = await serveApp({
     descriptor: buildRelayAppDescriptor(),
-    createHandler: (ctx) => createMcpHandler(ctx),
+    createHandler: (ctx) => {
+      // Fire-and-forget: reloads queued jobs, fails stale processing jobs,
+      // marks abandoned recordings interrupted, sweeps dead vendor garbage —
+      // across every known room. Never blocks the handler from being ready.
+      void startupSweep(ctx.agentBotHub).catch((error) => {
+        console.warn('[boot] startupSweep thất bại:', error instanceof Error ? error.message : error);
+      });
+      return createMcpHandler(ctx);
+    },
     ui: uiResourceProvider,
     port: Number(process.env.PORT || manifest.port || 3012),
     ...(transportOverride ? { transportOverride } : {}),

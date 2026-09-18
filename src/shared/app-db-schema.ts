@@ -173,6 +173,8 @@ export const SCHEMAS: readonly CollectionSchema[] = [
       { name: 'keepAudio', type: 'boolean' },
       { name: 'partFileIds', type: 'array' },
       { name: 'audioFileId', type: 'string' },
+      // soniox-async | elevenlabs-batch — pinned at enqueue time (P3), never changes for this job.
+      { name: 'sttProvider', type: 'string' },
       { name: 'providerFileId', type: 'string' },
       { name: 'providerTranscriptionId', type: 'string' },
       // queued | processing | completed | failed

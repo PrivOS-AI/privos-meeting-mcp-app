@@ -11,6 +11,7 @@ import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, ensureAppDbSchema } from '../hub/app-db-bot-client.js';
 import { appendKnownRoom } from '../hub/app-settings.js';
 import { ensureBotInRoom } from '../hub/ensure-bot-in-room.js';
+import { sweepRoom } from '../jobs/startup-sweep.js';
 import type { AppTool } from './registry.js';
 
 export const bootstrapTool: AppTool = {
@@ -18,7 +19,7 @@ export const bootstrapTool: AppTool = {
   title: 'Khởi tạo dữ liệu phòng',
   description: 'Đăng ký schema App DB, ghi nhận phòng và đảm bảo bot là thành viên phòng.',
   inputSchema: { type: 'object', required: ['roomId'], properties: { roomId: { type: 'string' } } },
-  async execute(args) {
+  async execute(args, _context, runtime) {
     const roomId = typeof args.roomId === 'string' ? args.roomId.trim() : '';
     if (!roomId) throw new AppError('roomId là bắt buộc.');
 
@@ -26,6 +27,12 @@ export const bootstrapTool: AppTool = {
     await ensureAppDbSchema(db);
     const knownRooms = await appendKnownRoom(db, roomId);
     const botJoined = await ensureBotInRoom(roomId);
+
+    // Best-effort: requeue this room's stuck jobs / abandoned recordings /
+    // dead vendor garbage every time the room opens, not just at process boot.
+    await sweepRoom(runtime.agentBotHub, roomId).catch((error) => {
+      console.warn('[meeting_bootstrap] sweep thất bại (không chặn bootstrap):', error instanceof Error ? error.message : error);
+    });
 
     return { ok: true, roomId, knownRoomCount: knownRooms.length, botJoined };
   },

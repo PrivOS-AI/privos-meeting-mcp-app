@@ -206,6 +206,36 @@
           "segments": { "type": "array", "items": { "type": "object" } }
         }
       }
+    },
+    {
+      "name": "meeting_process",
+      "title": "Xử lý cuộc họp",
+      "description": "Ghép các phần ghi âm, nhận diện người nói và tạo transcript cho cuộc họp bằng nhà cung cấp STT đang chọn.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["roomId", "meetingId"],
+        "properties": { "roomId": { "type": "string" }, "meetingId": { "type": "string" } }
+      }
+    },
+    {
+      "name": "meeting_status",
+      "title": "Trạng thái xử lý cuộc họp",
+      "description": "Xem tiến độ xử lý cuộc họp: bước hiện tại, phần trăm hoàn thành và kết quả khi xong.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["roomId", "meetingId"],
+        "properties": { "roomId": { "type": "string" }, "meetingId": { "type": "string" } }
+      }
+    },
+    {
+      "name": "meeting_summarize",
+      "title": "Tóm tắt lại cuộc họp",
+      "description": "Chạy lại riêng bước tóm tắt bằng Hub AI từ transcript đã lưu, không xử lý lại toàn bộ.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["roomId", "meetingId"],
+        "properties": { "roomId": { "type": "string" }, "meetingId": { "type": "string" } }
+      }
     }
   ],
   "env": [
