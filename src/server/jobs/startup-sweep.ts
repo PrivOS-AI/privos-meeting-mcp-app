@@ -12,7 +12,7 @@ import type { RoomBoundHubClient } from '@privos_ai/app-server';
 
 import { meetingId8 } from '../../shared/meeting-slug.js';
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
-import { getSetting } from '../hub/app-settings.js';
+import { readKnownRooms } from './known-rooms-store.js';
 import { env } from '../env.js';
 import type { PartRef } from '../media/concat-parts.js';
 import { listRoomFolderFiles } from '../media/hub-file-download.js';
@@ -128,10 +128,9 @@ export async function sweepRoom(hub: RoomBoundHubClient, roomId: string): Promis
   for (const row of extractDbRecords(failed)) await cleanupDeadSonioxJob(row);
 }
 
-/** `knownRooms` (`app_settings`, global) -> sweep each room. Called at boot and again from `meeting_bootstrap`. */
+/** Node-local known-rooms registry -> sweep each room. Called at boot (room-less) and again from `meeting_bootstrap`. */
 export async function startupSweep(hub: RoomBoundHubClient): Promise<void> {
-  const globalDb = new AppDbBotClient();
-  const knownRooms = (await getSetting<string[]>(globalDb, 'knownRooms')) ?? [];
+  const knownRooms = await readKnownRooms();
   for (const roomId of knownRooms) {
     await sweepRoom(hub, roomId).catch((error) => {
       console.error('[startup-sweep] room sweep failed', { roomId, error: error instanceof Error ? error.message : error });

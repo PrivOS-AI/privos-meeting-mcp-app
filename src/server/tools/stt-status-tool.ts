@@ -24,7 +24,8 @@ export const sttStatusTool: AppTool = {
   inputSchema: { type: 'object', properties: {} },
   async execute(_args, context) {
     const actor = requireVerifiedActor(context);
-    const db = new AppDbBotClient();
+    // Bind to the caller's room so the global `app_settings` reads resolve to the granted `room` permission context.
+    const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     const realtimeVendor = await resolveRealtimeVendor(db).catch(() => undefined);
 
     if (!isWorkspaceAdmin(actor)) {

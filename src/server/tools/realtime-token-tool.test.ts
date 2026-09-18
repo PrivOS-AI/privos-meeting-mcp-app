@@ -9,13 +9,14 @@ vi.mock('@privos_ai/app-server', async (importOriginal) => {
 });
 vi.mock('../hub/resolve-hub-origin.js', () => ({ resolveHubOrigin: async () => 'https://hub.example' }));
 vi.mock('../hub/resolve-own-mcp-app-id.js', () => ({ resolveOwnMcpAppId: async () => 'app-123' }));
+// Concurrent-recording count enumerates the node-local known-rooms store, not app_settings.
+vi.mock('../jobs/known-rooms-store.js', () => ({ readKnownRooms: async () => ['room-1'] }));
 
 let store: Store;
 let fakeHub: ReturnType<typeof installFakeHub>;
 
 function freshStore(): Store {
   return {
-    app_settings: [{ _id: 'set-1', key: 'knownRooms', valueJson: JSON.stringify(['room-1']) }],
     meetings: [
       {
         _id: 'meeting-1',

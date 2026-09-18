@@ -37,7 +37,8 @@ export const settingsSetTool: AppTool = {
     }
     const value = WORKSPACE_SETTING_VALIDATORS[key](args.value);
 
-    const db = new AppDbBotClient();
+    // Bind to the admin's room so the global `app_settings` write resolves to the granted `room` permission context.
+    const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     await setSetting(db, key, value);
     return { settings: { [key]: value } };
   },

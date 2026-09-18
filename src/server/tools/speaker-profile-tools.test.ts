@@ -8,6 +8,8 @@ vi.mock('@privos_ai/app-server', async (importOriginal) => {
 });
 vi.mock('../hub/resolve-hub-origin.js', () => ({ resolveHubOrigin: async () => 'https://hub.example' }));
 vi.mock('../hub/resolve-own-mcp-app-id.js', () => ({ resolveOwnMcpAppId: async () => 'app-123' }));
+// Known rooms now live in the node-local store, not app_settings; delete sweeps this list.
+vi.mock('../jobs/known-rooms-store.js', () => ({ readKnownRooms: async () => ['room-a', 'room-b'] }));
 
 import { env } from '../env.js';
 import { resetVoiceprintKeyCacheForTests, sealEmbedding } from '../speaker/voiceprint-crypto.js';
@@ -83,7 +85,6 @@ describe('speaker_profile_list/_update/_delete', () => {
   });
 
   it('delete removes the profile row and purges links across every known room', async () => {
-    store.app_settings = [{ _id: 's1', key: 'knownRooms', valueJson: JSON.stringify(['room-a', 'room-b']) }];
     store.meeting_speakers = [
       { _id: 'ms1', profileId: 'profile-1', pendingEmbedding: 'x' },
       { _id: 'ms2', profileId: 'profile-1', pendingEmbedding: '' },

@@ -1,7 +1,17 @@
 /**
  * `mcpapp.db.*` wrapper that runs as this app's installation bot (via
- * `callAppPlatformTool`). Global collections (speaker_profiles, app_settings)
- * are addressed room-lessly; room collections pass the bound `roomId`.
+ * `callAppPlatformTool`). Every call carries the bound `roomId` when the client
+ * has one — for global collections (speaker_profiles, app_settings) too.
+ *
+ * Why globals also pass the roomId: the Hub grants `db:*` only at the `room`
+ * permission context this app declares, and a call resolves to `room` context
+ * only when a roomId is present (room-less resolves to `workspace`, which never
+ * matches). For a `scope:'global'` collection the Hub IGNORES the roomId for
+ * storage — it resolves to the same `app_{appId}_{collection}` and returns the
+ * same shared rows (verified in Hub `resolveCollectionName` / `findByApp`) — so
+ * passing it only satisfies the permission context, never shards the data.
+ * A room-less client (no bound roomId) still sends nothing and is only used
+ * where a room genuinely does not exist yet.
  *
  * `ensureAppDbSchema` registers every collection in the shared schema module,
  * treating the Hub's non-idempotent "already registered" as success and
@@ -44,12 +54,13 @@ export function extractDbTotal(result: unknown): number {
   return typeof total === 'number' ? total : extractDbRecords(result).length;
 }
 
-/** Room-less scopes never send a roomId; room scopes require the bound one. */
+/** Carries the bound roomId on every call (globals included) so the Hub resolves the granted `room` permission context; see the file header. */
 export class AppDbBotClient {
   constructor(private readonly roomId?: string) {}
 
-  private roomArg(scope: 'global' | 'room'): string | undefined {
-    return scope === 'room' ? this.roomId : undefined;
+  /** The bound roomId for BOTH scopes: room scope needs it for storage, global scope needs it only for the permission context. */
+  private roomArg(_scope: 'global' | 'room'): string | undefined {
+    return this.roomId;
   }
 
   async registerCollection(schema: CollectionSchema): Promise<unknown> {
@@ -112,8 +123,10 @@ export class AppDbBotClient {
 /**
  * Register every schema in the shared module. Idempotent from the caller's view:
  * "already registered/exists" is treated as success, then drift is reconciled.
- * Global collections register room-lessly (verified QĐ-05); a global schema that
- * comes back stamped with a roomId is the poisoned state P1 spike 4 checks for.
+ * Global collections register with the bound roomId too (for the `room`
+ * permission context); the Hub does not persist a roomId on a `scope:'global'`
+ * schema (verified in the Hub schema registry — only room scope stamps one), so
+ * the global schema stays unstamped and shared across every room.
  */
 export async function ensureAppDbSchema(db: AppDbBotClient): Promise<void> {
   for (const schema of SCHEMAS) {

@@ -1,17 +1,17 @@
 /**
  * `meeting_bootstrap {roomId}` — one-time-per-room setup, idempotent. Registers
- * every App DB collection room-lessly for globals and room-scoped for the rest,
- * records the room in `knownRooms`, and ensures the installation bot is a member
- * of the room so it can write Files.
+ * every App DB collection (globals and room-scoped alike, all under this room's
+ * permission context), records the room in the node-local known-rooms registry,
+ * and ensures the installation bot is a member of the room so it can write Files.
  *
  * Reserved seams (filled in later phases): sweep interrupted jobs (P3), sweep
  * abandoned recording meetings (P3), delete expired audio (P8).
  */
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, ensureAppDbSchema } from '../hub/app-db-bot-client.js';
-import { appendKnownRoom } from '../hub/app-settings.js';
 import { ensureBotInRoom } from '../hub/ensure-bot-in-room.js';
 import { purgeExpiredAudio } from '../jobs/audio-retention-job.js';
+import { addKnownRoom } from '../jobs/known-rooms-store.js';
 import { sweepRoom } from '../jobs/startup-sweep.js';
 import type { AppTool } from './registry.js';
 
@@ -26,7 +26,7 @@ export const bootstrapTool: AppTool = {
 
     const db = new AppDbBotClient(roomId);
     await ensureAppDbSchema(db);
-    const knownRooms = await appendKnownRoom(db, roomId);
+    const knownRooms = await addKnownRoom(roomId);
     const botJoined = await ensureBotInRoom(roomId);
 
     // Best-effort: requeue this room's stuck jobs / abandoned recordings /

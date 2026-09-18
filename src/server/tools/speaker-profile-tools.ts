@@ -14,7 +14,7 @@
 import { sanitizeDisplayName } from '../../shared/sanitize-display-name.js';
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
-import { getSetting } from '../hub/app-settings.js';
+import { readKnownRooms } from '../jobs/known-rooms-store.js';
 import * as profileStore from '../speaker/profile-store.js';
 import { isWorkspaceAdmin, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
@@ -44,8 +44,8 @@ export const speakerProfileListTool: AppTool = {
   description: 'Liệt kê mọi hồ sơ giọng nói trong workspace (tên, liên kết, số mẫu) — không bao giờ trả về vector.',
   inputSchema: { type: 'object', properties: {} },
   async execute(_args, context) {
-    requireVerifiedActor(context);
-    const db = new AppDbBotClient();
+    const actor = requireVerifiedActor(context);
+    const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     const profiles = await profileStore.listProfiles(db);
     return { profiles: profiles.map(toListItem) };
   },
@@ -110,14 +110,14 @@ export const speakerProfileDeleteTool: AppTool = {
     const profileId = asString(args.profileId);
     if (!profileId) throw new AppError('profileId là bắt buộc.');
 
-    const db = new AppDbBotClient();
+    const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     const profile = await profileStore.getProfile(db, profileId);
     if (!profile) throw new AppError('Không tìm thấy hồ sơ giọng nói.');
     if (profile.createdByUserId !== actor.userId && !isWorkspaceAdmin(actor)) {
       throw new AppError('Chỉ người tạo hồ sơ hoặc quản trị viên workspace mới xoá được hồ sơ này.');
     }
 
-    const knownRooms = (await getSetting<string[]>(db, 'knownRooms')) ?? [];
+    const knownRooms = await readKnownRooms();
     await profileStore.deleteProfile(db, profileId, knownRooms);
     return { deleted: true };
   },

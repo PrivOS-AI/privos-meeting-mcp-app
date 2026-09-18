@@ -17,7 +17,8 @@ phát hiện, không đặt bằng env:
 Boot chạy `assertProviderKeysAtBoot()` (fatal ở production nếu provider đang chọn thiếu
 khoá hoặc thiếu `VOICEPRINT_ENC_KEY`) và self-check credential bot. Sau khi handler sẵn
 sàng: `startupSweep()` (job/meeting bỏ rơi) và `startAudioRetention()` (P8, mỗi 6h) chạy
-fire-and-forget trên mọi `knownRooms`. `SIGTERM`/`SIGINT` được app tự bắt (đăng ký TRƯỚC
+fire-and-forget trên mọi phòng trong registry node-local `known-rooms.json` (đọc room-less,
+xem `jobs/known-rooms-store.ts`). `SIGTERM`/`SIGINT` được app tự bắt (đăng ký TRƯỚC
 `serveApp()`) để `meetingQueue.startDraining()` từ chối job mới và dừng interval retention
 ngay lập tức — `serveApp` tự lo phần đóng transport/HTTP server; pm2's `kill_timeout` chỉ
 còn phải chờ job **đang chạy** (nếu có) tự xong hoặc tự timeout.
@@ -25,9 +26,12 @@ còn phải chờ job **đang chạy** (nếu có) tự xong hoặc tự timeout
 ## Backend Hub access (installation bot)
 
 Mọi ghi App DB/job/settings đi qua `POST /api/v1/mcp-apps.tool-call` với credential bot
-(`src/server/hub/bot-tool-call.ts` → `callAppPlatformTool`). `roomId` **tuỳ chọn** —
-collection `scope:'global'` (speaker_profiles, app_settings) gọi room-lessly (QĐ-05).
-`resolveOwnMcpAppId()` cấp `mcpAppId` cho body. Iframe chỉ **đọc** App DB để hiển thị.
+(`src/server/hub/bot-tool-call.ts` → `callAppPlatformTool`). Mọi call mang `roomId` khi
+client có (kể cả collection `scope:'global'` speaker_profiles/app_settings): Hub cấp `db:*`
+chỉ ở permission context `room`, nên call phải có roomId mới resolve đúng context — Hub bỏ
+qua roomId khi lưu global collection (dữ liệu vẫn dùng chung mọi phòng), roomId chỉ thoả
+context. Sweep boot/6h chạy room-less nên đọc danh sách phòng từ registry node-local, không
+từ App DB. `resolveOwnMcpAppId()` cấp `mcpAppId` cho body. Iframe chỉ **đọc** App DB để hiển thị.
 
 ## Data flow (record → live naming → process → review)
 
@@ -74,7 +78,8 @@ naming) dùng lại nguyên xi:
   range riêng** (không nối PCM trước) để tính `minPairwiseCosine` — cụm lưỡng đỉnh (hai
   giọng lẫn một turn) bị chặn enrol tự động dù embedding trung bình có vẻ khớp ai đó.
 - `speaker-matcher.ts`: so **từng embedding** (max), không so centroid.
-- `profile-store.ts`: CRUD `speaker_profiles` (global, room-less), `withProfileLock` +
+- `profile-store.ts`: CRUD `speaker_profiles` (global, dùng chung mọi phòng; call vẫn mang
+  roomId cho permission context), `withProfileLock` +
   re-read trước khi ghi (chặn 2 job ghi đè `embeddings[]`), cap 20 embedding/profile.
 
 Tool: `speaker_resolve` (owner, 4 mode, cổng đồng nhất nội cụm), `speaker_profile_list/_update/_delete`

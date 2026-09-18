@@ -17,8 +17,8 @@
  *     `pendingEmbedding` cũ hơn 30 ngày"). The row keeps its "Người nói N"
  *     label; only the pending biometric ciphertext is cleared.
  *
- * Runs at boot and every 6h across every `app_settings.knownRooms` room
- * (`startAudioRetention`), and per-room from `meeting_bootstrap`
+ * Runs at boot and every 6h across every room in the node-local known-rooms
+ * registry (`startAudioRetention`), and per-room from `meeting_bootstrap`
  * (`purgeExpiredAudio`) — same signature convention as `startup-sweep.ts`'s
  * `sweepRoom`/`startupSweep` pair, which this module is a sibling of.
  */
@@ -28,6 +28,7 @@ import { DEFAULT_WORKSPACE_SETTINGS } from '../../shared/app-settings.js';
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
 import { getSetting } from '../hub/app-settings.js';
 import { deleteRoomFile, listRoomFolderFiles } from '../media/hub-file-download.js';
+import { readKnownRooms } from './known-rooms-store.js';
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 const PENDING_EMBEDDING_TTL_DAYS = 30;
@@ -123,10 +124,11 @@ async function purgeStalePendingEmbeddings(roomId: string): Promise<number> {
 
 /** One room's full retention sweep — called by `meeting_bootstrap` for the room it just opened, and by `startAudioRetention`'s interval for every known room. */
 export async function purgeExpiredAudio(hub: RoomBoundHubClient, roomId: string): Promise<RetentionSummary> {
-  const globalDb = new AppDbBotClient();
-  const autoDeleteAudioDays = (await getSetting<number>(globalDb, 'autoDeleteAudioDays')) ?? DEFAULT_WORKSPACE_SETTINGS.autoDeleteAudioDays;
+  // Global `app_settings` reads carry this room's id so they resolve to the granted `room` permission context (see AppDbBotClient).
+  const settingsDb = new AppDbBotClient(roomId);
+  const autoDeleteAudioDays = (await getSetting<number>(settingsDb, 'autoDeleteAudioDays')) ?? DEFAULT_WORKSPACE_SETTINGS.autoDeleteAudioDays;
   const interruptedPartsRetentionDays =
-    (await getSetting<number>(globalDb, 'interruptedPartsRetentionDays')) ?? DEFAULT_WORKSPACE_SETTINGS.interruptedPartsRetentionDays;
+    (await getSetting<number>(settingsDb, 'interruptedPartsRetentionDays')) ?? DEFAULT_WORKSPACE_SETTINGS.interruptedPartsRetentionDays;
 
   const audioDeleted = await purgeKeptAudio(hub, roomId, autoDeleteAudioDays);
   const orphanPartsDeleted = await purgeInterruptedParts(hub, roomId, interruptedPartsRetentionDays);
@@ -139,8 +141,7 @@ export async function purgeExpiredAudio(hub: RoomBoundHubClient, roomId: string)
 }
 
 async function sweepAllKnownRooms(hub: RoomBoundHubClient): Promise<void> {
-  const globalDb = new AppDbBotClient();
-  const knownRooms = (await getSetting<string[]>(globalDb, 'knownRooms')) ?? [];
+  const knownRooms = await readKnownRooms();
   for (const roomId of knownRooms) {
     await purgeExpiredAudio(hub, roomId).catch((error) => {
       console.warn('[audio-retention-job] room sweep thất bại:', roomId, error instanceof Error ? error.message : error);

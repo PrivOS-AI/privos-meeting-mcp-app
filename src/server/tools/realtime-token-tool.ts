@@ -8,7 +8,7 @@
  */
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
-import { getSetting } from '../hub/app-settings.js';
+import { readKnownRooms } from '../jobs/known-rooms-store.js';
 import { env } from '../env.js';
 import { realtimeProviderFor, resolveRealtimeVendor } from '../stt/stt-provider-registry.js';
 import type { AppTool } from './registry.js';
@@ -30,8 +30,7 @@ function asString(value: unknown): string {
 }
 
 async function countFreshRecordings(freshSinceIso: string): Promise<number> {
-  const globalDb = new AppDbBotClient();
-  const knownRooms = (await getSetting<string[]>(globalDb, 'knownRooms')) ?? [];
+  const knownRooms = await readKnownRooms();
   let total = 0;
   for (const roomId of knownRooms) {
     const roomDb = new AppDbBotClient(roomId);

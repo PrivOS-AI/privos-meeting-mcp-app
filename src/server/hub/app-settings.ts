@@ -60,18 +60,3 @@ export async function setSetting(db: AppDbBotClient, key: string, value: unknown
     await db.update('app_settings', 'global', raced._id, { valueJson });
   }
 }
-
-/**
- * Add a roomId to the `knownRooms` list setting if not already present.
- * NOTE: read-modify-write is not atomic — two bootstraps for DIFFERENT rooms
- * racing could last-write-wins and drop one entry. Acceptable now (bootstrap is
- * rare and idempotent-on-retry); the Phase-3 sweeper must not assume knownRooms
- * is exhaustive on the first call.
- */
-export async function appendKnownRoom(db: AppDbBotClient, roomId: string): Promise<string[]> {
-  const rooms = (await getSetting<string[]>(db, 'knownRooms')) ?? [];
-  if (rooms.includes(roomId)) return rooms;
-  const next = [...rooms, roomId];
-  await setSetting(db, 'knownRooms', next);
-  return next;
-}
