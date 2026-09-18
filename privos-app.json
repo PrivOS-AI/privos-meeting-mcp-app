@@ -80,7 +80,7 @@
       "scope": "sandbox:generate",
       "requirement": "required",
       "context": "room",
-      "executionContext": "both",
+      "executionContext": "user",
       "feature": "meeting.ai.summary",
       "reason": "Tóm tắt và dịch theo lô bằng Hub AI, không gửi transcript ra bên thứ ba."
     },
@@ -115,7 +115,7 @@
       "scope": "bot:room:join",
       "requirement": "optional",
       "context": "room",
-      "executionContext": "background",
+      "executionContext": "user",
       "feature": "meeting.bot.join",
       "reason": "meeting_bootstrap thêm bot cài đặt vào phòng để ghi Files.",
       "degradedBehavior": "Nhờ quản trị viên thêm bot vào phòng thủ công; xử lý tạm dừng tới khi bot vào phòng."
@@ -124,7 +124,7 @@
       "scope": "bot:identity:read",
       "requirement": "optional",
       "context": "room",
-      "executionContext": "background",
+      "executionContext": "user",
       "feature": "meeting.bot.identity",
       "reason": "Đọc danh tính bot để kiểm tra credential và hiển thị trạng thái.",
       "degradedBehavior": "Banner hướng dẫn cấu hình credential bot."
