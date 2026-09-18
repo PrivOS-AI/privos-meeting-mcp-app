@@ -11,7 +11,7 @@ import type { AppMcpHandler, ServeAppHandlerContext, ToolCallContext } from '@pr
 
 import { AppError } from '../shared/app-error.js';
 import { env, isDevelopmentRuntime } from './env.js';
-import { UI_RESOURCE_URI, manifest } from './manifest.js';
+import { UI_RESOURCE_URI, manifest, resolveFilesOrigin } from './manifest.js';
 import { listToolDefinitions, resolveTool, type ToolRuntime } from './tools/registry.js';
 import { renderUiHtml } from './ui-resource.js';
 
@@ -21,10 +21,15 @@ const UI_TOOL_NAME = String(UI_TOOL?.name ?? 'meeting_agent');
 const UI_TOOL_TITLE = String(UI_TOOL?.title ?? manifest.title);
 const UI_TOOL_DESCRIPTION = String(UI_TOOL?.description ?? manifest.description);
 
-/** `_meta.ui` (resourceUri + permissions + csp + hideAiChat) for the UI tool. */
-const UI_TOOL_META = (manifest.tools[0] as { _meta?: { ui?: unknown } })?._meta ?? {
-  ui: { resourceUri: UI_RESOURCE_URI },
-};
+/**
+ * `_meta.ui` (resourceUri + permissions + csp + hideAiChat) for the UI tool.
+ * The CSP `<PRIVOS_FILES_ORIGIN>` placeholder is resolved from env here too —
+ * this `_meta` is what `tools/list` advertises to the Hub, which is where the
+ * iframe CSP is actually enforced from.
+ */
+const UI_TOOL_META = resolveFilesOrigin(
+  (manifest.tools[0] as { _meta?: { ui?: unknown } })?._meta ?? { ui: { resourceUri: UI_RESOURCE_URI } },
+);
 
 /** Fail closed unless the caller is a verified actor (dev escape hatch aside). */
 function assertVerifiedActor(context: ToolCallContext): void {

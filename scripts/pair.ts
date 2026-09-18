@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { buildPairingMetadata, pairAndAwaitApproval, type PairingResult } from '@privos_ai/app-server';
 import WebSocket from 'ws';
 
-import { buildRelayAppDescriptor } from '../src/server/manifest.js';
+import { buildRelayAppDescriptor, resolveFilesOrigin } from '../src/server/manifest.js';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -46,7 +46,9 @@ async function main(): Promise<void> {
   const pairUrl = await prompt('Enter the one-time pairing URL from Hub Admin: ');
   if (!pairUrl) throw new Error('No pairing URL provided');
 
-  const manifest = JSON.parse(await readFile(path.join(repositoryRoot, 'privos-app.json'), 'utf8'));
+  // Resolve the CSP `<PRIVOS_FILES_ORIGIN>` placeholder from env before announcing,
+  // so the paired install carries the real Files origin (not the literal token).
+  const manifest = resolveFilesOrigin(JSON.parse(await readFile(path.join(repositoryRoot, 'privos-app.json'), 'utf8')));
   console.log('\nRegistering… once registered, approve the permission ceiling in Hub Admin > Apps.');
   console.log('This command keeps waiting and starts the app automatically after approval.');
   const paired: PairingResult = await pairAndAwaitApproval(

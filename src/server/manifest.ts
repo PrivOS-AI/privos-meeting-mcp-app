@@ -19,11 +19,33 @@ export const MARKETPLACE_MANIFEST_FIELDS = [
 
 export type AppManifest = Pick<typeof publisherManifest, Extract<(typeof MARKETPLACE_MANIFEST_FIELDS)[number], keyof typeof publisherManifest>>;
 
+/**
+ * Placeholder token in the manifest CSP (`_meta.ui.csp.connect-src`/`media-src`)
+ * that must be replaced with the Hub's real presigned-Files origin before the
+ * iframe can fetch transcript/audio. Kept literal in `privos-app.json` (source +
+ * lint) and resolved from `PRIVOS_FILES_ORIGIN` at build/boot by
+ * {@link createManifest}, so switching Hub is an env change, not a manifest edit.
+ */
+export const FILES_ORIGIN_PLACEHOLDER = '<PRIVOS_FILES_ORIGIN>';
+
+/**
+ * Substitute {@link FILES_ORIGIN_PLACEHOLDER} with `PRIVOS_FILES_ORIGIN` when set
+ * (trailing slash trimmed). Regex-free string replace so an origin with special
+ * characters is safe. Leaves the placeholder untouched when the env is unset
+ * (dev / `manifest:lint`), which never reaches a real iframe.
+ */
+export function resolveFilesOrigin<T>(value: T): T {
+  const origin = (process.env.PRIVOS_FILES_ORIGIN ?? '').trim().replace(/\/+$/, '');
+  if (!origin) return value;
+  return JSON.parse(JSON.stringify(value).split(FILES_ORIGIN_PLACEHOLDER).join(origin)) as T;
+}
+
 /** The reviewed manifest projected onto the fields the Hub/marketplace recognizes. */
 export function createManifest(): AppManifest {
-  return Object.fromEntries(
+  const projected = Object.fromEntries(
     MARKETPLACE_MANIFEST_FIELDS.map((field) => [field, (publisherManifest as Record<string, unknown>)[field]]),
   ) as AppManifest;
+  return resolveFilesOrigin(projected);
 }
 
 /** The full reviewed manifest, for code that needs fields outside the projection. */
