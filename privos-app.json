@@ -133,7 +133,7 @@
       "scope": "bot:message:send",
       "requirement": "optional",
       "context": "room",
-      "executionContext": "user",
+      "executionContext": "background",
       "feature": "meeting.chat.send",
       "reason": "Gửi tóm tắt cuộc họp vào phòng chat qua bot cài đặt.",
       "degradedBehavior": "Ẩn nút Gửi vào chat."
