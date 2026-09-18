@@ -1,15 +1,26 @@
 /**
- * Reads `live-turns.json` from the meeting's Files folder — P5 appends live
- * speaker spans there after every part, P3 only reads it (the reconcile hook
- * this phase leaves in place, see `jobs/meeting-job.ts`). Absent until P5
- * ships, so a miss is normal, not an error.
+ * Reads and appends `live-turns.json` in the meeting's Files folder. P5's
+ * chunk worker (`live-speakers/chunk-worker.ts`) calls `appendLiveTurns`
+ * after every chunk with the turns it just settled — `speakerKey` there
+ * carries the LIVE `sessionSpeakerId`, not a Soniox label, so P3/P6's
+ * `reconcileWithLiveSpeakers` (`jobs/meeting-job.ts`) can align it against the
+ * async pass's own spans via `caption-aligner.alignByMaxOverlap`. Reading
+ * happens BOTH ways: the reconcile hook reads the finished file, and
+ * `appendLiveTurns` itself reads-then-writes since there is no server-side
+ * "append to file" primitive on Files — safe here because App DB's
+ * `snapshotHash` gate already limits chunk writes to at most once per part,
+ * so nothing else is racing this read-modify-write for the same meeting
+ * (chunks are processed serially per meeting, `keyed-serial-queue.ts`).
+ * Absent until the first chunk ever lands, so a miss is normal, not an error.
  */
 import type { RoomBoundHubClient } from '@privos_ai/app-server';
 
+import { uploadBotFile } from '../files/hub-file-upload.js';
 import { fetchFileReadable, listRoomFolderFiles } from './hub-file-download.js';
 
 export interface LiveTurnSpan {
   id: string;
+  /** The live `sessionSpeakerId` this span belongs to (P5) — NOT a raw Soniox label. */
   speakerKey: string;
   /** Meeting-clock milliseconds (already offset-adjusted client-side). */
   startMs: number;
@@ -66,4 +77,34 @@ export async function readLiveTurns(
   } catch {
     return null;
   }
+}
+
+/**
+ * Appends `newTurns` to the meeting's `live-turns.json`, creating it on the
+ * first call. A no-op when `newTurns` is empty — the chunk worker calls this
+ * unconditionally, so an idle/silent chunk must not still trigger a Files
+ * write. Failures are the caller's to handle (chunk-worker.ts already treats
+ * the whole chunk as best-effort and never lets this throw past its own
+ * `catch`).
+ */
+export async function appendLiveTurns(
+  hub: RoomBoundHubClient,
+  roomId: string,
+  folderId: string,
+  newTurns: readonly LiveTurnSpan[],
+  signal?: AbortSignal,
+): Promise<void> {
+  if (newTurns.length === 0) return;
+  const existing = await readLiveTurns(hub, roomId, folderId, signal);
+  const merged: LiveTurnsFile = { turns: [...(existing?.turns ?? []), ...newTurns] };
+  await uploadBotFile({
+    hub,
+    roomId,
+    folderId,
+    fileName: LIVE_TURNS_FILE_NAME,
+    mimeType: 'application/json',
+    data: Buffer.from(JSON.stringify(merged), 'utf8'),
+    duplicateAction: 'replace',
+    signal,
+  });
 }

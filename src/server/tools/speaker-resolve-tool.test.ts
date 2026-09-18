@@ -117,4 +117,25 @@ describe('speaker_resolve', () => {
     await speakerResolveTool.execute({ roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'name', displayName: 'An' }] }, ctx(), {} as never);
     expect(store.meeting_speakers[0].pendingEmbedding).toBeTruthy();
   });
+
+  it('P5 quick-assign: accepts a sessionSpeakerId as speakerId when no async speakerId row matches (mid-meeting live registry row)', async () => {
+    store.meeting_speakers.push({
+      _id: 'ms-live',
+      meeting: 'meeting-1',
+      sessionSpeakerId: 'ss-42',
+      resolved: false,
+      pendingEmbedding: sealPendingEmbedding(new Float32Array([0, 1, 0, 0]), { profileId: 'live:meeting-1:ss-42', minPairwiseCosine: 1, rangeCount: 1, durationSec: 9 }),
+    });
+
+    const result = (await speakerResolveTool.execute(
+      { roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'ss-42', mode: 'name', displayName: 'Thanh' }] },
+      ctx(),
+      {} as never,
+    )) as { resolved: Array<{ speakerId: string; enrolled: boolean; displayName?: string }> };
+
+    expect(result.resolved[0]).toMatchObject({ speakerId: 'ss-42', enrolled: true, displayName: 'Thanh' });
+    const liveRow = store.meeting_speakers.find((r) => r.sessionSpeakerId === 'ss-42')!;
+    expect(liveRow.displayName).toBe('Thanh');
+    expect(liveRow.resolved).toBe(true);
+  });
 });

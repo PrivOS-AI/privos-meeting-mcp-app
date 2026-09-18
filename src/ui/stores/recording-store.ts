@@ -63,6 +63,10 @@ export interface RecordingState {
   clockSkewMs: number;
   lines: CaptionLine[];
   speakerMap: Record<string, LiveSpeakerBadge>;
+  /** Raw list from the last `meeting_live_speakers` poll — drives the "Ai đang nói?" chip row. */
+  liveSpeakers: LiveSpeaker[];
+  /** True once any chunk for this meeting was dropped/failed (S2-08) — "một số đoạn chưa nhận diện được". */
+  liveSpeakersDegraded: boolean;
   stageCaptionSize: StageCaptionSize;
   showTranslation: boolean;
   wakeLock: WakeLockState;
@@ -96,6 +100,8 @@ function initialState(): RecordingState {
     clockSkewMs: 0,
     lines: [],
     speakerMap: {},
+    liveSpeakers: [],
+    liveSpeakersDegraded: false,
     stageCaptionSize: 'medium',
     showTranslation: false,
     wakeLock: { supported: false, active: false },
@@ -308,6 +314,7 @@ export class RecordingStore {
         roomId: this.ctx.roomId,
         meetingId,
         onUpdate: (map) => this.applySpeakerMap(map),
+        onSpeakersUpdate: (speakers, meta) => this.setState({ liveSpeakers: speakers, liveSpeakersDegraded: meta.degraded }),
       });
     }
 
@@ -350,6 +357,25 @@ export class RecordingStore {
     }
     // Relabel every rendered line's badge only — never touch `text`.
     this.setState({ speakerMap });
+  }
+
+  /**
+   * Optimistic update right after a quick-assign `speaker_resolve` call
+   * succeeds — patches the chip AND every already-rendered line's badge for
+   * that `sessionSpeakerId` immediately, instead of waiting up to
+   * `intervalMs` for the next poll to confirm the same thing.
+   */
+  applyQuickAssignResult(sessionSpeakerId: string, displayName: string): void {
+    const liveSpeakers = this.state.liveSpeakers.map((s) => (s.sessionSpeakerId === sessionSpeakerId ? { ...s, displayName, resolved: true } : s));
+    const target = liveSpeakers.find((s) => s.sessionSpeakerId === sessionSpeakerId);
+    const speakerMap = { ...this.state.speakerMap };
+    if (target) {
+      for (const label of target.sonioxLabels) {
+        const key = label.split('@')[0];
+        if (speakerMap[key]) speakerMap[key] = { ...speakerMap[key], displayName, resolved: true };
+      }
+    }
+    this.setState({ liveSpeakers, speakerMap });
   }
 
   // -------------------------------------------------------------- upload

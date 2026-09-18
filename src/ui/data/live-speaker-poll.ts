@@ -2,9 +2,9 @@
  * Polls `meeting_live_speakers` every 3-5s while recording (provider has
  * speaker labels only — QĐ-18) and applies the returned map onto every
  * already-rendered caption line by `speakerKey`: relabel the badge, NEVER the
- * text. The backend tool itself lands in Phase 5; until then this simply gets
- * "unknown tool" errors, which are swallowed the same way a real miss would be
- * (the label just stays as "Người nói N" longer).
+ * text (plan.md § "Giao thức relabel"). Also exposes the raw session-speaker
+ * list (`onSpeakersUpdate`) for the "Ai đang nói?" chip row, and the
+ * `degraded`/`labelsSupported` flags for the UI's own notices.
  */
 import { parseToolResult } from '@privos_ai/app-react';
 import type { McpApp } from '@privos_ai/app-react';
@@ -15,12 +15,17 @@ export interface LiveSpeaker {
   displayName?: string;
   profileId?: string;
   liveConfidence?: number;
+  liveSpeechSec: number;
   colorKey: string;
   resolved: boolean;
+  /** Set when this session speaker lost a merge — its labels are already folded into the winner's own `sonioxLabels`, so callers should treat this entry as a historical alias, not a live speaker of its own. */
+  mergedInto?: string;
 }
 
 interface LiveSpeakersResponse {
   sessionSpeakers?: LiveSpeaker[];
+  degraded?: boolean;
+  labelsSupported?: boolean;
   updatedAt?: string;
 }
 
@@ -30,14 +35,25 @@ export interface LiveSpeakerPollOptions {
   intervalMs?: number;
   /** speakerKey -> LiveSpeaker, applied to every rendered line with that key. */
   onUpdate(map: Map<string, LiveSpeaker>): void;
+  /** The raw list every poll — drives the "Ai đang nói?" chip row. */
+  onSpeakersUpdate?(speakers: LiveSpeaker[], meta: { degraded: boolean; labelsSupported: boolean }): void;
 }
 
 const DEFAULT_INTERVAL_MS = 4000;
 
-/** speakerKey is `s{sessionIndex}:{label}` — a `sonioxLabels` entry may carry a `@n` split suffix the badge ignores. */
+/**
+ * `speakerKey` is `s{sessionIndex}:{label}` — a `sonioxLabels` entry may carry
+ * a `@n` split-instance suffix the badge ignores. A session speaker that lost
+ * a merge (`mergedInto` set) is skipped here: the WINNER's own `sonioxLabels`
+ * already includes every label the loser ever owned (see
+ * `session-speaker-registry.ts`'s `maybeMerge`), so mapping the loser too
+ * would non-deterministically overwrite the winner's entry depending on
+ * array order.
+ */
 function toSpeakerKeyMap(speakers: LiveSpeaker[]): Map<string, LiveSpeaker> {
   const map = new Map<string, LiveSpeaker>();
   for (const speaker of speakers) {
+    if (speaker.mergedInto) continue;
     for (const label of speaker.sonioxLabels) map.set(label.split('@')[0], speaker);
   }
   return map;
@@ -62,7 +78,9 @@ export class LiveSpeakerPoll {
         arguments: { roomId: this.opts.roomId, meetingId: this.opts.meetingId },
       });
       const parsed = parseToolResult(raw) as LiveSpeakersResponse;
-      this.opts.onUpdate(toSpeakerKeyMap(parsed?.sessionSpeakers ?? []));
+      const speakers = parsed?.sessionSpeakers ?? [];
+      this.opts.onUpdate(toSpeakerKeyMap(speakers));
+      this.opts.onSpeakersUpdate?.(speakers, { degraded: parsed?.degraded === true, labelsSupported: parsed?.labelsSupported !== false });
     } catch {
       // Not available before Phase 5, or a transient failure — badges just stay unresolved longer.
     }

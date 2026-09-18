@@ -129,5 +129,13 @@
   "speaker.settingsPanel.thresholdSave": "Save",
   "speaker.settingsPanel.thresholdWarning": "Changing the threshold only affects meetings processed afterwards.",
   "speaker.settingsPanel.thresholdSaved": "Threshold saved.",
-  "speaker.settingsPanel.thresholdUnavailable": "This setting is not available in this version yet."
+  "speaker.settingsPanel.thresholdUnavailable": "This setting is not available in this version yet.",
+
+  "recording.speakerChips.label": "Who's speaking?",
+  "recording.speakerChips.identifying": "Identifying…",
+  "recording.speakerChips.degraded": "Some segments could not be identified",
+
+  "speaker.quickAssign.title": "Who's speaking?",
+  "speaker.quickAssign.samePersonAs": "Same person as …",
+  "speaker.quickAssign.notFoundYet": "Not enough voice data for this person yet — try again in a few seconds."
 }

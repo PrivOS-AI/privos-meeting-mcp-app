@@ -75,6 +75,43 @@ naming) dùng lại nguyên xi:
 Tool: `speaker_resolve` (owner, 4 mode, cổng đồng nhất nội cụm), `speaker_profile_list/_update/_delete`
 (`createdByUserId` hoặc admin), `meeting_relabel_speaker` (back-propagate, P7 dùng lại).
 
+## Live speaker naming từ chunk (P5)
+
+Chunk = part 60s P2 đã upload (không thêm luồng audio). `meeting_chunk_ready` xác thực
+span (cấu trúc, không audio) rồi enqueue vào `src/server/jobs/keyed-serial-queue.ts` —
+khoá theo `meetingId`, backlog "mới nhất + 2", `abort()` đợi child thoát (KHÔNG dùng
+`render-queue.ts` của gia phả — không khoá theo key, timeout không dừng việc đang chạy).
+
+`src/server/live-speakers/chunk-worker.ts` (`processChunk`): tải part theo `seq`
+(`part-window.ts`) → decode → cắt PCM theo turn (bù ring buffer overlap) → RMS lọc khoảng
+lặng (`tools/span-validation.ts`, mặc định RMS — Silero/`sherpa_onnx.Vad` là câu hỏi mở
+#9 chưa chốt) → `computeEmbedding` → `session-speaker-registry.ts`. Turn vắt biên part
+được **hoãn** (`defer`/`takeDeferred`), không bỏ; dedupe theo `(speaker, startMs)`. Một
+chunk lỗi chỉ mất nhãn của chính nó — `noteDecoded` luôn chạy trong `finally` nên đồng hồ
+tích luỹ (`decodedSecBefore`) không bao giờ lệch vĩnh viễn.
+
+`session-speaker-registry.ts` (thuần in-memory, theo `meetingId`): nhãn Soniox chỉ là gợi
+ý — mọi embedding được so lại với centroid của session speaker đang gắn nhãn đó; nhãn bị
+dùng lại cho giọng khác → mở `label@n`, centroid cũ không đổi. Gắn dính (`sticky`) chỉ sau
+≥2 lượt và ≥`LIVE_MIN_SPEECH_SEC` giây nói. Hai session speaker hội tụ centroid
+(`SPEAKER_SESSION_MERGE_THRESHOLD`) → gộp, bên `speechSec` lớn hơn thắng. TTL 30 phút +
+LRU (trần = `LIVE_MAX_CONCURRENT_RECORDINGS`) qua `SessionRegistryStore`.
+
+`live-speakers/live-speaker-repository.ts`: `upsertAll` ghi `meeting_speakers` (khoá
+`sessionSpeakerId`, **không** ghi đè trường của upsert async khoá `speakerId` — hai hàm
+chỉ set trường chính chúng có) — chỉ ghi khi `snapshotHash` đổi (≤1 lần/part). Span đã
+chốt được nối vào `live-turns.json` (`media/live-turns-store.ts`, Files) mỗi chunk.
+
+`meeting_live_speakers` (room member, không owner) trả DTO allowlist (không vector/
+`pendingEmbedding`); `degraded:true` khi có chunk bị bỏ; `labelsSupported:false` khi
+provider của cuộc họp (ElevenLabs realtime) không gán nhãn — QĐ-18 degraded mode.
+
+`jobs/meeting-job.ts`'s `reconcileWithLiveSpeakers` (pass cuối): đọc `live-turns.json` →
+`caption-aligner.alignByMaxOverlap` map segment async ↔ `sessionSpeakerId` live theo tổng
+overlap lớn nhất → gộp về MỘT hàng `meeting_speakers`/người (`meeting-repository.ts`'s
+`mergeLiveIntoAsyncSpeaker`), ưu tiên tên `user` > `async` > `live`; live không map được bị
+xoá (`deleteUnmappedLiveSpeakers`).
+
 ## Spike results — CHƯA CHẠY (cần Hub + credential + khoá vendor thật)
 
 Điền quan sát thực tế vào các mục dưới khi chạy `scripts/spikes/*` với môi trường thật.

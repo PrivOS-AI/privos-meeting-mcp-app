@@ -13,8 +13,9 @@ describe('LiveSpeakerPoll', () => {
     const poll = new LiveSpeakerPoll(
       fakeApp(async () => ({
         sessionSpeakers: [
-          { sessionSpeakerId: 'a', sonioxLabels: ['s0:1', 's0:1@2'], colorKey: 'blue', resolved: true, displayName: 'An' },
+          { sessionSpeakerId: 'a', sonioxLabels: ['s0:1', 's0:1@2'], colorKey: 'blue', resolved: true, displayName: 'An', liveSpeechSec: 12 },
         ],
+        labelsSupported: true,
         updatedAt: new Date().toISOString(),
       })),
       { roomId: 'r', meetingId: 'm', onUpdate: (map) => updates.push(map) },
@@ -25,6 +26,44 @@ describe('LiveSpeakerPoll', () => {
 
     expect(updates).toHaveLength(1);
     expect(updates[0].get('s0:1')).toMatchObject({ displayName: 'An' });
+  });
+
+  it('skips a merged-away (mergedInto) session speaker when building the label map — the winner already carries its labels', async () => {
+    const updates: Array<Map<string, unknown>> = [];
+    const poll = new LiveSpeakerPoll(
+      fakeApp(async () => ({
+        sessionSpeakers: [
+          { sessionSpeakerId: 'winner', sonioxLabels: ['s0:1', 's0:2'], colorKey: 'blue', resolved: true, displayName: 'An', liveSpeechSec: 20 },
+          { sessionSpeakerId: 'loser', sonioxLabels: ['s0:2'], colorKey: 'gold', resolved: false, liveSpeechSec: 5, mergedInto: 'winner' },
+        ],
+      })),
+      { roomId: 'r', meetingId: 'm', onUpdate: (map) => updates.push(map) },
+    );
+
+    await poll.pollOnce();
+    poll.stop();
+
+    expect(updates[0].get('s0:2')).toMatchObject({ sessionSpeakerId: 'winner' });
+  });
+
+  it('forwards the raw speaker list and degraded/labelsSupported flags via onSpeakersUpdate', async () => {
+    const onSpeakersUpdate = vi.fn();
+    const poll = new LiveSpeakerPoll(
+      fakeApp(async () => ({
+        sessionSpeakers: [{ sessionSpeakerId: 'a', sonioxLabels: ['s0:1'], colorKey: 'blue', resolved: false, liveSpeechSec: 3 }],
+        degraded: true,
+        labelsSupported: true,
+      })),
+      { roomId: 'r', meetingId: 'm', onUpdate: () => {}, onSpeakersUpdate },
+    );
+
+    await poll.pollOnce();
+    poll.stop();
+
+    expect(onSpeakersUpdate).toHaveBeenCalledTimes(1);
+    const [speakers, meta] = onSpeakersUpdate.mock.calls[0];
+    expect(speakers).toHaveLength(1);
+    expect(meta).toEqual({ degraded: true, labelsSupported: true });
   });
 
   it('swallows a failure (e.g. the P5 tool not existing yet) without throwing', async () => {

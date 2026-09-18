@@ -83,6 +83,72 @@ export async function upsertMeetingSpeakers(db: AppDbBotClient, meetingId: strin
   }
 }
 
+/** Priority rank for `nameSource` — higher wins (plan.md: "tên theo nameSource: user > async > live"). */
+function nameSourceRank(nameSource: unknown): number {
+  if (nameSource === 'user') return 3;
+  if (nameSource === 'async') return 2;
+  if (nameSource === 'live') return 1;
+  return 0;
+}
+
+/**
+ * Folds a LIVE-only `meeting_speakers` row (keyed by `sessionSpeakerId`,
+ * written during the meeting by `live-speaker-repository.ts`) into the
+ * matching ASYNC row (keyed by `speakerId`, written by this job) for the
+ * SAME person — `reconcileWithLiveSpeakers` (`meeting-job.ts`) already
+ * decided the two rows are the same person via `caption-aligner`'s
+ * max-overlap alignment. Only ever ONE row per person survives: the async
+ * row absorbs the live row's `sessionSpeakerId`/`sonioxLabels`/live metadata,
+ * then the standalone live row is deleted. The NAME itself only moves from
+ * live to async when the async row does not already have a higher-or-equal
+ * priority name (`user` > `async` > `live`) — segmentation is always async's,
+ * but an unresolved async speaker still gets a name from a live quick-assign
+ * or live auto-match rather than staying "Người nói N" forever.
+ */
+export async function mergeLiveIntoAsyncSpeaker(db: AppDbBotClient, meetingId: string, speakerId: string, sessionSpeakerId: string): Promise<void> {
+  const result = await db.query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 });
+  const rows = extractDbRecords(result);
+  const asyncRow = rows.find((r) => r.speakerId === speakerId);
+  if (!asyncRow) return;
+  const liveRow = rows.find((r) => r.sessionSpeakerId === sessionSpeakerId && r._id !== asyncRow._id);
+
+  const patch: Record<string, unknown> = { sessionSpeakerId };
+  if (liveRow) {
+    if (Array.isArray(liveRow.sonioxLabels)) patch.sonioxLabels = liveRow.sonioxLabels;
+    if (typeof liveRow.liveSpeechSec === 'number') patch.liveSpeechSec = liveRow.liveSpeechSec;
+    if (typeof liveRow.liveConfidence === 'number') patch.liveConfidence = liveRow.liveConfidence;
+    if (typeof liveRow.liveUpdatedAt === 'string') patch.liveUpdatedAt = liveRow.liveUpdatedAt;
+
+    if (nameSourceRank(liveRow.nameSource) > nameSourceRank(asyncRow.nameSource)) {
+      if (typeof liveRow.displayName === 'string' && liveRow.displayName) patch.displayName = liveRow.displayName;
+      if (typeof liveRow.nameSource === 'string') patch.nameSource = liveRow.nameSource;
+      if (typeof liveRow.profileId === 'string' && liveRow.profileId) patch.profileId = liveRow.profileId;
+      patch.resolved = true;
+    }
+  }
+
+  await db.update('meeting_speakers', 'room', asyncRow._id, patch);
+  if (liveRow) await db.delete('meeting_speakers', 'room', liveRow._id);
+}
+
+/**
+ * Deletes every LIVE-only `meeting_speakers` row (has `sessionSpeakerId`, no
+ * `speakerId`) whose `sessionSpeakerId` was NOT in `mappedSessionSpeakerIds`
+ * — a session speaker the live registry opened but the async pass never
+ * corroborated (noise, a false split, or someone who only spoke during a
+ * part that failed to process). Async segmentation is authoritative
+ * (plan.md), so an orphaned live guess does not get its own permanent row.
+ */
+export async function deleteUnmappedLiveSpeakers(db: AppDbBotClient, meetingId: string, mappedSessionSpeakerIds: ReadonlySet<string>): Promise<void> {
+  const result = await db.query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 });
+  for (const row of extractDbRecords(result)) {
+    const isLiveOnly = typeof row.sessionSpeakerId === 'string' && row.sessionSpeakerId && !(typeof row.speakerId === 'string' && row.speakerId);
+    if (isLiveOnly && !mappedSessionSpeakerIds.has(row.sessionSpeakerId as string)) {
+      await db.delete('meeting_speakers', 'room', row._id);
+    }
+  }
+}
+
 export interface ActionItemInput {
   task: string;
   owner?: string;

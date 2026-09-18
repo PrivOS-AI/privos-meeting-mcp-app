@@ -3,6 +3,7 @@
  * (dark Stage). Both share the same `RecordingStore` state and footer.
  */
 import { useState } from 'react';
+import { usePrivosContext } from '@privos_ai/app-react';
 
 import { CapacityNotice } from '../components/capacity-notice.js';
 import { CaptionLine } from '../components/caption-line.js';
@@ -10,6 +11,7 @@ import { DegradedLabelsNotice } from '../components/degraded-labels-notice.js';
 import { EmptyState } from '../components/empty-state.js';
 import { Icon } from '../components/icon.js';
 import { KeepAwakeNotice } from '../components/keep-awake-notice.js';
+import { LiveSpeakerChips } from '../components/live-speaker-chips.js';
 import { MicLevelMeter } from '../components/mic-level-meter.js';
 import { RecIndicator } from '../components/rec-indicator.js';
 import { RecordingFooter } from '../components/recording-footer.js';
@@ -27,6 +29,7 @@ const SIZE_CYCLE: StageCaptionSize[] = ['small', 'medium', 'large'];
 
 export function LiveScreen({ onEnded }: LiveScreenProps) {
   const { t } = useI18n();
+  const { roomId } = usePrivosContext();
   const store = useRecordingStore();
   const state = useRecordingState();
   const [view, setView] = useState<ViewMode>('transcript');
@@ -41,6 +44,17 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
     await store.endAndSummarize();
     onEnded();
   }
+
+  const speakerChips =
+    state.meetingId && state.capabilities?.speakerLabels ? (
+      <LiveSpeakerChips
+        roomId={roomId}
+        meetingId={state.meetingId}
+        speakers={state.liveSpeakers}
+        degraded={state.liveSpeakersDegraded}
+        onResolved={(sessionSpeakerId, displayName) => store.applyQuickAssignResult(sessionSpeakerId, displayName)}
+      />
+    ) : null;
 
   const footer = (
     <RecordingFooter
@@ -78,6 +92,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
           </button>
         </div>
         {notices}
+        {speakerChips}
         <StageCaption lines={state.lines} speakerMap={state.speakerMap} size={state.stageCaptionSize} />
         <div className="ma-stage__footer">{footer}</div>
       </div>
@@ -104,6 +119,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
           </div>
         </div>
         {notices}
+        {speakerChips}
         <div className="ma-live__lines">
           {state.lines.length === 0 ? (
             <p className="ma-live__waiting">{t('recording.waitingForCaptions')}</p>

@@ -1,0 +1,88 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@privos_ai/app-server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@privos_ai/app-server')>();
+  return { ...actual, createAgentBotHubClient: () => fakeHub };
+});
+vi.mock('../hub/resolve-hub-origin.js', () => ({ resolveHubOrigin: async () => 'https://hub.example' }));
+vi.mock('../hub/resolve-own-mcp-app-id.js', () => ({ resolveOwnMcpAppId: async () => 'app-123' }));
+
+import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
+import { installFakeHub, type Store } from '../tools/test-support/fake-hub.js';
+import { deleteUnmappedLiveSpeakers, mergeLiveIntoAsyncSpeaker } from './meeting-repository.js';
+
+let store: Store;
+let fakeHub: ReturnType<typeof installFakeHub>;
+
+function db(): AppDbBotClient {
+  return new AppDbBotClient('room-1');
+}
+
+describe('mergeLiveIntoAsyncSpeaker', () => {
+  beforeEach(() => {
+    store = { meeting_speakers: [] };
+    fakeHub = installFakeHub({ store });
+  });
+
+  it('folds the live row into the async row and deletes the standalone live row', async () => {
+    store.meeting_speakers.push(
+      { _id: 'async-1', meeting: 'm1', speakerId: 'spkA', displayName: 'Người nói 1', nameSource: 'async', resolved: false },
+      { _id: 'live-1', meeting: 'm1', sessionSpeakerId: 'ss-1', sonioxLabels: ['s0:1'], liveSpeechSec: 12, liveConfidence: 0.7, nameSource: 'live', displayName: 'Some Name', resolved: true },
+    );
+
+    await mergeLiveIntoAsyncSpeaker(db(), 'm1', 'spkA', 'ss-1');
+
+    const rows = extractDbRecords(await db().query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: 'm1' }] }));
+    expect(rows).toHaveLength(1);
+    const merged = rows[0];
+    expect(merged.speakerId).toBe('spkA');
+    expect(merged.sessionSpeakerId).toBe('ss-1');
+    expect(merged.sonioxLabels).toEqual(['s0:1']);
+    expect(merged.liveSpeechSec).toBe(12);
+    // live (rank 1) does NOT outrank async's already-set name source (rank 2) — async keeps its own placeholder name.
+    expect(merged.displayName).toBe('Người nói 1');
+    expect(merged.nameSource).toBe('async');
+  });
+
+  it("adopts the live row's user-confirmed name when the async row is still unresolved", async () => {
+    store.meeting_speakers.push(
+      { _id: 'async-1', meeting: 'm1', speakerId: 'spkA', displayName: 'Người nói 1', nameSource: undefined, resolved: false },
+      { _id: 'live-1', meeting: 'm1', sessionSpeakerId: 'ss-1', displayName: 'Thanh', nameSource: 'user', profileId: 'profile-9', resolved: true },
+    );
+
+    await mergeLiveIntoAsyncSpeaker(db(), 'm1', 'spkA', 'ss-1');
+
+    const rows = extractDbRecords(await db().query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: 'm1' }] }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].displayName).toBe('Thanh');
+    expect(rows[0].nameSource).toBe('user');
+    expect(rows[0].profileId).toBe('profile-9');
+    expect(rows[0].resolved).toBe(true);
+  });
+
+  it('is a no-op when there is no matching async row', async () => {
+    store.meeting_speakers.push({ _id: 'live-1', meeting: 'm1', sessionSpeakerId: 'ss-1' });
+    await mergeLiveIntoAsyncSpeaker(db(), 'm1', 'spkMissing', 'ss-1');
+    expect(store.meeting_speakers).toHaveLength(1); // untouched
+  });
+});
+
+describe('deleteUnmappedLiveSpeakers', () => {
+  beforeEach(() => {
+    store = { meeting_speakers: [] };
+    fakeHub = installFakeHub({ store });
+  });
+
+  it('deletes live-only rows that never mapped to an async speaker, keeps mapped/async rows', async () => {
+    store.meeting_speakers.push(
+      { _id: 'async-1', meeting: 'm1', speakerId: 'spkA', sessionSpeakerId: 'ss-mapped' },
+      { _id: 'live-mapped', meeting: 'm1', sessionSpeakerId: 'ss-mapped' },
+      { _id: 'live-orphan', meeting: 'm1', sessionSpeakerId: 'ss-orphan' },
+    );
+
+    await deleteUnmappedLiveSpeakers(db(), 'm1', new Set(['ss-mapped']));
+
+    const rows = extractDbRecords(await db().query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: 'm1' }] }));
+    expect(rows.map((r) => r._id).sort()).toEqual(['async-1', 'live-mapped']);
+  });
+});

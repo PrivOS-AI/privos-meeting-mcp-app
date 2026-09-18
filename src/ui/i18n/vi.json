@@ -129,5 +129,13 @@
   "speaker.settingsPanel.thresholdSave": "Lưu",
   "speaker.settingsPanel.thresholdWarning": "Thay đổi ngưỡng chỉ ảnh hưởng cuộc họp xử lý sau.",
   "speaker.settingsPanel.thresholdSaved": "Đã lưu ngưỡng.",
-  "speaker.settingsPanel.thresholdUnavailable": "Tính năng này chưa khả dụng ở phiên bản hiện tại."
+  "speaker.settingsPanel.thresholdUnavailable": "Tính năng này chưa khả dụng ở phiên bản hiện tại.",
+
+  "recording.speakerChips.label": "Ai đang nói?",
+  "recording.speakerChips.identifying": "Đang nhận diện…",
+  "recording.speakerChips.degraded": "Một số đoạn chưa nhận diện được",
+
+  "speaker.quickAssign.title": "Ai đang nói?",
+  "speaker.quickAssign.samePersonAs": "Cùng người với …",
+  "speaker.quickAssign.notFoundYet": "Chưa có đủ dữ liệu giọng cho người này, thử lại sau vài giây."
 }

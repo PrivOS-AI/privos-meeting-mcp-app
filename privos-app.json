@@ -193,6 +193,16 @@
       }
     },
     {
+      "name": "meeting_live_speakers",
+      "title": "Người nói trực tiếp",
+      "description": "Danh sách người nói đã nhận diện được trong lúc đang họp, kèm tên nếu đã khớp hồ sơ giọng nói.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["roomId", "meetingId"],
+        "properties": { "roomId": { "type": "string" }, "meetingId": { "type": "string" } }
+      }
+    },
+    {
       "name": "meeting_translate",
       "title": "Dịch phụ đề trực tiếp",
       "description": "Dịch một lô dòng phụ đề đã chốt bằng Hub AI khi nhà cung cấp STT không dịch song ngữ trực tiếp.",

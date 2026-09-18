@@ -22,12 +22,13 @@ import { readLiveTurns } from '../media/live-turns-store.js';
 import { dataDir } from '../paths.js';
 import { resolveSpeakers as resolveSpeakersEmbed } from '../speaker/resolve-speakers.js';
 import { asyncProviderFor } from '../stt/stt-provider-registry.js';
+import { alignByMaxOverlap } from '../transcript/caption-aligner.js';
 import { buildSegments, type Segment } from '../transcript/segment-builder.js';
 import { buildTranscriptMarkdown } from '../transcript/markdown-writer.js';
 import { buildTranscriptJson, serializeTranscriptJson } from '../transcript/transcript-json.js';
 import { buildSrt } from '../transcript/srt-writer.js';
 import { HEARTBEAT_INTERVAL_MS, JobRepository, type JobRecord, type JobResultSpeaker } from './job-repository.js';
-import { upsertMeeting, upsertMeetingSpeakers, type SpeakerUpsertInput } from './meeting-repository.js';
+import { deleteUnmappedLiveSpeakers, mergeLiveIntoAsyncSpeaker, upsertMeeting, upsertMeetingSpeakers, type SpeakerUpsertInput } from './meeting-repository.js';
 
 export interface RunMeetingJobInput {
   job: JobRecord;
@@ -38,23 +39,66 @@ export interface RunMeetingJobInput {
   signal: AbortSignal;
 }
 
-// ---- P5/P6 seams — real logic lands in later phases; kept here so the
-// orchestrator's call sites never move once those phases land. ----
+// ---- P6 seam — real logic lands in P6; kept here so the orchestrator's
+// call site never moves once that phase lands. ----
+
+const RECONCILE_TOLERANCE_MS = 1500;
 
 /**
- * P5 seam: merge the async pass's speakers against `live-turns.json` via
- * `caption-aligner.alignByMaxOverlap`. No-op until P5 ships the live registry
- * writer — `readLiveTurns` is already wired at the call site below so P5 only
- * has to fill this function in, not touch the orchestrator.
+ * Reconciles the async pass's segmentation (authoritative — plan.md) against
+ * `live-turns.json` (P5's live registry) so each real person ends up with
+ * exactly ONE `meeting_speakers` row, `sessionSpeakerId` filled in, and no
+ * lingering standalone live-only rows.
+ *
+ * For each async `speakerId`, picks whichever live `sessionSpeakerId`
+ * overlaps its segments the MOST (summed overlap, via
+ * `caption-aligner.alignByMaxOverlap`) and folds that live row's metadata
+ * into the async row (`mergeLiveIntoAsyncSpeaker` — name priority `user` >
+ * `async` > `live`). Live session speakers that never overlapped any async
+ * speaker are deleted as noise. A no-op when the meeting never produced a
+ * `live-turns.json` (ElevenLabs-degraded meetings, or a meeting with no
+ * speech long enough to go live).
+ *
+ * Returns `speakerId -> sessionSpeakerId` for the mapped speakers, so the
+ * caller can also carry `liveSessionSpeakerId` onto the `JobResult` it
+ * returns from the tool (never re-querying App DB just for that).
  */
 async function reconcileWithLiveSpeakers(
-  _hub: RoomBoundHubClient,
-  _roomId: string,
-  _folderId: string,
-  _segments: readonly Segment[],
-  _speakers: readonly JobResultSpeaker[],
-): Promise<void> {
-  // Intentionally empty for P3.
+  db: AppDbBotClient,
+  hub: RoomBoundHubClient,
+  roomId: string,
+  folderId: string,
+  meetingId: string,
+  segments: readonly Segment[],
+  speakers: readonly JobResultSpeaker[],
+): Promise<Map<string, string>> {
+  const mapped = new Map<string, string>();
+  const live = await readLiveTurns(hub, roomId, folderId);
+  if (!live || live.turns.length === 0) return mapped;
+
+  const asyncSpans = segments.map((s) => ({ startMs: Math.round(s.startSec * 1000), endMs: Math.round(s.endSec * 1000), speakerId: s.speakerId }));
+  const aligned = alignByMaxOverlap(asyncSpans, live.turns, { toleranceMs: RECONCILE_TOLERANCE_MS });
+
+  const overlapMsBySpeaker = new Map<string, Map<string, number>>();
+  for (const { a, b } of aligned) {
+    if (!b) continue;
+    const overlapMs = Math.min(a.endMs, b.endMs) - Math.max(a.startMs, b.startMs);
+    if (overlapMs <= 0) continue;
+    const bySession = overlapMsBySpeaker.get(a.speakerId) ?? new Map<string, number>();
+    bySession.set(b.speakerKey, (bySession.get(b.speakerKey) ?? 0) + overlapMs);
+    overlapMsBySpeaker.set(a.speakerId, bySession);
+  }
+
+  for (const speaker of speakers) {
+    const bySession = overlapMsBySpeaker.get(speaker.speakerId);
+    if (!bySession || bySession.size === 0) continue;
+    const [sessionSpeakerId] = [...bySession.entries()].sort((x, y) => y[1] - x[1])[0];
+    await mergeLiveIntoAsyncSpeaker(db, meetingId, speaker.speakerId, sessionSpeakerId);
+    mapped.set(speaker.speakerId, sessionSpeakerId);
+  }
+
+  await deleteUnmappedLiveSpeakers(db, meetingId, new Set(mapped.values()));
+  return mapped;
 }
 
 /** P6 seam: Hub AI summary + translation. Returns `undefined` until P6 ships. */
@@ -123,7 +167,7 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
     await jobRepo.patch(job._id, { step: 'segment', progress: 0.6 });
     const segments = buildSegments(sttResult.tokens, { pauseSplitSec: 1.5 });
 
-    // 5. P4 embed + match/enrol against `speaker_profiles` (P5 reconcile below is still a stub).
+    // 5. P4 embed + match/enrol against `speaker_profiles`; P5 reconciles against live-turns.json right after.
     await jobRepo.patch(job._id, { step: 'embed', progress: 0.7 });
     const resolved = await resolveSpeakersEmbed(db, wavPath, segments, job.meetingId);
     const speakerUpserts: SpeakerUpsertInput[] = resolved.map((s, i) => ({
@@ -152,8 +196,11 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       resolved: s.resolved,
       sampleRange: s.sampleRange,
     }));
-    await readLiveTurns(agentBotHub, roomId, folderId, signal); // P5 writes this file; P3 only proves the read path.
-    await reconcileWithLiveSpeakers(agentBotHub, roomId, folderId, segments, speakers);
+    const liveSessionSpeakerIds = await reconcileWithLiveSpeakers(db, agentBotHub, roomId, folderId, job.meetingId, segments, speakers);
+    for (const speaker of speakers) {
+      const sessionSpeakerId = liveSessionSpeakerIds.get(speaker.speakerId);
+      if (sessionSpeakerId) speaker.liveSessionSpeakerId = sessionSpeakerId;
+    }
 
     // 6. P6 summarize (stub).
     await jobRepo.patch(job._id, { step: 'summarize', progress: 0.8 });
