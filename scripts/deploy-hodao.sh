@@ -27,8 +27,8 @@ echo "Deploying $LOCAL -> $SSH_HOST:$REMOTE"
 ssh -i "$SSH_KEY" -p "$SSH_PORT" "$SSH_HOST" 'ss -ltnp | grep :3012 || echo "port 3012 free"' || true
 
 rsync -az -e "ssh -i $SSH_KEY -p $SSH_PORT" \
-  --exclude node_modules/ --exclude .git/ --exclude .recyclebin/ \
-  --exclude '*.tsbuildinfo' --exclude data/ \
+  --exclude /node_modules/ --exclude /.git/ --exclude /.recyclebin/ \
+  --exclude '*.tsbuildinfo' --exclude /data/ --exclude /dist/ --exclude /models/ \
   "$LOCAL" "$SSH_HOST:$REMOTE/"
 
 # rsync preserves the local uid; pm2 runs as root and refuses the identity/.env
