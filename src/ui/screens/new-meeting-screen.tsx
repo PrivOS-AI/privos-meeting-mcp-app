@@ -28,6 +28,21 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
   const [micError, setMicError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
+  // TEMP mic diagnostic (opaque-origin vs missing allow="microphone") — runs
+  // inside the exact iframe that fails, so it is readable on mobile without
+  // desktop DevTools. Remove once the mic-access root cause is confirmed.
+  const [micDiag, setMicDiag] = useState('');
+  useEffect(() => {
+    const fp = (document as unknown as { featurePolicy?: { allowsFeature?: (f: string) => boolean } }).featurePolicy;
+    let micPolicy: string;
+    try {
+      micPolicy = typeof fp?.allowsFeature === 'function' ? String(fp.allowsFeature('microphone')) : 'n/a';
+    } catch {
+      micPolicy = 'err';
+    }
+    setMicDiag(`origin=${window.origin} · mediaDevices=${Boolean(navigator.mediaDevices)} · micPolicy=${micPolicy}`);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     app
@@ -110,6 +125,12 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
       </div>
 
       {micError ? <p className="ma-new-meeting__error">{micError}</p> : null}
+
+      {micDiag ? (
+        <p className="ma-new-meeting__subtitle" style={{ fontFamily: 'monospace', fontSize: 11, wordBreak: 'break-all' }}>
+          mic-diag: {micDiag}
+        </p>
+      ) : null}
 
       <button type="button" className="ma-new-meeting__start" disabled={starting} onClick={() => void handleStart()}>
         <Icon name="record" size={18} />
