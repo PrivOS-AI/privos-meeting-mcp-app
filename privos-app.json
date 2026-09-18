@@ -32,7 +32,7 @@
       "scope": "files:read",
       "requirement": "required",
       "context": "room",
-      "executionContext": "user",
+      "executionContext": "both",
       "feature": "meeting.files.read",
       "reason": "Đọc và stream lại audio, transcript và tóm tắt đã lưu trong Files của phòng."
     },
@@ -40,7 +40,7 @@
       "scope": "files:write",
       "requirement": "required",
       "context": "room",
-      "executionContext": "user",
+      "executionContext": "both",
       "feature": "meeting.files.write",
       "reason": "Upload các part audio, audio ghép, transcript và tóm tắt vào Files của phòng."
     },
@@ -48,7 +48,7 @@
       "scope": "db:schema:read",
       "requirement": "required",
       "context": "room",
-      "executionContext": "user",
+      "executionContext": "both",
       "feature": "meeting.db.schema.read",
       "reason": "Kiểm tra schema các collection App DB trước khi đăng ký."
     },
@@ -56,7 +56,7 @@
       "scope": "db:schema:write",
       "requirement": "required",
       "context": "room",
-      "executionContext": "user",
+      "executionContext": "both",
       "feature": "meeting.db.schema.write",
       "reason": "Đăng ký các collection App DB (cuộc họp, người nói, hồ sơ giọng, job xử lý)."
     },
@@ -64,7 +64,7 @@
       "scope": "db:read",
       "requirement": "required",
       "context": "room",
-      "executionContext": "user",
+      "executionContext": "both",
       "feature": "meeting.db.read",
       "reason": "Đọc danh sách cuộc họp, người nói và trạng thái job để hiển thị."
     },
@@ -72,7 +72,7 @@
       "scope": "db:write",
       "requirement": "required",
       "context": "room",
-      "executionContext": "user",
+      "executionContext": "both",
       "feature": "meeting.db.write",
       "reason": "Ghi cuộc họp, người nói, hồ sơ giọng đã mã hoá, action item và trạng thái job."
     },
@@ -80,7 +80,7 @@
       "scope": "sandbox:generate",
       "requirement": "required",
       "context": "room",
-      "executionContext": "user",
+      "executionContext": "both",
       "feature": "meeting.ai.summary",
       "reason": "Tóm tắt và dịch theo lô bằng Hub AI, không gửi transcript ra bên thứ ba."
     },
@@ -115,7 +115,7 @@
       "scope": "bot:room:join",
       "requirement": "optional",
       "context": "room",
-      "executionContext": "user",
+      "executionContext": "background",
       "feature": "meeting.bot.join",
       "reason": "meeting_bootstrap thêm bot cài đặt vào phòng để ghi Files.",
       "degradedBehavior": "Nhờ quản trị viên thêm bot vào phòng thủ công; xử lý tạm dừng tới khi bot vào phòng."
@@ -124,7 +124,7 @@
       "scope": "bot:identity:read",
       "requirement": "optional",
       "context": "room",
-      "executionContext": "user",
+      "executionContext": "background",
       "feature": "meeting.bot.identity",
       "reason": "Đọc danh tính bot để kiểm tra credential và hiển thị trạng thái.",
       "degradedBehavior": "Banner hướng dẫn cấu hình credential bot."
