@@ -1,0 +1,189 @@
+/*
+ * P8 — Settings shell (240px nav + 7 panels) and the shared panel/field/table
+ * primitives every `screens/settings/*-panel.tsx` reuses. Split out of
+ * speaker-identity.css to keep each theme file under ~200 lines (repo
+ * convention) — `.ma-settings-screen`'s base rule stays in speaker-identity.css
+ * (P4), this file only adds the nav layout + panel primitives P8 introduces.
+ */
+
+.ma-settings-screen--with-nav {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+  max-width: none;
+}
+
+.ma-settings-nav {
+  flex: 0 0 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  position: sticky;
+  top: var(--space-6);
+}
+
+.ma-settings-nav__item {
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-3) var(--space-4);
+  color: var(--ma-fg-2);
+  font-weight: var(--weight-medium);
+  min-height: auto;
+}
+
+.ma-settings-nav__item:hover {
+  background: var(--bg-hover);
+}
+
+.ma-settings-nav__item--active {
+  background: var(--ma-status-info-bg);
+  color: var(--ma-brand-blue);
+  font-weight: var(--weight-semibold);
+}
+
+.ma-settings-content {
+  flex: 1;
+  min-width: 0;
+  max-width: 720px;
+}
+
+.ma-settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-8);
+}
+
+.ma-settings-panel__title {
+  margin: 0;
+}
+
+.ma-settings-panel__hint {
+  color: var(--ma-fg-3);
+  font-size: var(--caption-size);
+  margin: 0;
+}
+
+.ma-settings-panel__warning {
+  color: var(--ma-status-warning);
+  font-size: var(--body-sm-size);
+  margin: 0;
+}
+
+.ma-settings-panel__error {
+  color: var(--ma-status-danger);
+  font-size: var(--body-sm-size);
+  margin: 0;
+}
+
+.ma-settings-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.ma-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-width: 420px;
+}
+
+.ma-settings-field span {
+  font-size: var(--body-sm-size);
+  color: var(--ma-fg-2);
+}
+
+.ma-settings-field select,
+.ma-settings-field input[type='text'],
+.ma-settings-field input[type='number'] {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  background: var(--ma-bg-canvas);
+  color: var(--ma-fg-1);
+}
+
+.ma-settings-field--checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ma-settings-field--readonly strong {
+  color: var(--ma-fg-1);
+}
+
+.ma-settings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--body-sm-size);
+}
+
+.ma-settings-table th,
+.ma-settings-table td {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--ma-border-1);
+}
+
+.ma-settings-panel__danger {
+  border: 1px solid var(--ma-status-danger);
+  border-radius: var(--ma-radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ma-settings-panel__danger button {
+  align-self: flex-start;
+  background: var(--ma-status-danger);
+  color: var(--ma-fg-inverse);
+  border: none;
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-2) var(--space-5);
+}
+
+.ma-settings-panel__policy {
+  background: var(--ma-bg-canvas);
+  border-radius: var(--ma-radius-md);
+  padding: var(--space-4);
+}
+
+.ma-settings-panel__policy h4,
+.ma-settings-panel__danger h4 {
+  margin: 0;
+}
+
+.ma-mic-test {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.ma-mic-test__wave {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 32px;
+}
+
+.ma-mic-test__bar {
+  width: 4px;
+  height: 100%;
+  background: var(--ma-brand-blue);
+  border-radius: 2px;
+  transform-origin: bottom;
+  transition: transform 80ms linear;
+}
+
+.ma-mic-test__error {
+  color: var(--ma-status-danger);
+  font-size: var(--caption-size);
+  flex-basis: 100%;
+  margin: 0;
+}

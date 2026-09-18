@@ -20,6 +20,7 @@ export class MeetingQueue {
   private readonly running = new Map<string, RunningJob>();
   private active = 0;
   private readonly waiters: Array<() => void> = [];
+  private draining = false;
 
   constructor(private readonly concurrency: number = 1) {}
 
@@ -28,10 +29,25 @@ export class MeetingQueue {
     return this.running.has(meetingId);
   }
 
+  /**
+   * SIGTERM/SIGINT hook (`index.ts`): reject every NEW job from this point on
+   * so pm2's `kill_timeout` window is spent letting whatever is already
+   * running finish (or hit its own timeout/abort) instead of starting fresh
+   * work that cannot possibly complete in time (plan.md § pm2 entry —
+   * "job-queue thêm cờ draining từ chối job mới"). A job already in
+   * `running` (including a re-enqueue of the SAME meetingId) is unaffected.
+   */
+  startDraining(): void {
+    this.draining = true;
+  }
+
   /** Enqueue one task for `meetingId`. A second call while the first is in flight returns the FIRST call's promise. */
   enqueue(meetingId: string, task: MeetingJobTask, timeoutMs: number): Promise<void> {
     const existing = this.running.get(meetingId);
     if (existing) return existing.promise;
+    if (this.draining) {
+      return Promise.reject(new AppError('Hệ thống đang tắt, không nhận job xử lý mới — vui lòng thử lại sau khi khởi động lại.'));
+    }
 
     const controller = new AbortController();
     const promise = this.runTask(meetingId, task, controller, timeoutMs);

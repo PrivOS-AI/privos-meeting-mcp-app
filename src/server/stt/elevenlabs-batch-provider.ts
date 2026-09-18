@@ -12,6 +12,7 @@ import { ElevenLabsClient, ElevenLabsError } from '@elevenlabs/elevenlabs-js';
 
 import { AppError } from '../../shared/app-error.js';
 import { env } from '../env.js';
+import { probeElevenLabsAccount } from './provider-health-probe.js';
 import type { AsyncSttProvider, ProviderStatus, SttResult, SttToken, TranscribeInput } from './stt-provider.js';
 
 const RETRY_ATTEMPTS = 3;
@@ -109,14 +110,16 @@ export const elevenLabsBatchProvider: AsyncSttProvider = {
   },
 
   async status(): Promise<ProviderStatus> {
-    const configured = Boolean(env.elevenLabsApiKey);
+    const probe = await probeElevenLabsAccount();
     return {
       provider: 'elevenlabs',
       kind: 'async',
-      configured,
-      ok: configured,
+      configured: probe.reason !== 'not_configured',
+      ok: probe.ok,
       models: [env.elevenLabsBatchModel],
-      detail: configured ? undefined : 'Thiếu ELEVENLABS_API_KEY.',
+      detail: probe.ok ? undefined : probe.reason === 'not_configured' ? 'Thiếu ELEVENLABS_API_KEY.' : 'Không kết nối được tới ElevenLabs.',
+      reason: probe.ok ? undefined : probe.reason,
+      usage: probe.usage,
     };
   },
 };

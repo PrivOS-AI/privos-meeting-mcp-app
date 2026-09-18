@@ -35,6 +35,16 @@ monospace`); nhúng woff2 base64 nếu cần đúng brand (ghi lại nếu chấ
 `vi` mặc định, `en` fallback; mọi chuỗi UI qua `t()`. Ngôn ngữ mở đầu: lựa chọn đã lưu
 → `navigator.language` → `vi`.
 
+## Settings (P8, 5 màn bổ sung ngoài design gốc)
+
+Design export chỉ phác thảo khung Settings; 5 trong 7 panel (Speech recognition,
+Microphone, AI summary, Privacy & storage, Caption display) không có mock chi
+tiết — dựng theo layout nav 240px + nội dung 720px chung của `1e` và tokens
+hiện có (`ma-settings-*` trong `theme/settings.css`), KHÔNG thêm token/màu mới.
+Language & translation và Speaker identification (P4) theo đúng mock. QĐ-08:
+không panel nào có ô nhập API key; provider STT chỉ có select + bảng trạng thái
+đọc từ `meeting_stt_status`.
+
 ## Search — "Ask AI" v1 (P7)
 
 Design gốc có ô search kèm toggle sparkle "Ask AI". **v1 không gọi LLM**: search là

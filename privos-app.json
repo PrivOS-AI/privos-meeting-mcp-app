@@ -2,7 +2,7 @@
   "schemaVersion": 3,
   "kind": "mcp-app",
   "name": "ai.privos.meeting-agent",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "title": "Meeting Agent",
   "description": "Ứng dụng MCP PrivOS ghi âm cuộc họp offline: live caption song ngữ kèm nhãn người nói, nhận diện người nói bằng voiceprint, tóm tắt bằng Hub AI và lưu transcript vào PrivOS Files.",
   "icon": "/public/icon.svg",

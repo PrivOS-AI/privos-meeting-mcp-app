@@ -15,7 +15,12 @@ phát hiện, không đặt bằng env:
 | `development` | không có cả hai và `NODE_ENV`≠production | dev Relay loop, unverified actor |
 
 Boot chạy `assertProviderKeysAtBoot()` (fatal ở production nếu provider đang chọn thiếu
-khoá hoặc thiếu `VOICEPRINT_ENC_KEY`) và self-check credential bot.
+khoá hoặc thiếu `VOICEPRINT_ENC_KEY`) và self-check credential bot. Sau khi handler sẵn
+sàng: `startupSweep()` (job/meeting bỏ rơi) và `startAudioRetention()` (P8, mỗi 6h) chạy
+fire-and-forget trên mọi `knownRooms`. `SIGTERM`/`SIGINT` được app tự bắt (đăng ký TRƯỚC
+`serveApp()`) để `meetingQueue.startDraining()` từ chối job mới và dừng interval retention
+ngay lập tức — `serveApp` tự lo phần đóng transport/HTTP server; pm2's `kill_timeout` chỉ
+còn phải chờ job **đang chạy** (nếu có) tự xong hoặc tự timeout.
 
 ## Backend Hub access (installation bot)
 
@@ -111,6 +116,34 @@ provider của cuộc họp (ElevenLabs realtime) không gán nhãn — QĐ-18 d
 overlap lớn nhất → gộp về MỘT hàng `meeting_speakers`/người (`meeting-repository.ts`'s
 `mergeLiveIntoAsyncSpeaker`), ưu tiên tên `user` > `async` > `live`; live không map được bị
 xoá (`deleteUnmappedLiveSpeakers`).
+
+## Settings, hardening & retention (P8)
+
+- `src/shared/app-settings.ts`: nguồn sự thật duy nhất cho 10 khoá `app_settings`
+  admin-gated (allowlist + `DEFAULT_WORKSPACE_SETTINGS` + validator) — `settings-set-tool.ts`
+  (backend, chỉ workspace admin) và `ui/data/settings-store.ts` (iframe đọc DEFAULTS +
+  merge với `app_settings`, ghi qua tool) dùng chung, không còn hai bản trôi dạt. Cài đặt
+  riêng người dùng (ngôn ngữ cuộc họp mặc định, cỡ chữ Stage, mic ưu tiên, độ trễ caption)
+  ở `ui/data/local-preferences.ts` (localStorage, không admin gate, không vào `app_settings`).
+- `tools/is-workspace-admin.ts`: heuristic đọc `actor.claims` (`isAdmin`/`admin`/`role`/`roles`)
+  — `authz.ts` re-export để mọi tool cũ giữ nguyên import path.
+- `meeting_stt_status` (P8 hoàn thiện): admin thấy `{ok, activeRealtimeProvider,
+  activeAsyncProvider, providers[4], liveConcurrency:{active,max}, checkedAt}`; người khác
+  chỉ `{ok}` (tính từ provider realtime đang active). `stt/provider-health-probe.ts` chạy
+  probe rẻ thật cho từng vendor có khoá — Soniox: mint temp key TTL 10s rồi bỏ; ElevenLabs:
+  `GET /v1/user/subscription` (cũng là nguồn usage tier/characterCount/characterLimit) —
+  không vendor nào bị gọi khi thiếu khoá (`reason:'not_configured'`, không có network call).
+- `jobs/audio-retention-job.ts`: `purgeExpiredAudio(hub, roomId)` (3 nhánh — audio giữ quá
+  `autoDeleteAudioDays`, part mồ côi của meeting `interrupted` quá `interruptedPartsRetentionDays`,
+  `pendingEmbedding` treo quá 30 ngày cố định) gọi từ `meeting_bootstrap` mỗi lần phòng mở;
+  `startAudioRetention(hub)` lặp mọi `knownRooms` mỗi 6h, khởi động/dừng trong `index.ts`.
+- `jobs/meeting-queue.ts`: cờ `draining` (`startDraining()`) — enqueue job MỚI bị từ chối,
+  job đang chạy hoặc re-enqueue cùng `meetingId` không bị ảnh hưởng.
+- Hardening đã xác minh bằng test: `grep` `src/ui/**` sạch secret; `cross-room-authz.test.ts`
+  (phòng B không `meeting_process`/`meeting_status`/`speaker_profile_delete` được dữ liệu
+  phòng A qua actual tool call, không chỉ primitive); `meeting-folder-collision.test.ts`
+  (hai cuộc họp cùng phòng/ngày/tiêu đề → thư mục + part khác nhau, `concatParts` từ chối
+  part mang dấu meeting khác dù được liệt trong `partFileIds`).
 
 ## Spike results — CHƯA CHẠY (cần Hub + credential + khoá vendor thật)
 

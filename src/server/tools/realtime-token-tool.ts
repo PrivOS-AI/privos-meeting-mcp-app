@@ -47,6 +47,17 @@ async function countFreshRecordings(freshSinceIso: string): Promise<number> {
   return total;
 }
 
+/**
+ * Exported for `stt-status-tool.ts`'s admin view ("số phiên realtime đang
+ * chạy / LIVE_MAX_CONCURRENT_RECORDINGS") — same freshness window and query
+ * this tool's own concurrency gate uses, so the two numbers a caller sees
+ * (the cap that blocked them here, the count shown in Settings) never drift.
+ */
+export async function countActiveRealtimeRecordings(): Promise<number> {
+  const freshSince = new Date(Date.now() - CONCURRENCY_FRESHNESS_MS).toISOString();
+  return countFreshRecordings(freshSince);
+}
+
 export const realtimeTokenTool: AppTool = {
   name: 'meeting_realtime_token',
   title: 'Lấy token phụ đề trực tiếp',

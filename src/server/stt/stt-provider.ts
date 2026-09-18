@@ -76,6 +76,16 @@ export interface RealtimeToken {
   capabilities: RealtimeCapabilities;
 }
 
+/** Cheap vendor-account probe outcome — never a key, never derived from a full transcription. */
+export type ProviderStatusReason = 'not_configured' | 'invalid_key' | 'network_error' | 'http_error';
+
+/** Vendor usage snapshot for the admin status table — whatever fields that vendor's cheap probe exposes. */
+export interface ProviderUsage {
+  tier?: string;
+  characterCount?: number;
+  characterLimit?: number;
+}
+
 /** Live status for the settings/status tool (never includes any key). */
 export interface ProviderStatus {
   provider: SttVendor;
@@ -84,6 +94,12 @@ export interface ProviderStatus {
   ok: boolean;
   models: string[];
   detail?: string;
+  /** Set only when `ok` is false and the cause is one of these known cheap-probe outcomes. */
+  reason?: ProviderStatusReason;
+  /** Vendor account usage from the cheap probe, when the vendor exposes one (ElevenLabs). */
+  usage?: ProviderUsage;
+  /** Realtime only: sessions this workspace currently has open with the ACTIVE realtime provider (shared cap, QĐ-19). */
+  activeSessions?: number;
 }
 
 /** Async (post-meeting) transcription provider. */

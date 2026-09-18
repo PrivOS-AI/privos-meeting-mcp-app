@@ -35,4 +35,10 @@ Notes:
 - The deploy script `chown -R root:root` + `chmod 600` the identity/.env after rsync
   (rsync preserves the local uid; pm2 runs as root and refuses the identity otherwise).
 - `npm install` only when deps changed; ONNX model + `.env` are provisioned on the node.
-- Verify: `pm2 logs meeting-agent` should show `relay.connected`.
+- Verify: `pm2 logs meeting-agent` should show `relay.connected`; also check
+  `curl localhost:3012/health` and `/ready` (both 200) — the deploy script prints these.
+- STT provider (Soniox/ElevenLabs, realtime + async) is switched from Settings
+  in the app (workspace admin only) — never requires a redeploy or manifest
+  republish; CSP already declares both vendor WS origins.
+- Full runbook (backup/rotate `VOICEPRINT_ENC_KEY`, rollback, pm2 ecosystem
+  entry, first-deploy steps): `docs/deployment-guide.md`.

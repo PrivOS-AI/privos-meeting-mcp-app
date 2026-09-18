@@ -15,12 +15,32 @@ import { serveApp, RuntimeModeError } from '@privos_ai/app-server';
 
 import { assertProviderKeysAtBoot } from './env.js';
 import { checkAgentBotCredential } from './hub/agent-bot-credential-check.js';
+import { startAudioRetention } from './jobs/audio-retention-job.js';
+import { meetingQueue } from './jobs/meeting-queue.js';
 import { startupSweep } from './jobs/startup-sweep.js';
 import { createManifest, buildRelayAppDescriptor, manifest } from './manifest.js';
 import { createMcpHandler } from './mcp-handler.js';
 import { repoRoot } from './paths.js';
 import { registerAllTools } from './tools/index.js';
 import { setDevPublicUrl, uiResourceProvider } from './ui-resource.js';
+
+/**
+ * SIGTERM/SIGINT: stop accepting new processing jobs immediately (pm2's
+ * `kill_timeout: 15000` is spent letting in-flight work finish, not starting
+ * new work that cannot complete in time) and stop the retention interval
+ * timer. Registered BEFORE `serveApp()` so it runs ahead of the SDK's own
+ * `installSignalHandlers` (default true) — `serveApp` owns closing the
+ * transport/server, this only owns this app's own background loops.
+ */
+let stopAudioRetention: (() => void) | undefined;
+function installDrainHandlers(): void {
+  const drain = () => {
+    meetingQueue.startDraining();
+    stopAudioRetention?.();
+  };
+  process.on('SIGTERM', drain);
+  process.on('SIGINT', drain);
+}
 
 /** Manifest-only degraded surface for a bare production container (no identity). */
 function startManifestOnlySurface(reason: string): void {
@@ -54,6 +74,7 @@ async function runBootChecks(): Promise<void> {
 
 async function start(): Promise<void> {
   registerAllTools();
+  installDrainHandlers();
   await runBootChecks();
 
   const transportOverride = process.env.PRIVOS_TRANSPORT === 'relay' ? ('relay' as const) : undefined;
@@ -67,6 +88,8 @@ async function start(): Promise<void> {
       void startupSweep(ctx.agentBotHub).catch((error) => {
         console.warn('[boot] startupSweep thất bại:', error instanceof Error ? error.message : error);
       });
+      // Retention sweep: boot + every 6h across every known room (P8).
+      stopAudioRetention = startAudioRetention(ctx.agentBotHub);
       return createMcpHandler(ctx);
     },
     ui: uiResourceProvider,

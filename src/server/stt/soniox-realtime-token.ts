@@ -8,6 +8,7 @@
  */
 import { AppError } from '../../shared/app-error.js';
 import { env } from '../env.js';
+import { probeSonioxAccount } from './provider-health-probe.js';
 import type { ProviderStatus, RealtimeCapabilities, RealtimeToken, RealtimeTokenProvider } from './stt-provider.js';
 
 const TEMP_KEY_URL = 'https://api.soniox.com/v1/auth/temporary-api-key';
@@ -67,14 +68,15 @@ export const sonioxRealtimeProvider: RealtimeTokenProvider = {
   },
 
   async status(): Promise<ProviderStatus> {
-    const configured = Boolean(env.sonioxApiKey);
+    const probe = await probeSonioxAccount();
     return {
       provider: 'soniox',
       kind: 'realtime',
-      configured,
-      ok: configured,
+      configured: probe.reason !== 'not_configured',
+      ok: probe.ok,
       models: [env.sonioxRtModel],
-      detail: configured ? undefined : 'Thiếu SONIOX_API_KEY.',
+      detail: probe.ok ? undefined : probe.reason === 'not_configured' ? 'Thiếu SONIOX_API_KEY.' : 'Không kết nối được tới Soniox.',
+      reason: probe.ok ? undefined : probe.reason,
     };
   },
 };

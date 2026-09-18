@@ -11,6 +11,7 @@ import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, ensureAppDbSchema } from '../hub/app-db-bot-client.js';
 import { appendKnownRoom } from '../hub/app-settings.js';
 import { ensureBotInRoom } from '../hub/ensure-bot-in-room.js';
+import { purgeExpiredAudio } from '../jobs/audio-retention-job.js';
 import { sweepRoom } from '../jobs/startup-sweep.js';
 import type { AppTool } from './registry.js';
 
@@ -32,6 +33,13 @@ export const bootstrapTool: AppTool = {
     // dead vendor garbage every time the room opens, not just at process boot.
     await sweepRoom(runtime.agentBotHub, roomId).catch((error) => {
       console.warn('[meeting_bootstrap] sweep thất bại (không chặn bootstrap):', error instanceof Error ? error.message : error);
+    });
+
+    // Best-effort: retention (kept audio past autoDeleteAudioDays, orphaned
+    // interrupted parts, stale pendingEmbedding) — same "every time the room
+    // opens" cadence as the sweep above, on top of the 6h interval.
+    await purgeExpiredAudio(runtime.agentBotHub, roomId).catch((error) => {
+      console.warn('[meeting_bootstrap] retention thất bại (không chặn bootstrap):', error instanceof Error ? error.message : error);
     });
 
     return { ok: true, roomId, knownRoomCount: knownRooms.length, botJoined };

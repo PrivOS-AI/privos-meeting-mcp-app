@@ -21,6 +21,7 @@ import { basename } from 'node:path';
 
 import { AppError } from '../../shared/app-error.js';
 import { env } from '../env.js';
+import { probeSonioxAccount } from './provider-health-probe.js';
 import type { AsyncSttProvider, ProviderStatus, SttResult, SttToken, TranscribeInput } from './stt-provider.js';
 
 const BASE_URL = 'https://api.soniox.com';
@@ -212,14 +213,15 @@ export const sonioxAsyncProvider: AsyncSttProvider = {
   },
 
   async status(): Promise<ProviderStatus> {
-    const configured = Boolean(env.sonioxApiKey);
+    const probe = await probeSonioxAccount();
     return {
       provider: 'soniox',
       kind: 'async',
-      configured,
-      ok: configured,
+      configured: probe.reason !== 'not_configured',
+      ok: probe.ok,
       models: [env.sonioxAsyncModel],
-      detail: configured ? undefined : 'Thiếu SONIOX_API_KEY.',
+      detail: probe.ok ? undefined : probe.reason === 'not_configured' ? 'Thiếu SONIOX_API_KEY.' : 'Không kết nối được tới Soniox.',
+      reason: probe.ok ? undefined : probe.reason,
     };
   },
 };

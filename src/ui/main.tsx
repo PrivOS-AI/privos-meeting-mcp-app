@@ -13,6 +13,7 @@ import './theme/live-speakers.css';
 import './theme/summary.css';
 import './theme/history.css';
 import './theme/meeting-detail.css';
+import './theme/settings.css';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element is missing from the app document.');

@@ -11,6 +11,10 @@ import { AppError } from '../../shared/app-error.js';
 import { env, isDevelopmentRuntime } from '../env.js';
 import type { AppDbBotClient, DbRow } from '../hub/app-db-bot-client.js';
 import { getFileMetadata } from '../media/hub-file-download.js';
+import { isWorkspaceAdmin } from './is-workspace-admin.js';
+
+/** Re-exported so every existing `import { isWorkspaceAdmin } from './authz.js'` keeps working — the implementation lives in `is-workspace-admin.ts` (plan.md P8 file ownership). */
+export { isWorkspaceAdmin };
 
 /**
  * Fail closed unless the caller is a verified actor. Mirrors the same check
@@ -71,26 +75,6 @@ export async function requireRoomMeeting(
     throw new AppError('Không tìm thấy cuộc họp trong phòng này.');
   }
   return meeting;
-}
-
-/**
- * Best-effort workspace-admin check for `speaker_profile_update`/`_delete`
- * (plan.md: "`createdByUserId` hoặc workspace admin"). The SDK's
- * `VerifiedActor.claims` is an untyped `Record<string, unknown>` — there is
- * no dedicated "is this user a workspace admin" claim documented anywhere in
- * this app's PrivOS dev-docs references, so this reads the conventional
- * flags a Hub-issued JWT is most likely to carry (`role`/`roles`/`isAdmin`).
- * A caller who is NOT recognized as admin by this heuristic still owns any
- * profile they created — this only ever WIDENS access for a real admin, it
- * never narrows a non-admin creator's own access. Track tightening this once
- * a confirmed Hub admin claim key is documented (see plan.md open questions).
- */
-export function isWorkspaceAdmin(actor: VerifiedActor): boolean {
-  const claims = actor.claims;
-  if (claims.isAdmin === true || claims.admin === true) return true;
-  if (typeof claims.role === 'string' && claims.role.toLowerCase() === 'admin') return true;
-  if (Array.isArray(claims.roles) && claims.roles.some((r) => typeof r === 'string' && r.toLowerCase() === 'admin')) return true;
-  return false;
 }
 
 /**
