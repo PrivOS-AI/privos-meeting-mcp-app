@@ -62,7 +62,10 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
       } else if (name) {
         setMicError(t('screen.new.micError')); // NotFound/NotReadable — real device fault
       } else {
-        setMicError(t('screen.new.startFailed')); // mic was fine; a later start step failed
+        // Surface the real cause: the generic message hid folder/token/relay
+        // failures and forced blind server-side debugging.
+        const detail = error instanceof Error ? error.message : String(error);
+        setMicError(`${t('screen.new.startFailed')} [${detail}]`); // mic was fine; a later start step failed
       }
     } finally {
       setStarting(false);
