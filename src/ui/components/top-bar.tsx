@@ -5,12 +5,10 @@
  * "translate" is the switch action itself.
  */
 import { SUPPORTED_LANGUAGES, useI18n } from '../i18n/i18n-provider.js';
-import { useTheme, type ThemeMode } from '../theme/theme-provider.js';
+import { useTheme } from '../theme/theme-provider.js';
 import { Icon } from './icon.js';
 
 const ENDONYMS: Record<string, string> = { vi: 'VI', en: 'EN' };
-
-const THEME_CYCLE: ThemeMode[] = ['auto', 'light', 'dark'];
 
 export interface TopBarProps {
   title: string;
@@ -18,14 +16,15 @@ export interface TopBarProps {
 
 export function TopBar({ title }: TopBarProps) {
   const { language, setLanguage, t } = useI18n();
-  const { mode, setMode } = useTheme();
+  const { theme, setMode } = useTheme();
 
   const otherLanguage = SUPPORTED_LANGUAGES.find((code) => code !== language) ?? language;
 
-  function cycleTheme() {
-    const currentIndex = THEME_CYCLE.indexOf(mode);
-    const next = THEME_CYCLE[(currentIndex + 1) % THEME_CYCLE.length];
-    setMode(next);
+  // Simple light<->dark toggle off the RESOLVED theme, so every click flips the
+  // visible theme (a 3-state auto/light/dark cycle looked unresponsive: from
+  // `auto` on a light host, `auto -> light` resolves to the same appearance).
+  function toggleTheme() {
+    setMode(theme === 'dark' ? 'light' : 'dark');
   }
 
   return (
@@ -50,7 +49,8 @@ export function TopBar({ title }: TopBarProps) {
           className="ma-topbar__action"
           aria-label={t('topbar.theme.toggle')}
           title={t('topbar.theme.toggle')}
-          onClick={cycleTheme}
+          aria-pressed={theme === 'dark'}
+          onClick={toggleTheme}
         >
           <Icon name="lightbulb" size={16} />
         </button>
