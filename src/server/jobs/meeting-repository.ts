@@ -151,20 +151,37 @@ export async function deleteUnmappedLiveSpeakers(db: AppDbBotClient, meetingId: 
 
 export interface ActionItemInput {
   task: string;
-  owner?: string;
-  due?: string;
-  atSec?: number;
+  owner?: string | null;
+  due?: string | null;
+  atSec?: number | null;
 }
 
 /**
- * Creates the given action items for the meeting. True "replace" (deleting
- * stale rows from a re-run) needs a `db.delete` capability `AppDbBotClient`
- * does not expose yet — P6, which is the only phase that calls this with a
- * non-empty list, tracks that as a follow-up. P3 never calls this with items
- * (the summarize hook is a stub), so the seam is exercised as a no-op here.
+ * True replace: deletes every existing `action_items` row for `meetingId`,
+ * then creates the given list fresh. Idempotent across a job re-run (or a
+ * `meeting_summarize` re-run) in the sense that matters most — it never
+ * accumulates duplicates — at the accepted cost that `done`/`listItemId` on a
+ * previous run's items do not carry over to a re-summarize (plan.md tracks
+ * "Push to Smart List" idempotency separately, keyed by task text once
+ * pushed again). `AppDbBotClient.delete` shipped in P4, closing the gap this
+ * function used to have (P3's summarize stub never called it with items).
  */
 export async function replaceActionItems(db: AppDbBotClient, meetingId: string, items: readonly ActionItemInput[]): Promise<void> {
+  const existingResult = await db.query('action_items', 'room', {
+    where: [{ field: 'meeting', op: '==', value: meetingId }],
+    limit: 1000,
+  });
+  for (const row of extractDbRecords(existingResult)) {
+    await db.delete('action_items', 'room', row._id);
+  }
   for (const item of items) {
-    await db.create('action_items', 'room', { meeting: meetingId, task: item.task, owner: item.owner, due: item.due, atSec: item.atSec, done: false });
+    await db.create('action_items', 'room', {
+      meeting: meetingId,
+      task: item.task,
+      owner: item.owner ?? undefined,
+      due: item.due ?? undefined,
+      atSec: item.atSec ?? undefined,
+      done: false,
+    });
   }
 }

@@ -1,7 +1,12 @@
 /**
  * `transcript.srt` — one cue per segment; a segment longer than
  * `MAX_CUE_SEC` is split at token boundaries into evenly-sized cues instead
- * of one giant subtitle.
+ * of one giant subtitle. When a segment carries a `translation` (P6
+ * bilingual pass) AND fits in a single cue, the translation is appended as a
+ * second line inside that cue (standard bilingual-SRT convention). A segment
+ * long enough to be split into multiple cues has no single cue that maps
+ * 1:1 to the whole-segment translation, so those stay original-only rather
+ * than duplicating/misaligning the translation across sub-cues.
  */
 import type { Segment } from './segment-builder.js';
 import type { SttToken } from '../stt/stt-provider.js';
@@ -36,7 +41,8 @@ function joinCueText(tokens: readonly SttToken[]): string {
 function splitSegment(segment: Segment, tokens: readonly SttToken[]): Cue[] {
   const durationSec = segment.endSec - segment.startSec;
   if (durationSec <= MAX_CUE_SEC) {
-    return [{ startSec: segment.startSec, endSec: segment.endSec, text: segment.text }];
+    const text = segment.translation ? `${segment.text}\n${segment.translation}` : segment.text;
+    return [{ startSec: segment.startSec, endSec: segment.endSec, text }];
   }
 
   const segmentTokens = tokens.filter(

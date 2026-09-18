@@ -1,11 +1,12 @@
 /**
  * Orchestrates one post-meeting processing job: concat parts -> decode wav16k
  * -> transcribe via the job's PINNED async provider -> segment -> embed/match
- * speakers (P4) -> (P5 reconcile, P6 summarize — stub hooks kept at the exact
- * call sites those phases wire into) -> write transcript.json/.md/.srt -> App
- * DB. `patch()` after every step keeps `meeting_status` accurate; a heartbeat
- * interval covers a single long-running step (an STT poll) so it never looks
- * dead to `sweepStale`. `finally` always clears the job's scratch directory.
+ * speakers (P4) -> P5 reconcile -> P6 translate (optional) + summarize via
+ * Hub AI -> write transcript.json/.md/.srt (+ summary.md) -> App DB.
+ * `patch()` after every step keeps `meeting_status` accurate; a heartbeat
+ * interval covers a single long-running step (an STT poll, or the Hub AI
+ * summarize pass) so it never looks dead to `sweepStale`. `finally` always
+ * clears the job's scratch directory.
  */
 import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -21,6 +22,10 @@ import { deleteRoomFile } from '../media/hub-file-download.js';
 import { readLiveTurns } from '../media/live-turns-store.js';
 import { dataDir } from '../paths.js';
 import { resolveSpeakers as resolveSpeakersEmbed } from '../speaker/resolve-speakers.js';
+import { chunkTranscript } from '../summary/chunker.js';
+import { renderSummaryMarkdown } from '../summary/summary-markdown.js';
+import { summarizeTranscript as runSummarizer, type SummaryPayload } from '../summary/summarizer.js';
+import { translateSegmentsBatch } from '../summary/translator.js';
 import { asyncProviderFor } from '../stt/stt-provider-registry.js';
 import { alignByMaxOverlap } from '../transcript/caption-aligner.js';
 import { buildSegments, type Segment } from '../transcript/segment-builder.js';
@@ -28,7 +33,14 @@ import { buildTranscriptMarkdown } from '../transcript/markdown-writer.js';
 import { buildTranscriptJson, serializeTranscriptJson } from '../transcript/transcript-json.js';
 import { buildSrt } from '../transcript/srt-writer.js';
 import { HEARTBEAT_INTERVAL_MS, JobRepository, type JobRecord, type JobResultSpeaker } from './job-repository.js';
-import { deleteUnmappedLiveSpeakers, mergeLiveIntoAsyncSpeaker, upsertMeeting, upsertMeetingSpeakers, type SpeakerUpsertInput } from './meeting-repository.js';
+import {
+  deleteUnmappedLiveSpeakers,
+  mergeLiveIntoAsyncSpeaker,
+  replaceActionItems,
+  upsertMeeting,
+  upsertMeetingSpeakers,
+  type SpeakerUpsertInput,
+} from './meeting-repository.js';
 
 export interface RunMeetingJobInput {
   job: JobRecord;
@@ -101,9 +113,85 @@ async function reconcileWithLiveSpeakers(
   return mapped;
 }
 
-/** P6 seam: Hub AI summary + translation. Returns `undefined` until P6 ships. */
-async function summarizeTranscript(_segments: readonly Segment[], _language: string): Promise<undefined> {
-  return undefined;
+/** Best-effort parse of the model's free-text `due` into an ISO date App DB's `date` field accepts; unparseable text is dropped rather than sent as an invalid date (the task text itself still carries any human phrasing like "cuối tuần này"). */
+function parseDueDate(due: string | null): string | undefined {
+  if (!due) return undefined;
+  const parsed = new Date(due);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+}
+
+export interface SummarizeStepResult {
+  payload: SummaryPayload;
+  summaryFileId: string;
+  /** Same segments, with `.translation` filled in where the batch translate pass succeeded — feeds the bilingual transcript.json/.md/.srt write. A fresh mutable array (never the caller's own `Segment[]` reference). */
+  translatedSegments: Segment[];
+}
+
+/**
+ * P6 hook: Hub AI translate (optional, QĐ-12 batch path) + map-reduce
+ * summarize (QĐ-07) + `summary.md` upload + `action_items` replace, for one
+ * meeting's already reconciled/named segments. Throws on any failure — the
+ * caller (`runMeetingJob`) treats that as NON-FATAL to the job itself
+ * (plan.md: record `meetings.summaryError`, job still `completed`, transcript
+ * untouched, audio NOT deleted even when `keepAudio===false`).
+ */
+export async function summarizeTranscript(input: {
+  db: AppDbBotClient;
+  hub: RoomBoundHubClient;
+  roomId: string;
+  folderId: string;
+  meetingId: string;
+  title: string;
+  startedAt: string;
+  durationSec: number;
+  language: string;
+  translationEnabled: boolean;
+  translationLang?: string;
+  segments: readonly Segment[];
+  speakers: readonly JobResultSpeaker[];
+  /** Optional — `runMeetingJob` always passes the job's abort signal; a standalone `meeting_summarize` tool call has none to propagate. */
+  signal?: AbortSignal;
+}): Promise<SummarizeStepResult> {
+  const { db, hub, roomId, folderId, meetingId, title, startedAt, durationSec, segments, speakers, signal } = input;
+
+  const displayNameBySpeaker: Record<string, string> = {};
+  for (const speaker of speakers) displayNameBySpeaker[speaker.speakerId] = speaker.displayName ?? speaker.speakerId;
+  const speakerNames = Object.values(displayNameBySpeaker);
+
+  // Translate first so the map-reduce summarizer and the transcript writers both see `.translation` — a per-batch
+  // translate failure is already swallowed inside `translateSegmentsBatch` (skip that batch), never here.
+  let translatedSegments = segments;
+  const targetLang = input.translationLang === 'vi' || input.translationLang === 'en' ? input.translationLang : undefined;
+  if (input.translationEnabled && targetLang) {
+    const translations = await translateSegmentsBatch(hub, { roomId, segments, target: targetLang, signal });
+    if (translations.size > 0) {
+      translatedSegments = segments.map((s) => (translations.has(s.id) ? { ...s, translation: translations.get(s.id) } : s));
+    }
+  }
+
+  const summaryLanguage: 'vi' | 'en' = input.language === 'en' ? 'en' : 'vi';
+  const chunks = chunkTranscript(translatedSegments, displayNameBySpeaker);
+  const payload = await runSummarizer(hub, { roomId, chunks, language: summaryLanguage, title, speakerNames }, signal);
+
+  const markdown = renderSummaryMarkdown({ title, startedAt, durationSec, speakers: speakerNames, payload, language: summaryLanguage });
+  const summaryUpload = await uploadBotFile({
+    hub,
+    roomId,
+    folderId,
+    fileName: 'summary.md',
+    mimeType: 'text/markdown',
+    data: Buffer.from(markdown, 'utf8'),
+    duplicateAction: 'replace',
+    signal,
+  });
+
+  await replaceActionItems(
+    db,
+    meetingId,
+    payload.action_items.map((item) => ({ task: item.task, owner: item.owner, due: parseDueDate(item.due), atSec: item.at ?? undefined })),
+  );
+
+  return { payload, summaryFileId: summaryUpload.fileId, translatedSegments: [...translatedSegments] };
 }
 
 // ---- orchestration ----
@@ -202,23 +290,54 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       if (sessionSpeakerId) speaker.liveSessionSpeakerId = sessionSpeakerId;
     }
 
-    // 6. P6 summarize (stub).
-    await jobRepo.patch(job._id, { step: 'summarize', progress: 0.8 });
-    const summary = await summarizeTranscript(segments, job.language);
-
-    // 7. write transcript.json/.md/.srt to Files.
-    await jobRepo.patch(job._id, { step: 'write', progress: 0.9 });
     const languageCode = sttResult.language ?? job.language;
     const durationSec = Math.round(decoded.durationSec);
+    const displayNameBySpeaker: Record<string, string> = Object.fromEntries(speakers.map((s) => [s.speakerId, s.displayName ?? s.speakerId]));
+
+    // 6. P6 translate (optional) + map-reduce summarize via Hub AI. Non-fatal: a failure here is recorded as
+    // `meetings.summaryError` and the job still completes with the transcript intact (plan.md § Requirements).
+    await jobRepo.patch(job._id, { step: 'summarize', progress: 0.75 });
+    const meetingRow = await db.getById('meetings', 'room', job.meetingId);
+    const translationEnabled = meetingRow?.translationEnabled === true;
+    const translationLang = typeof meetingRow?.translationLang === 'string' ? meetingRow.translationLang : undefined;
+
+    let summarized: SummarizeStepResult | undefined;
+    let summaryError: string | undefined;
+    try {
+      summarized = await summarizeTranscript({
+        db,
+        hub: agentBotHub,
+        roomId,
+        folderId,
+        meetingId: job.meetingId,
+        title: job.title,
+        startedAt: job.startedAt,
+        durationSec,
+        language: job.language,
+        translationEnabled,
+        translationLang,
+        segments,
+        speakers,
+        signal,
+      });
+    } catch (error) {
+      summaryError = error instanceof Error ? error.message : String(error);
+      console.warn('[meeting-job] tóm tắt/dịch thất bại (transcript vẫn được giữ, job vẫn hoàn tất):', summaryError);
+    }
+    const finalSegments = summarized?.translatedSegments ?? segments;
+
+    // 7. write transcript.json/.md/.srt (bilingual when translated) to Files.
+    await jobRepo.patch(job._id, { step: 'write', progress: 0.9 });
     const transcriptDoc = buildTranscriptJson({
       meetingId: job.meetingId,
       title: job.title,
       startedAt: job.startedAt,
       durationSec,
       languageCode,
+      translationLang: summarized ? translationLang : undefined,
       provider: job.sttProvider,
       speakers: speakers.map((s) => ({ speakerId: s.speakerId, totalSpeakSec: s.totalSpeakSec, displayName: s.displayName ?? null })),
-      segments,
+      segments: finalSegments,
       tokens: sttResult.tokens,
     });
     const markdown = buildTranscriptMarkdown({
@@ -227,9 +346,10 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       durationSec,
       languageCode,
       provider: job.sttProvider,
-      segments,
+      segments: finalSegments,
+      displayNameBySpeaker,
     });
-    const srt = buildSrt(segments, sttResult.tokens);
+    const srt = buildSrt(finalSegments, sttResult.tokens);
 
     const [jsonUpload, mdUpload, srtUpload] = await Promise.all([
       uploadBotFile({
@@ -254,12 +374,15 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       srtFileId: srtUpload.fileId,
       speakerCount: speakers.length,
       durationSec,
+      ...(summarized ? { summaryFileId: summarized.summaryFileId, summaryText: summarized.payload.summary.slice(0, 20_000), keyTopics: summarized.payload.key_topics } : {}),
+      // Clears a PREVIOUS run's summaryError on success, records this run's on failure — always a fresh write, never stale.
+      summaryError: summaryError ?? '',
     });
 
-    // 8. cleanup — delete audio.webm ONLY when keepAudio===false AND summarize succeeded.
-    // (P3's summarize stub always "succeeds" with no summary, so this already exercises the real gate P6 will rely on.)
+    // 8. cleanup — delete audio.webm ONLY when keepAudio===false AND summarize succeeded (plan.md: never delete the
+    // only remaining source of truth when the AI step failed, even if the user opted out of keeping audio).
     await jobRepo.patch(job._id, { step: 'cleanup', progress: 0.98 });
-    if (!job.keepAudio) {
+    if (!job.keepAudio && summarized) {
       await deleteRoomFile(agentBotHub, audioUpload.fileId, signal)
         .then(() => upsertMeeting(db, job.meetingId, { audioDeletedAt: new Date().toISOString() }))
         .catch((error) => {
@@ -272,8 +395,8 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       languageCode,
       sttProvider: job.sttProvider,
       speakers,
-      fileIds: { transcriptJson: jsonUpload.fileId, transcriptMd: mdUpload.fileId, srt: srtUpload.fileId },
-      summary,
+      fileIds: { transcriptJson: jsonUpload.fileId, transcriptMd: mdUpload.fileId, srt: srtUpload.fileId, summary: summarized?.summaryFileId },
+      summary: summarized?.payload,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -13,6 +13,8 @@ import { processTool } from './process-tool.js';
 import { realtimeTokenTool } from './realtime-token-tool.js';
 import { registerTool } from './registry.js';
 import { relabelSpeakerTool } from './relabel-speaker-tool.js';
+import { sendToChatTool } from './send-to-chat-tool.js';
+import { settingsSetTool } from './settings-set-tool.js';
 import { speakerProfileDeleteTool, speakerProfileListTool, speakerProfileUpdateTool } from './speaker-profile-tools.js';
 import { speakerResolveTool } from './speaker-resolve-tool.js';
 import { statusTool } from './status-tool.js';
@@ -31,6 +33,8 @@ export function registerAllTools(): void {
   registerTool(processTool);
   registerTool(statusTool);
   registerTool(summarizeTool);
+  registerTool(sendToChatTool);
+  registerTool(settingsSetTool);
   registerTool(speakerResolveTool);
   registerTool(speakerProfileListTool);
   registerTool(speakerProfileUpdateTool);

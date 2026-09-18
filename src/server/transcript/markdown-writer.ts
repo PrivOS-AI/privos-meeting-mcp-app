@@ -1,7 +1,9 @@
 /**
  * `transcript.md` — a human-readable rendering of the same segments as
  * `transcript.json`. `# <title>` + meta, then one `## [HH:MM:SS] <speaker>`
- * heading per segment followed by its text.
+ * heading per segment followed by its text — and, when the segment carries a
+ * `translation` (P6 bilingual pass), an indented italic line right under it
+ * so the two languages read together without a second document.
  */
 import type { Segment } from './segment-builder.js';
 
@@ -39,6 +41,10 @@ export function buildTranscriptMarkdown(input: BuildTranscriptMarkdownInput): st
     lines.push(`## [${formatTimestamp(segment.startSec)}] ${name}`);
     lines.push('');
     lines.push(segment.text);
+    if (segment.translation) {
+      lines.push('');
+      lines.push(`*${segment.translation}*`);
+    }
     lines.push('');
   }
 

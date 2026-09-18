@@ -9,7 +9,7 @@ vi.mock('../hub/resolve-own-mcp-app-id.js', () => ({ resolveOwnMcpAppId: async (
 
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
 import { installFakeHub, type Store } from '../tools/test-support/fake-hub.js';
-import { deleteUnmappedLiveSpeakers, mergeLiveIntoAsyncSpeaker } from './meeting-repository.js';
+import { deleteUnmappedLiveSpeakers, mergeLiveIntoAsyncSpeaker, replaceActionItems } from './meeting-repository.js';
 
 let store: Store;
 let fakeHub: ReturnType<typeof installFakeHub>;
@@ -84,5 +84,41 @@ describe('deleteUnmappedLiveSpeakers', () => {
 
     const rows = extractDbRecords(await db().query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: 'm1' }] }));
     expect(rows.map((r) => r._id).sort()).toEqual(['async-1', 'live-mapped']);
+  });
+});
+
+describe('replaceActionItems', () => {
+  beforeEach(() => {
+    store = { action_items: [] };
+    fakeHub = installFakeHub({ store });
+  });
+
+  it('creates the given items for a meeting with no prior action_items', async () => {
+    await replaceActionItems(db(), 'm1', [{ task: 'Viết tài liệu', owner: 'Thanh', due: '2026-09-25T00:00:00.000Z', atSec: 12 }]);
+    const rows = extractDbRecords(await db().query('action_items', 'room', { where: [{ field: 'meeting', op: '==', value: 'm1' }] }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ meeting: 'm1', task: 'Viết tài liệu', owner: 'Thanh', done: false });
+  });
+
+  it('re-running with the same items does not duplicate rows (deletes stale rows first)', async () => {
+    await replaceActionItems(db(), 'm1', [{ task: 'A' }, { task: 'B' }]);
+    await replaceActionItems(db(), 'm1', [{ task: 'A' }, { task: 'B' }]);
+    const rows = extractDbRecords(await db().query('action_items', 'room', { where: [{ field: 'meeting', op: '==', value: 'm1' }] }));
+    expect(rows).toHaveLength(2);
+  });
+
+  it('drops items from a previous run that are no longer present', async () => {
+    await replaceActionItems(db(), 'm1', [{ task: 'A' }, { task: 'B' }]);
+    await replaceActionItems(db(), 'm1', [{ task: 'A' }]);
+    const rows = extractDbRecords(await db().query('action_items', 'room', { where: [{ field: 'meeting', op: '==', value: 'm1' }] }));
+    expect(rows.map((r) => r.task)).toEqual(['A']);
+  });
+
+  it('never touches another meeting\'s action_items', async () => {
+    await replaceActionItems(db(), 'm1', [{ task: 'A' }]);
+    store.action_items.push({ _id: 'other-1', meeting: 'm2', task: 'Other meeting task', done: false });
+    await replaceActionItems(db(), 'm1', [{ task: 'A2' }]);
+    const other = extractDbRecords(await db().query('action_items', 'room', { where: [{ field: 'meeting', op: '==', value: 'm2' }] }));
+    expect(other).toHaveLength(1);
   });
 });

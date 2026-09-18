@@ -128,6 +128,15 @@
       "feature": "meeting.bot.identity",
       "reason": "Đọc danh tính bot để kiểm tra credential và hiển thị trạng thái.",
       "degradedBehavior": "Banner hướng dẫn cấu hình credential bot."
+    },
+    {
+      "scope": "bot:message:send",
+      "requirement": "optional",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.chat.send",
+      "reason": "Gửi tóm tắt cuộc họp vào phòng chat qua bot cài đặt.",
+      "degradedBehavior": "Ẩn nút Gửi vào chat."
     }
   ],
   "tools": [
@@ -245,6 +254,26 @@
         "type": "object",
         "required": ["roomId", "meetingId"],
         "properties": { "roomId": { "type": "string" }, "meetingId": { "type": "string" } }
+      }
+    },
+    {
+      "name": "meeting_send_to_chat",
+      "title": "Gửi tóm tắt vào phòng chat",
+      "description": "Gửi tóm tắt cuộc họp đã lưu vào phòng chat qua bot cài đặt — nội dung được dựng ở máy chủ, không nhận text từ máy khách.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["roomId", "meetingId"],
+        "properties": { "roomId": { "type": "string" }, "meetingId": { "type": "string" } }
+      }
+    },
+    {
+      "name": "meeting_settings_set",
+      "title": "Cập nhật cấu hình workspace",
+      "description": "Ghi một cấu hình toàn workspace (nhà cung cấp STT, ngưỡng nhận diện người nói, lưu trữ…) — chỉ quản trị viên workspace.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["key", "value"],
+        "properties": { "key": { "type": "string" }, "value": {} }
       }
     },
     {
