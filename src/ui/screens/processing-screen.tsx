@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { parseToolResult, usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { Icon } from '../components/icon.js';
+import { ResolveSpeakersModal, type UnresolvedSpeaker } from '../components/resolve-speakers-modal.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 import { useRecordingState } from '../stores/recording-store.js';
 
@@ -18,6 +19,14 @@ export interface ProcessingScreenProps {
 const STEPS = ['download', 'decode', 'transcribe', 'segment', 'embed', 'summarize', 'write', 'cleanup'] as const;
 type Step = (typeof STEPS)[number];
 
+interface JobResultSpeakerDto {
+  speakerId: string;
+  totalSpeakSec: number;
+  displayName?: string | null;
+  confidence?: number;
+  resolved?: boolean;
+}
+
 interface MeetingStatusResult {
   status: 'queued' | 'processing' | 'completed' | 'failed' | 'not_found';
   step: Step | null;
@@ -26,6 +35,8 @@ interface MeetingStatusResult {
   stale: boolean;
   provider?: string;
   error?: string;
+  // P4: present once the job completes — drives the "Xác nhận người nói" modal below.
+  result?: { speakers?: JobResultSpeakerDto[] };
 }
 
 const POLL_MS = 3000;
@@ -50,6 +61,7 @@ export function ProcessingScreen({ onDone }: ProcessingScreenProps) {
   const [status, setStatus] = useState<MeetingStatusResult | null>(null);
   const [elapsedSec, setElapsedSec] = useState(0);
   const startedAtRef = useRef(Date.now());
+  const [resolveModalDismissed, setResolveModalDismissed] = useState(false);
 
   useEffect(() => {
     if (!meetingId) return undefined;
@@ -91,6 +103,15 @@ export function ProcessingScreen({ onDone }: ProcessingScreenProps) {
 
   const showRetry = status?.status === 'failed' || status?.stale === true;
 
+  // P4: job `completed` with any `resolved:false` speaker -> open the modal
+  // right away (plan.md § Implementation Steps 11). Dismissible ("Để sau")
+  // without blocking the user from moving on — the numbered placeholder
+  // stays until they confirm later via Settings/meeting detail (P7).
+  const unresolvedSpeakers: UnresolvedSpeaker[] = (status?.result?.speakers ?? [])
+    .filter((s) => s.resolved === false)
+    .map((s) => ({ speakerId: s.speakerId, totalSpeakSec: s.totalSpeakSec, displayName: s.displayName, confidence: s.confidence }));
+  const showResolveModal = status?.status === 'completed' && unresolvedSpeakers.length > 0 && !resolveModalDismissed;
+
   return (
     <div className="ma-processing">
       <h2 className="ma-processing__title">{t('processing.title')}</h2>
@@ -123,6 +144,16 @@ export function ProcessingScreen({ onDone }: ProcessingScreenProps) {
       <button type="button" className="ma-processing__done" onClick={onDone}>
         {t('processing.backToHistory')}
       </button>
+
+      {showResolveModal && meetingId && context.roomId ? (
+        <ResolveSpeakersModal
+          roomId={context.roomId}
+          meetingId={meetingId}
+          speakers={unresolvedSpeakers}
+          onClose={() => setResolveModalDismissed(true)}
+          onResolved={() => setResolveModalDismissed(true)}
+        />
+      ) : null}
     </div>
   );
 }

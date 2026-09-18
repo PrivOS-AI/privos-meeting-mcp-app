@@ -1,11 +1,11 @@
 /**
  * Orchestrates one post-meeting processing job: concat parts -> decode wav16k
- * -> transcribe via the job's PINNED async provider -> segment -> (P4 embed,
- * P5 reconcile, P6 summarize — stub hooks kept at the exact call sites those
- * phases wire into) -> write transcript.json/.md/.srt -> App DB. `patch()`
- * after every step keeps `meeting_status` accurate; a heartbeat interval
- * covers a single long-running step (an STT poll) so it never looks dead to
- * `sweepStale`. `finally` always clears the job's scratch directory.
+ * -> transcribe via the job's PINNED async provider -> segment -> embed/match
+ * speakers (P4) -> (P5 reconcile, P6 summarize — stub hooks kept at the exact
+ * call sites those phases wire into) -> write transcript.json/.md/.srt -> App
+ * DB. `patch()` after every step keeps `meeting_status` accurate; a heartbeat
+ * interval covers a single long-running step (an STT poll) so it never looks
+ * dead to `sweepStale`. `finally` always clears the job's scratch directory.
  */
 import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -20,13 +20,14 @@ import { decodeToWav16k } from '../media/decode-audio.js';
 import { deleteRoomFile } from '../media/hub-file-download.js';
 import { readLiveTurns } from '../media/live-turns-store.js';
 import { dataDir } from '../paths.js';
+import { resolveSpeakers as resolveSpeakersEmbed } from '../speaker/resolve-speakers.js';
 import { asyncProviderFor } from '../stt/stt-provider-registry.js';
 import { buildSegments, type Segment } from '../transcript/segment-builder.js';
 import { buildTranscriptMarkdown } from '../transcript/markdown-writer.js';
 import { buildTranscriptJson, serializeTranscriptJson } from '../transcript/transcript-json.js';
 import { buildSrt } from '../transcript/srt-writer.js';
 import { HEARTBEAT_INTERVAL_MS, JobRepository, type JobRecord, type JobResultSpeaker } from './job-repository.js';
-import { upsertMeeting, upsertMeetingSpeakers } from './meeting-repository.js';
+import { upsertMeeting, upsertMeetingSpeakers, type SpeakerUpsertInput } from './meeting-repository.js';
 
 export interface RunMeetingJobInput {
   job: JobRecord;
@@ -37,28 +38,8 @@ export interface RunMeetingJobInput {
   signal: AbortSignal;
 }
 
-// ---- P4/P5/P6 seams — real logic lands in later phases; kept here so the
+// ---- P5/P6 seams — real logic lands in later phases; kept here so the
 // orchestrator's call sites never move once those phases land. ----
-
-/** P4 seam: embedding + cosine match against `speaker_profiles`. For now: total speaking time per speakerId, no identity resolution. */
-async function resolveSpeakers(segments: readonly Segment[]): Promise<JobResultSpeaker[]> {
-  const bySpeaker = new Map<string, { totalSpeakSec: number; sampleStartSec: number; sampleEndSec: number }>();
-  for (const segment of segments) {
-    const duration = segment.endSec - segment.startSec;
-    const entry = bySpeaker.get(segment.speakerId);
-    if (entry) {
-      entry.totalSpeakSec += duration;
-      entry.sampleEndSec = Math.max(entry.sampleEndSec, segment.endSec);
-    } else {
-      bySpeaker.set(segment.speakerId, { totalSpeakSec: duration, sampleStartSec: segment.startSec, sampleEndSec: segment.endSec });
-    }
-  }
-  return [...bySpeaker.entries()].map(([speakerId, v]) => ({
-    speakerId,
-    totalSpeakSec: Math.round(v.totalSpeakSec),
-    sampleRange: { startSec: v.sampleStartSec, endSec: v.sampleEndSec },
-  }));
-}
 
 /**
  * P5 seam: merge the async pass's speakers against `live-turns.json` via
@@ -142,20 +123,35 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
     await jobRepo.patch(job._id, { step: 'segment', progress: 0.6 });
     const segments = buildSegments(sttResult.tokens, { pauseSplitSec: 1.5 });
 
-    // 5. P4 embed / P5 reconcile.
+    // 5. P4 embed + match/enrol against `speaker_profiles` (P5 reconcile below is still a stub).
     await jobRepo.patch(job._id, { step: 'embed', progress: 0.7 });
-    const speakers = await resolveSpeakers(segments);
-    await upsertMeetingSpeakers(
-      db,
-      job.meetingId,
-      speakers.map((s) => ({
-        speakerId: s.speakerId,
-        totalSpeakSec: s.totalSpeakSec,
-        nameSource: 'async' as const,
-        sampleStartSec: s.sampleRange?.startSec,
-        sampleEndSec: s.sampleRange?.endSec,
-      })),
-    );
+    const resolved = await resolveSpeakersEmbed(db, wavPath, segments, job.meetingId);
+    const speakerUpserts: SpeakerUpsertInput[] = resolved.map((s, i) => ({
+      speakerId: s.speakerId,
+      totalSpeakSec: s.totalSpeakSec,
+      nameSource: s.resolved ? ('async' as const) : undefined,
+      sampleStartSec: s.sampleRange?.startSec,
+      sampleEndSec: s.sampleRange?.endSec,
+      profileId: s.profileId,
+      // plan.md § Requirements: unmatched speakers keep the numbered placeholder until `speaker_resolve` confirms a real name.
+      displayName: s.resolved ? s.displayName : `Người nói ${i + 1}`,
+      confidence: s.confidence,
+      resolved: s.resolved,
+      // A previous pass' pendingEmbedding is replaced by this pass' result — '' clears it when this pass resolved the speaker.
+      pendingEmbedding: s.pendingEmbeddingJson ?? (s.resolved ? '' : undefined),
+    }));
+    await upsertMeetingSpeakers(db, job.meetingId, speakerUpserts);
+    // JobResult never carries the sealed pendingEmbedding ciphertext — App DB (`meeting_speakers.pendingEmbedding`, just written above) is its only home.
+    const speakers: JobResultSpeaker[] = resolved.map((s) => ({
+      speakerId: s.speakerId,
+      totalSpeakSec: s.totalSpeakSec,
+      sampleSec: s.sampleSec,
+      displayName: s.displayName,
+      profileId: s.profileId,
+      confidence: s.confidence,
+      resolved: s.resolved,
+      sampleRange: s.sampleRange,
+    }));
     await readLiveTurns(agentBotHub, roomId, folderId, signal); // P5 writes this file; P3 only proves the read path.
     await reconcileWithLiveSpeakers(agentBotHub, roomId, folderId, segments, speakers);
 

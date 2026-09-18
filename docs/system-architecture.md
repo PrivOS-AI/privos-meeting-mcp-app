@@ -54,6 +54,27 @@ Nguồn sự thật: `src/shared/app-db-schema.ts` (7 collection). Global: `spea
 `app_settings` → env) + bốn vỏ (soniox/elevenlabs × realtime/async). Phase 1 là vỏ; logic
 thật ở P2 (realtime token mint) / P3 (async transcribe).
 
+## Speaker identity + voiceprint (P4)
+
+`src/server/speaker/` — mọi module xuất hàm thuần (không gắn vòng đời job), để P5 (live
+naming) dùng lại nguyên xi:
+
+- `voiceprint-crypto.ts`: AES-256-GCM + HMAC-SHA256 (`VOICEPRINT_ENC_KEY`, HKDF-derived
+  MAC key) bọc mọi embedding trước khi ghi App DB — `openEmbedding` không bao giờ ném lỗi,
+  HMAC sai → `null` + log `hmac_mismatch` (QĐ-06).
+- `embedding-extractor.ts`: lazy singleton quanh `sherpa-onnx-node`'s
+  `SpeakerEmbeddingExtractor`, nạp qua **dynamic import** (package không có `.d.ts` — xem
+  `sherpa-onnx-node.d.ts`) và fail rõ ràng khi thiếu model/native addon; `dim` đọc runtime.
+- `segment-picker.ts` → `resolve-speakers.ts`: chọn range sạch mỗi speaker, embed **từng
+  range riêng** (không nối PCM trước) để tính `minPairwiseCosine` — cụm lưỡng đỉnh (hai
+  giọng lẫn một turn) bị chặn enrol tự động dù embedding trung bình có vẻ khớp ai đó.
+- `speaker-matcher.ts`: so **từng embedding** (max), không so centroid.
+- `profile-store.ts`: CRUD `speaker_profiles` (global, room-less), `withProfileLock` +
+  re-read trước khi ghi (chặn 2 job ghi đè `embeddings[]`), cap 20 embedding/profile.
+
+Tool: `speaker_resolve` (owner, 4 mode, cổng đồng nhất nội cụm), `speaker_profile_list/_update/_delete`
+(`createdByUserId` hoặc admin), `meeting_relabel_speaker` (back-propagate, P7 dùng lại).
+
 ## Spike results — CHƯA CHẠY (cần Hub + credential + khoá vendor thật)
 
 Điền quan sát thực tế vào các mục dưới khi chạy `scripts/spikes/*` với môi trường thật.

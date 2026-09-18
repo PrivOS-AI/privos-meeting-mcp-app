@@ -86,6 +86,11 @@ export class AppDbBotClient {
     return callAppPlatformTool('mcpapp.db.update', { collection, id, data }, 'db:write', this.roomArg(scope));
   }
 
+  /** Hard delete — used by `speaker_profile_delete` (P4) to actually erase biometric data, not just unlink it. */
+  async delete(collection: string, scope: 'global' | 'room', id: string): Promise<unknown> {
+    return callAppPlatformTool('mcpapp.db.delete', { collection, id }, 'db:write', this.roomArg(scope));
+  }
+
   async query(collection: string, scope: 'global' | 'room', args: Record<string, unknown> = {}): Promise<unknown> {
     return callAppPlatformTool('mcpapp.db.query', { collection, ...args }, 'db:read', this.roomArg(scope));
   }

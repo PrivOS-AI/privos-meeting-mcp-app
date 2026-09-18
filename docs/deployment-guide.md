@@ -41,8 +41,27 @@ bash scripts/deploy-hodao.sh
 - Remote: `/opt/privos/apps/meeting-agent` · pm2: `meeting-agent`
 - Sau rsync: `chown -R root:root` + `chmod 600` identity/.env (pm2 chạy root).
 - Provision trên node: `.env` (đủ khoá vendor + bot credential + `VOICEPRINT_ENC_KEY`
-  + `PRIVOS_FILES_ORIGIN`), model ONNX trong `models/`.
+  + `PRIVOS_FILES_ORIGIN`).
 - `VOICEPRINT_ENC_KEY` **phải backup** — mất khoá = mất toàn bộ voiceprint.
+
+## Model nhận diện giọng nói (`SPEAKER_MODEL_PATH`, P4)
+
+`scripts/deploy-hodao.sh` tự tải model ONNX vào `models/` trên node nếu chưa có
+(idempotent — không tải lại mỗi lần deploy). Model **không** commit vào mã
+nguồn (`models/` đã `.gitignore`); `sherpa-onnx-node` (Apache-2.0, native addon
+`sherpa-onnx-linux-x64`) cài qua `npm install` như dependency thường.
+
+- Mặc định script tải `3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx`
+  từ [sherpa-onnx speaker-recognition-models release](https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-recongition-models),
+  lưu thành `models/3dspeaker_speaker-embedding_advanced.onnx` (khớp
+  `SPEAKER_MODEL_PATH` mặc định trong `env.ts`).
+- Đổi model: set `SPEAKER_MODEL_FILE`/`SPEAKER_MODEL_URL` (và `SPEAKER_MODEL_PATH`
+  trong `.env` trên node) trước khi chạy `deploy-hodao.sh`; tuỳ chọn
+  `SPEAKER_MODEL_SHA256` để xác minh checksum sau tải.
+- **Model/ngưỡng chưa benchmark** (plan.md câu hỏi mở #5) — chạy
+  `npm run calibrate:speaker -- ./samples` (`<samples>/<person>/<file>.wav`,
+  16kHz mono PCM16) để đo FAR/FRR/EER thật trước khi tin `SPEAKER_MATCH_THRESHOLD`
+  mặc định (`0.5`).
 
 ## Env
 

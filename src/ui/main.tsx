@@ -8,6 +8,7 @@ import { ThemeProvider } from './theme/theme-provider.js';
 import './theme/tokens.css';
 import './theme/app-shell.css';
 import './theme/recording.css';
+import './theme/speaker-identity.css';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element is missing from the app document.');

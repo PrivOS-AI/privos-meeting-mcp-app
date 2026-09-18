@@ -35,9 +35,23 @@ export interface SpeakerUpsertInput {
   sampleStartSec?: number;
   sampleEndSec?: number;
   colorKey?: string;
+  /** P4: the matched/enrolled profile, when resolved. */
+  profileId?: string;
+  resolved?: boolean;
+  /** P4: sealed ciphertext (never a raw vector) awaiting `speaker_resolve` confirmation, or `''` to clear it. */
+  pendingEmbedding?: string;
 }
 
-/** One row per `speakerId` for the meeting — idempotent: updates the existing row when present, else creates one. */
+/**
+ * One row per `speakerId` for the meeting — idempotent: updates the existing
+ * row when present, else creates one. Writes ONLY the fields present on each
+ * `SpeakerUpsertInput` (a partial `db.update`, never a full-document
+ * replace), so P5's live-registry fields (`sessionSpeakerId`, `sonioxLabels`,
+ * `liveConfidence`, `liveSpeechSec`, `liveUpdatedAt`) — none of which this
+ * function ever sets — survive untouched when the async pass (P3/P4)
+ * overwrites the SAME row (plan.md § Requirements, `meeting_speakers` merge
+ * requirement).
+ */
 export async function upsertMeetingSpeakers(db: AppDbBotClient, meetingId: string, speakers: readonly SpeakerUpsertInput[]): Promise<void> {
   if (speakers.length === 0) return;
   const existingResult = await db.query('meeting_speakers', 'room', {
@@ -59,6 +73,9 @@ export async function upsertMeetingSpeakers(db: AppDbBotClient, meetingId: strin
     if (speaker.sampleStartSec !== undefined) data.sampleStartSec = speaker.sampleStartSec;
     if (speaker.sampleEndSec !== undefined) data.sampleEndSec = speaker.sampleEndSec;
     if (speaker.colorKey !== undefined) data.colorKey = speaker.colorKey;
+    if (speaker.profileId !== undefined) data.profileId = speaker.profileId;
+    if (speaker.resolved !== undefined) data.resolved = speaker.resolved;
+    if (speaker.pendingEmbedding !== undefined) data.pendingEmbedding = speaker.pendingEmbedding;
 
     const row = bySpeakerId.get(speaker.speakerId);
     if (row) await db.update('meeting_speakers', 'room', row._id, data);

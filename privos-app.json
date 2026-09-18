@@ -236,6 +236,77 @@
         "required": ["roomId", "meetingId"],
         "properties": { "roomId": { "type": "string" }, "meetingId": { "type": "string" } }
       }
+    },
+    {
+      "name": "speaker_resolve",
+      "title": "Xác nhận người nói",
+      "description": "Xác nhận, đặt tên hoặc gộp người nói chưa xác định của một cuộc họp vào hồ sơ giọng nói.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["roomId", "meetingId", "assignments"],
+        "properties": {
+          "roomId": { "type": "string" },
+          "meetingId": { "type": "string" },
+          "assignments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["speakerId", "mode"],
+              "properties": {
+                "speakerId": { "type": "string" },
+                "mode": { "type": "string", "enum": ["user", "name", "merge", "skip"] },
+                "privosUserId": { "type": "string" },
+                "displayName": { "type": "string", "maxLength": 80 },
+                "profileId": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "speaker_profile_list",
+      "title": "Danh sách hồ sơ giọng nói",
+      "description": "Liệt kê mọi hồ sơ giọng nói trong workspace (tên, liên kết, số mẫu) — không bao giờ trả về vector.",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "speaker_profile_update",
+      "title": "Cập nhật hồ sơ giọng nói",
+      "description": "Đổi tên, liên kết người dùng PrivOS hoặc ghi nhận lại giọng nói cho một hồ sơ — chỉ người tạo hồ sơ hoặc quản trị viên workspace.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["profileId"],
+        "properties": {
+          "profileId": { "type": "string" },
+          "displayName": { "type": "string", "maxLength": 80 },
+          "privosUserId": { "type": "string" },
+          "privosUsername": { "type": "string" },
+          "action": { "type": "string", "enum": ["reenrol"] }
+        }
+      }
+    },
+    {
+      "name": "speaker_profile_delete",
+      "title": "Xoá hồ sơ giọng nói",
+      "description": "Xoá hẳn một hồ sơ giọng nói và mọi liên kết của nó trong tất cả các phòng — chỉ người tạo hồ sơ hoặc quản trị viên workspace.",
+      "inputSchema": { "type": "object", "required": ["profileId"], "properties": { "profileId": { "type": "string" } } }
+    },
+    {
+      "name": "meeting_relabel_speaker",
+      "title": "Sửa nhãn người nói",
+      "description": "Sửa người nói của một cuộc họp sang hồ sơ đúng hoặc một tên khác, và cập nhật lại hồ sơ giọng nói tương ứng.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["roomId", "meetingId", "speakerId"],
+        "properties": {
+          "roomId": { "type": "string" },
+          "meetingId": { "type": "string" },
+          "speakerId": { "type": "string" },
+          "profileId": { "type": "string" },
+          "displayName": { "type": "string", "maxLength": 80 }
+        }
+      }
     }
   ],
   "env": [

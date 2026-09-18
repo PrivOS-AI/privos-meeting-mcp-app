@@ -68,6 +68,11 @@ export function installFakeHub(options: FakeHubOptions): RoomBoundHubClient & { 
       store[collection] = (store[collection] ?? []).map((row) => (row._id === id ? { ...row, ...data } : row));
       return { updated: true };
     }
+    if (toolName === 'mcpapp.db.delete') {
+      const { collection, id } = args as { collection: string; id: string };
+      store[collection] = (store[collection] ?? []).filter((row) => row._id !== id);
+      return { deleted: true };
+    }
     throw new Error(`fake hub: unhandled toolName "${toolName}"`);
   }
 
