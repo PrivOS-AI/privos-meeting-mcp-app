@@ -170,8 +170,21 @@ export class RecordingStore {
 
   constructor(
     private readonly app: McpApp,
-    private readonly ctx: { roomId: string; userId: string; username: string },
+    private ctx: { roomId: string; userId: string; username: string },
   ) {}
+
+  /**
+   * Refresh the host context. The store is a mount-lived singleton constructed
+   * on the FIRST render, when the host may not have delivered `roomId`/`userId`
+   * yet (they arrive asynchronously over the postMessage bridge) — capturing
+   * them once would leave `ctx.roomId` empty and write orphaned meetings with
+   * no room. The provider re-syncs on every render; never mid-recording, so a
+   * live session keeps the room it started in.
+   */
+  syncContext(next: { roomId: string; userId: string; username: string }): void {
+    if (this.state.status === 'recording' || this.state.status === 'paused') return;
+    if (next.roomId) this.ctx = next;
+  }
 
   getState = (): RecordingState => this.state;
 
@@ -232,6 +245,10 @@ export class RecordingStore {
 
   async startRecording(input: StartRecordingInput): Promise<void> {
     try {
+      // Guard the async host context: without a room every downstream call
+      // (meeting row, Files folder, realtime token) is meaningless, and a
+      // create would persist an orphaned meeting with an empty roomId.
+      if (!this.ctx.roomId) throw new Error('Chưa nhận được ngữ cảnh phòng từ Hub — thử lại sau giây lát.');
       // This document runs in an opaque origin, where the browser refuses
       // `getUserMedia` even with `allow="microphone"` delegated. Capture through
       // the host (it records under its own origin) and rebuild a MediaStream the
@@ -527,9 +544,14 @@ let singleton: RecordingStore | null = null;
 export function RecordingStoreProvider({ children }: { children: ReactNode }) {
   const app = usePrivosApp();
   const context = usePrivosContext();
+  const ctx = { roomId: context.roomId, userId: context.userId, username: context.username };
   if (!singleton) {
-    singleton = new RecordingStore(app, { roomId: context.roomId, userId: context.userId, username: context.username });
+    singleton = new RecordingStore(app, ctx);
   }
+  // Host context (roomId/userId) is delivered asynchronously and may be empty
+  // on the first render that built the singleton — keep it fresh so a recording
+  // never starts against an empty room.
+  singleton.syncContext(ctx);
   return createElement(RecordingStoreContext.Provider, { value: singleton }, children);
 }
 
