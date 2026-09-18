@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: "Phase 8: Settings, hardening, tests and hodao deploy"
-status: pending
+status: code-complete-deterministic
 priority: P1
 effort: "4.5d"
 dependencies: [1, 2, 3, 4, 5, 6, 7]

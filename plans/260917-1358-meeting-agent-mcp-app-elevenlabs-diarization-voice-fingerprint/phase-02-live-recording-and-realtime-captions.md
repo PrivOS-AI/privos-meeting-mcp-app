@@ -1,7 +1,7 @@
 ---
 phase: 2
 title: "Phase 2: Live recording and realtime captions"
-status: pending
+status: code-complete-deterministic
 priority: P1
 effort: "4d"
 dependencies: [1]

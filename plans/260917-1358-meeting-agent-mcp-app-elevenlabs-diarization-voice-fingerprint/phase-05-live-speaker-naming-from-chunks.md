@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: "Phase 5: Live speaker naming from chunks"
-status: pending
+status: code-complete-deterministic
 priority: P1
 effort: "3.5d"
 dependencies: [3, 4]

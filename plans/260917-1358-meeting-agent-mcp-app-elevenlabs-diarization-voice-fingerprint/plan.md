@@ -1,7 +1,7 @@
 ---
 title: "Meeting Agent MCP App - dual STT provider + voice fingerprint"
 description: "PrivOS MCP app ghi âm họp offline qua mic trình duyệt, live caption + nhãn người nói song ngữ hai nhà cung cấp STT (Soniox / ElevenLabs) chọn được theo workspace, voiceprint sherpa-onnx mã hoá, tóm tắt bằng Hub AI và lưu transcript/summary vào PrivOS Files."
-status: pending
+status: code-complete-deterministic
 priority: P1
 effort: "28d"
 tags: [mcp-app, privos, soniox, elevenlabs, speaker-id, react, node]

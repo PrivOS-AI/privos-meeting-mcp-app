@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: "Phase 7: History and meeting detail review"
-status: pending
+status: code-complete-deterministic
 priority: P1
 effort: "3d"
 dependencies: [3, 4, 5, 6]

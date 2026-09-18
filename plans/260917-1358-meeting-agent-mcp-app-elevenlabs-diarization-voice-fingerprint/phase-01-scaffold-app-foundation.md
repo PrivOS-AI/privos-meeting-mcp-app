@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: "Phase 1: Scaffold app foundation"
-status: in-progress
+status: code-complete-deterministic
 priority: P1
 effort: "3d"
 dependencies: []

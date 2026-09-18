@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: "Phase 4: Speaker identity and voice fingerprint"
-status: pending
+status: code-complete-deterministic
 priority: P1
 effort: "3d"
 dependencies: [3]
