@@ -18,8 +18,12 @@ function fileNameToIconName(path: string): string {
   return path.replace('../assets/icons/', '').replace(/\.svg$/, '');
 }
 
+// Every icon ships with a hardcoded `#080D0F` ink stroke/fill. Rewrite it to
+// `currentColor` so icons follow the surrounding text color and flip with the
+// theme (white on the dark canvas, navy on the gold button, white on brand
+// buttons) instead of staying near-black and vanishing in dark mode.
 const markupByName: Record<string, string> = Object.fromEntries(
-  Object.entries(iconModules).map(([path, svg]) => [fileNameToIconName(path), svg]),
+  Object.entries(iconModules).map(([path, svg]) => [fileNameToIconName(path), svg.replace(/#080D0F/gi, 'currentColor')]),
 );
 
 export const ICON_NAMES = [

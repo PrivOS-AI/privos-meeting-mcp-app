@@ -184,6 +184,19 @@
   --ma-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
   --ma-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
   --ma-shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.4);
+
+  /* Raw design-system surface/status tokens some components use directly
+     (bypassing the --ma-* alias layer). Without these dark values they keep
+     their light defaults — e.g. --bg-sunken (#e6e8eb) rendered a glaring white
+     card on the dark canvas. Overriding the raw tokens here also flips the
+     --ma-status-*-bg aliases, which resolve through them. */
+  --bg-sunken: rgba(255, 255, 255, 0.05);
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.12);
+  --status-success-bg: rgba(31, 158, 111, 0.18);
+  --status-warning-bg: rgba(229, 168, 0, 0.18);
+  --status-danger-bg: rgba(219, 75, 75, 0.18);
+  --status-info-bg: rgba(60, 130, 230, 0.18);
 }
 
 * {
