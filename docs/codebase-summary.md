@@ -18,7 +18,7 @@ meeting-agent/
     manifest.ts app-icon.ts mcp-handler.ts ui-resource.ts relay-transport.ts dev-server.ts paths.ts env.ts
     hub/                      # installation-bot Hub access
       resolve-hub-origin.ts resolve-own-mcp-app-id.ts bot-tool-call.ts
-      agent-bot-credential-check.ts app-db-bot-client.ts app-settings.ts ensure-bot-in-room.ts
+      app-db-bot-client.ts app-settings.ts
     stt/                      # provider abstraction (interface + registry + 4 real providers)
       stt-provider.ts stt-provider-registry.ts provider-health-probe.ts (P8: cheap real vendor probes)
       soniox-realtime-token.ts soniox-async-provider.ts

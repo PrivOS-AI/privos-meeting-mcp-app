@@ -11,10 +11,9 @@ import 'dotenv/config';
 import path from 'node:path';
 
 import express from 'express';
-import { serveApp, RuntimeModeError } from '@privos_ai/app-server';
+import { serveApp, RuntimeModeError, type RoomBoundHubClient } from '@privos_ai/app-server';
 
 import { assertProviderKeysAtBoot } from './env.js';
-import { checkAgentBotCredential } from './hub/agent-bot-credential-check.js';
 import { startAudioRetention } from './jobs/audio-retention-job.js';
 import { meetingQueue } from './jobs/meeting-queue.js';
 import { startupSweep } from './jobs/startup-sweep.js';
@@ -60,15 +59,27 @@ async function runBootChecks(): Promise<void> {
   for (const problem of assertProviderKeysAtBoot()) {
     console.warn(`[boot] Cảnh báo cấu hình: ${problem}`);
   }
+}
+
+/**
+ * Validate the installation-bot credential through the RESOLVED bot transport.
+ * Must run after `serveApp` built it: in standalone-production the credential
+ * is delivered over the control channel and seeded from the identity file
+ * inside `serveApp`, so an env-only check before that reports a false
+ * "not-configured" for a perfectly live credential.
+ */
+async function logAgentBotCredentialStatus(agentBotHub: RoomBoundHubClient): Promise<void> {
   try {
-    const check = await checkAgentBotCredential();
-    if (check.status === 'valid') {
-      console.log(`[boot] Agent-bot credential valid (@${check.username || check.botId}).`);
-    } else {
-      console.warn(`[boot] Agent-bot credential ${check.status} — backend Hub access will fail until it is configured.`);
-    }
+    const response = await agentBotHub.authorizedFetch('/api/v1/me', { requiredScope: 'basic:information', retryMode: 'never' });
+    if (response.ok) console.log('[boot] Agent-bot credential valid.');
+    else console.warn(`[boot] Agent-bot credential rejected by Hub (HTTP ${response.status}).`);
   } catch (error) {
-    console.warn('[boot] Agent-bot credential check could not complete:', error instanceof Error ? error.message : error);
+    const name = error instanceof Error ? error.name : '';
+    console.warn(
+      name === 'AgentBotCredentialAbsentError'
+        ? '[boot] Agent-bot credential not delivered yet — a workspace admin must issue it (Admin > Apps > this app).'
+        : `[boot] Agent-bot credential check could not complete: ${error instanceof Error ? error.message : error}`,
+    );
   }
 }
 
@@ -82,6 +93,7 @@ async function start(): Promise<void> {
   const handle = await serveApp({
     descriptor: buildRelayAppDescriptor(),
     createHandler: (ctx) => {
+      void logAgentBotCredentialStatus(ctx.agentBotHub);
       // Fire-and-forget: reloads queued jobs, fails stale processing jobs,
       // marks abandoned recordings interrupted, sweeps dead vendor garbage —
       // across every known room. Never blocks the handler from being ready.

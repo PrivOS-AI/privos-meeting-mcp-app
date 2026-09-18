@@ -56,8 +56,16 @@ export function App() {
     if (bootstrapped.current) return;
     if (!context.roomId) return;
     bootstrapped.current = true;
+    // The Hub gates every room-scoped call the installation bot makes on the
+    // bot being a MEMBER of that room (a non-member resolves to an empty ACL,
+    // i.e. "Insufficient scope" for db:*/files:*), and only a user-execution
+    // call may add it (`bot:room:join` is user-only). So join from here, as
+    // the current room member, BEFORE the backend bootstrap that runs as the
+    // bot. Idempotent; a refusal must not block the bootstrap attempt.
     app
-      .callServerTool({ name: 'meeting_bootstrap', arguments: { roomId: context.roomId } })
+      .callServerTool({ name: 'mcpapp.bot.joinCurrentRoom', arguments: {} })
+      .catch((error: unknown) => console.warn('mcpapp.bot.joinCurrentRoom failed', error))
+      .then(() => app.callServerTool({ name: 'meeting_bootstrap', arguments: { roomId: context.roomId } }))
       .then((raw) => parseToolResult(raw))
       .catch((error: unknown) => {
         // Bootstrap failure must not block the shell from rendering; later

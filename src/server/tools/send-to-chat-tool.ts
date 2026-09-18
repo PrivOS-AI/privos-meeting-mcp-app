@@ -9,8 +9,8 @@
  * OPEN QUESTION (plan.md risk table, spike P1-6 unresolved offline): the
  * exact `mcpapp.bot.*` tool name for posting a room message has never been
  * observed against a live Hub. `BOT_SEND_MESSAGE_TOOL` below is this phase's
- * best-guess DEFAULT (mirrors `ensure-bot-in-room.ts`'s `mcpapp.bot.joinRoom`
- * naming convention). Unlike that best-effort join, a failure HERE is not
+ * DEFAULT — the name itself matches the Hub's registered tool list, the argument
+ * shape is still unobserved. A failure HERE is not
  * swallowed — `callAppPlatformTool` throws an `AppError` with the Hub's own
  * message, which the UI is expected to use to disable the "Send to Chat"
  * button with a tooltip (plan.md: "không lỗi im lặng" — no silent failure).
