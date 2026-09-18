@@ -145,6 +145,15 @@
       "title": "Meeting Agent",
       "description": "Mở ứng dụng ghi âm và xem lại cuộc họp trong phòng này.",
       "inputSchema": { "type": "object", "properties": { "roomId": { "type": "string" } } },
+      "ui": {
+        "resourceUri": "ui://meeting-agent/app.html",
+        "hideAiChat": true,
+        "permissions": ["microphone", "screen-wake-lock"],
+        "csp": {
+          "connect-src": ["wss://stt-rt.soniox.com", "wss://api.elevenlabs.io", "<PRIVOS_FILES_ORIGIN>"],
+          "media-src": ["<PRIVOS_FILES_ORIGIN>"]
+        }
+      },
       "_meta": {
         "ui": {
           "resourceUri": "ui://meeting-agent/app.html",
