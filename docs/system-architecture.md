@@ -154,7 +154,7 @@ xoá (`deleteUnmappedLiveSpeakers`).
 
 Điền quan sát thực tế vào các mục dưới khi chạy `scripts/spikes/*` với môi trường thật.
 
-1. **Mic** (spike-01): getUserMedia trong tab phòng dưới `_meta.ui.permissions`. → _TBD_
+1. **Mic** (spike-01): getUserMedia trong tab phòng dưới `_meta.ui.permissions`. → **NotAllowedError trên hodao (2026-09-18, Chrome Android) — CHƯA phải bug Hub.** Đã verify tận container `tenant-hodao-vn-hub` (image `privos-hub:v7.15.42-tenant.230`): bundle deploy MỚI hơn source local — `McpAppTab.tsx` cả 3 nhánh iframe dùng `allow=appIframeAllowAttribute(tool.ui.permissions, embedPolicy)`; hàm này sanitize theo allowlist `["camera","microphone","screen-wake-lock"]`; Mongo `rocketchat_mcp_apps` có `entryPoints.roomTab.toolName="meeting_agent"` và tool đó `ui.permissions=["microphone","screen-wake-lock"]`; `mcp-apps.get`→`publicMcpAppView` trả nguyên `tools`+`entryPoints`. Nghĩa là iframe ĐÁNG LẼ đã có `allow="microphone; screen-wake-lock"`. Nghi vấn còn lại: (a) Chrome cache bundle Hub cũ (trước khi Hub đổi sang `appIframeAllowAttribute`; Meteor cache dynamic-import trong IndexedDB) → test bằng Incognito; (b) iframe opaque-origin (sandbox không `allow-same-origin`) chặn getUserMedia kể cả có `allow`. Chưa chốt (a)/(b) — cần live-confirm. `screen-wake-lock` đã nằm trong allowlist Hub nên cùng đường.
 2. **uploadFile ceiling** (spike-02): base64 tối đa → độ dài timeslice. → _TBD_
 3. **CSP/presign** (spike-03): `PRIVOS_FILES_ORIGIN`, fetch transcript.json + audio. → _TBD_
 4. **Global collection room-less** (spike-04): getSchema trả scope:'global' không roomId. → _TBD_
