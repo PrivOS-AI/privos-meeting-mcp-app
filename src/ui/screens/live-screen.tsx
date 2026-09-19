@@ -35,6 +35,10 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
   const [view, setView] = useState<ViewMode>('transcript');
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
+  // Shared across every caption line so the whole column flips together.
+  const [timeMode, setTimeMode] = useState<'clock' | 'duration'>('clock');
+  // Mobile only: the Summary/Bookmarks panel is a right-hand drawer.
+  const [sideOpen, setSideOpen] = useState(false);
 
   // Chat-style transcript: keep the newest caption in view so older lines are
   // pushed up as people talk — but never yank the view while the user has
@@ -109,7 +113,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
     <div className="ma-live">
       <div className="ma-live__main">
         <div className="ma-live__topbar">
-          <div>
+          <div className="ma-live__title-wrap">
             {editingTitle ? (
               <input
                 className="ma-live__title-input"
@@ -130,11 +134,13 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
                 onClick={() => { setTitleDraft(state.title); setEditingTitle(true); }}
                 aria-label={t('recording.editTitle')}
               >
-                <span>{state.title}</span>
+                <span className="ma-live__title-text">{state.title}</span>
                 <Icon name="edit" size={15} />
               </button>
             )}
-            <p className="ma-live__meta">
+          </div>
+          <div className="ma-live__topbar-actions">
+            <span className="ma-live__meta">
               <Icon name="person-multiple" size={14} />
               {speakerKeys.length > 0 ? t('recording.speakerCount', { n: speakerKeys.length }) : t('recording.speakerCount.unknown')}
               {state.liveSpeakersDegraded ? (
@@ -142,13 +148,14 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
                   <Icon name="alert-circle" size={14} />
                 </button>
               ) : null}
-            </p>
-          </div>
-          <div className="ma-live__topbar-actions">
+            </span>
             <RecIndicator elapsedSec={state.elapsedSec} paused={state.status === 'paused'} />
             <button type="button" className="ma-live__toggle" onClick={() => setView('stage')}>
               <Icon name="volume" size={16} />
               {t('recording.view.stage')}
+            </button>
+            <button type="button" className="ma-live__side-toggle" onClick={() => setSideOpen(true)} aria-label={t('recording.side.open')}>
+              <Icon name="sparkle" size={18} />
             </button>
           </div>
         </div>
@@ -179,6 +186,8 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
                   onAddSpeaker={(name, applyToVoice) => store.reassignLine(line.id, store.addManualSpeaker(name), applyToVoice)}
                   onRename={(speakerKey, choice) => store.assignRealtimeSpeaker(speakerKey, choice)}
                   onMenuOpenChange={(open) => { menuOpenRef.current = open; }}
+                  timeMode={timeMode}
+                  onToggleTimeMode={() => setTimeMode((m) => (m === 'clock' ? 'duration' : 'clock'))}
                   onBookmark={() => void store.addBookmark()}
                 />
               );
@@ -187,7 +196,11 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
         </div>
         {footer}
       </div>
-      <aside className="ma-live__side">
+      {sideOpen ? <button type="button" className="ma-live__side-scrim" aria-label={t('recording.side.close')} onClick={() => setSideOpen(false)} /> : null}
+      <aside className={`ma-live__side${sideOpen ? ' ma-live__side--open' : ''}`}>
+        <button type="button" className="ma-live__side-close" onClick={() => setSideOpen(false)} aria-label={t('recording.side.close')}>
+          <Icon name="close" size={18} />
+        </button>
         <LiveSidePanel meetingId={state.meetingId} bookmarkAtSec={state.bookmarkAtSec} />
       </aside>
     </div>

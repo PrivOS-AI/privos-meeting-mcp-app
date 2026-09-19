@@ -155,26 +155,43 @@ describe('createSonioxConnection', () => {
     const lines = new Map(stub.captions.map((c) => [c.id, c.text]));
     expect([...lines.values()]).toEqual(['xin chào mọi người', 'tiếp theo']);
   });
-  it('splits one speaker\'s uninterrupted monologue into multiple lines past the length cap', async () => {
+  async function linesFor(tokens: Token[]): Promise<string[]> {
     const stub = new RealtimeConnectionCallbacksStub();
     createSonioxConnection({ ...stub.options(), mintToken: async () => token(), stream: {} as MediaStream, recorderEpochMs: 0, translate: false });
     await vi.waitFor(() => expect(FakeSonioxClient.instances).toHaveLength(1));
     const client = FakeSonioxClient.instances[0];
     client.options.onStarted?.();
+    client.options.onPartialResult?.({ tokens, text: '', final_audio_proc_ms: 0, total_audio_proc_ms: 0 });
+    return [...new Map(stub.captions.filter((c) => !c.translationOf).map((c) => [c.id, c.text])).values()];
+  }
+  const wordCount = (text: string) => text.trim().split(/\s+/).length;
+  /** `n` one-word tokens from one speaker with no pause; `sentenceEndAt` puts a full stop on that word (1-based). */
+  function monologue(n: number, sentenceEndAt?: number): Token[] {
+    return Array.from({ length: n }, (_, i) =>
+      makeToken({ text: `${i + 1 === sentenceEndAt ? 'word.' : 'word'} `, speaker: '1', is_final: true, start_ms: i * 300, end_ms: i * 300 + 290 }),
+    );
+  }
 
-    // ~40 tokens of 30 chars each = ~1200 chars, ONE speaker, NO pause between
-    // tokens -> must break into more than one line (cap ~750 chars).
-    const tokens: Token[] = [];
-    for (let i = 0; i < 40; i++) {
-      tokens.push(makeToken({ text: 'x'.repeat(29) + ' ', speaker: '1', is_final: true, start_ms: i * 300, end_ms: i * 300 + 280 }));
-    }
-    client.options.onPartialResult?.({ tokens, text: '', final_audio_proc_ms: 12_000, total_audio_proc_ms: 12_000 });
-
-    const originalLines = stub.captions.filter((c) => !c.translationOf);
-    const uniqueIds = new Set(originalLines.map((c) => c.id));
-    expect(uniqueIds.size).toBeGreaterThan(1);
-    // Every emitted line stays within a sane bound (cap + one token's worth).
-    for (const c of originalLines) expect(c.text.length).toBeLessThanOrEqual(790);
+  it('keeps a monologue under the soft limit on one line', async () => {
+    expect(await linesFor(monologue(90, 40))).toHaveLength(1);
+  });
+  it('past the soft limit, breaks at the END OF A SENTENCE rather than at a fixed size', async () => {
+    const lines = await linesFor(monologue(140, 120));
+    expect(lines).toHaveLength(2);
+    expect(wordCount(lines[0])).toBe(120);
+    expect(lines[0].trim().endsWith('.')).toBe(true);
+  });
+  it('past the soft limit, breaks at a short breath pause', async () => {
+    const tokens = monologue(140);
+    for (let i = 110; i < tokens.length; i++) { tokens[i].start_ms! += 600; tokens[i].end_ms! += 600; }
+    const lines = await linesFor(tokens);
+    expect(lines).toHaveLength(2);
+    expect(wordCount(lines[0])).toBe(110);
+  });
+  it('hard-caps a line at 150 words when there is no sentence end or pause at all', async () => {
+    const lines = await linesFor(monologue(200));
+    expect(lines).toHaveLength(2);
+    expect(wordCount(lines[0])).toBe(150);
   });
   it('builds up history when each response carries only NEW final tokens (Soniox sends a final once)', async () => {
     const stub = new RealtimeConnectionCallbacksStub();

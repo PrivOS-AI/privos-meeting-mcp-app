@@ -28,6 +28,9 @@ export interface CaptionLineProps {
   onRename?(speakerKey: string, choice: RealtimeAssignChoice): void;
   /** Fires when this line's speaker menu opens/closes, so the transcript can stop auto-scrolling while it is open. */
   onMenuOpenChange?(open: boolean): void;
+  /** 'clock' = timestamp since meeting start; 'duration' = how long this turn was spoken. */
+  timeMode?: 'clock' | 'duration';
+  onToggleTimeMode?(): void;
   onBookmark?: () => void;
 }
 
@@ -37,7 +40,14 @@ function formatTimestamp(atSec: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, speakers, onReassign, onAddSpeaker, onRename, onMenuOpenChange, onBookmark }: CaptionLineProps) {
+/** Spoken length of a turn: "8s" under a minute, else "1:05". */
+function formatDuration(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, speakers, onReassign, onAddSpeaker, onRename, onMenuOpenChange, timeMode = 'clock', onToggleTimeMode, onBookmark }: CaptionLineProps) {
   const { t } = useI18n();
   const [menu, setMenu] = useState<'closed' | 'picker' | 'rename'>('closed');
   useEffect(() => { onMenuOpenChange?.(menu !== 'closed'); }, [menu, onMenuOpenChange]);
@@ -69,7 +79,19 @@ export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, s
               <span className="ma-caption-line__speaker">{badgeLabel}</span>
             )
           ) : null}
-          {line.isFinal ? <span className="ma-caption-line__time">{formatTimestamp(line.atSec)}</span> : <span className="ma-caption-line__speaking">{t('recording.speakerBadge.speakingNow')}</span>}
+          {line.isFinal ? (
+            <button
+              type="button"
+              className="ma-caption-line__time"
+              title={t('recording.time.toggle')}
+              aria-label={t('recording.time.toggle')}
+              onClick={onToggleTimeMode}
+            >
+              {timeMode === 'duration' ? formatDuration(line.endSec - line.atSec) : formatTimestamp(line.atSec)}
+            </button>
+          ) : (
+            <span className="ma-caption-line__speaking">{t('recording.speakerBadge.speakingNow')}</span>
+          )}
 
           {menu === 'picker' && speakerKey ? (
             <LineSpeakerPicker

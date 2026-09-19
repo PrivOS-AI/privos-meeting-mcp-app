@@ -27,7 +27,6 @@ export type Route = 'new' | 'live' | 'processing' | 'detail' | 'history' | 'sett
 export function App() {
   const app = usePrivosApp();
   const context = usePrivosContext();
-  const { t } = useI18n();
   const [route, setRoute] = useState<Route>('new');
   // Mobile-only: the rail is an off-canvas drawer toggled by the hamburger below.
   const [railOpen, setRailOpen] = useState(false);
@@ -70,15 +69,7 @@ export function App() {
   return (
     <RecordingStoreProvider>
       <div className="ma-app">
-        <button
-          type="button"
-          className="ma-rail-toggle"
-          aria-label={t(railOpen ? 'rail.close' : 'rail.open')}
-          aria-expanded={railOpen}
-          onClick={() => setRailOpen((v) => !v)}
-        >
-          <Icon name={railOpen ? 'close' : 'menu'} size={22} />
-        </button>
+        <RailToggle open={railOpen} onToggle={() => setRailOpen((v) => !v)} />
         <AppRail current={route} onNavigate={setRoute} open={railOpen} onClose={() => setRailOpen(false)} />
         <div className="ma-app__column">
           <BotCredentialBanner />
@@ -89,6 +80,28 @@ export function App() {
         </div>
       </div>
     </RecordingStoreProvider>
+  );
+}
+
+/**
+ * The mobile-only sidebar toggle. It IS the Meeting icon: while a meeting is
+ * live it ripples (round), and tapping it opens the left rail. (Hidden on
+ * desktop, where the rail is always visible.)
+ */
+function RailToggle({ open, onToggle }: { open: boolean; onToggle(): void }) {
+  const { t } = useI18n();
+  const recording = useRecordingState();
+  const meetingActive = recording.status === 'recording' || recording.status === 'paused' || recording.status === 'ending';
+  return (
+    <button
+      type="button"
+      className={`ma-rail-toggle${meetingActive ? ' ma-rail-toggle--recording' : ''}`}
+      aria-label={t(open ? 'rail.close' : 'rail.open')}
+      aria-expanded={open}
+      onClick={onToggle}
+    >
+      <Icon name={open ? 'close' : 'record'} size={22} />
+    </button>
   );
 }
 

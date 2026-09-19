@@ -45,15 +45,37 @@ interface BuildResult {
 /** A same-speaker pause longer than this starts a new caption line. */
 const LINE_BREAK_PAUSE_MS = 1500;
 /**
- * Even with no pause, a long monologue is cut into ~100-150-word lines: a
- * single ever-growing paragraph is hard to read AND makes speaker correction
- * coarse (one huge line = one label over minutes), and it feeds the live
- * embedder one long, drift-prone span. ~750 chars ≈ 120-140 English words /
- * ~150 Vietnamese words. The cut is deterministic on finalized text, so line
- * ids stay stable across snapshot rebuilds. At normal speech ~750 chars is
- * ~45-70s — well above `speakerMinSegmentSec`, so no span is dropped.
+ * A long monologue is cut by MEANING, not at a fixed size: one ever-growing
+ * paragraph is hard to read, makes speaker correction coarse, and feeds the live
+ * embedder one long, drift-prone span. Up to SOFT_MAX_WORDS nothing but a long
+ * pause breaks a line. Between SOFT and HARD the line ends at the first natural
+ * boundary — the end of a sentence, or a short breath pause. HARD_MAX_WORDS is
+ * only the safety net for speech with no punctuation and no pauses, and even
+ * then the cut waits for a word boundary. Decided on finalized text only, so
+ * line ids stay stable across snapshot rebuilds.
  */
-const MAX_LINE_CHARS = 750;
+const SOFT_MAX_WORDS = 100;
+const HARD_MAX_WORDS = 150;
+/** A same-speaker pause this long is a natural break once the line is past the soft limit. */
+const BREATH_PAUSE_MS = 400;
+const SENTENCE_END_RE = /[.!?…。！？]["')\]]*\s*$/;
+
+function countWords(text: string): number {
+  const trimmed = text.trim();
+  return trimmed ? trimmed.split(/\s+/).length : 0;
+}
+
+/** Should the same speaker's next token open a NEW line rather than extend `text`? */
+function shouldBreakLine(text: string, nextToken: string, pausedMs: number): boolean {
+  if (pausedMs > LINE_BREAK_PAUSE_MS) return true;
+  // Cheap guard: 100 words is never under ~200 characters, so skip the count until then.
+  if (text.length < 200) return false;
+  const words = countWords(text);
+  if (words < SOFT_MAX_WORDS) return false;
+  if (SENTENCE_END_RE.test(text) || pausedMs >= BREATH_PAUSE_MS) return true;
+  // Hard cap — but never split inside a word (tokens can be sub-word pieces).
+  return words >= HARD_MAX_WORDS && (/\s$/.test(text) || /^\s/.test(nextToken));
+}
 
 function buildFromSnapshot(sessionIndex: number, tokens: Token[], offsetMs: number): BuildResult {
   const captions: CaptionEvent[] = [];
@@ -93,7 +115,7 @@ function buildFromSnapshot(sessionIndex: number, tokens: Token[], offsetMs: numb
     // Same speaker continues the line — unless they paused: a long monologue
     // would otherwise be one ever-growing paragraph with no visible history.
     const pausedMs = current ? (token.start_ms ?? current.endMsRaw) - current.endMsRaw : 0;
-    if (current && current.speakerKey === speakerKey && pausedMs <= LINE_BREAK_PAUSE_MS && current.text.length < MAX_LINE_CHARS) {
+    if (current && current.speakerKey === speakerKey && !shouldBreakLine(current.text, token.text, pausedMs)) {
       current.text += token.text;
       current.endMsRaw = token.end_ms ?? current.endMsRaw;
       current.final = token.is_final;
