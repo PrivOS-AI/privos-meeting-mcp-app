@@ -24,6 +24,9 @@ export const sttStatusTool: AppTool = {
   inputSchema: { type: 'object', properties: {} },
   async execute(_args, context) {
     const actor = requireVerifiedActor(context);
+    // TEMP: dump the exact verified-actor shape the Hub delivers, to confirm
+    // whether any workspace-admin signal is present. Remove after diagnosis.
+    console.error('[stt_status] actor=', JSON.stringify(actor), 'identityState=', context.identityState, 'isWorkspaceAdmin=', isWorkspaceAdmin(actor));
     // Bind to the caller's room so the global `app_settings` reads resolve to the granted `room` permission context.
     const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     const realtimeVendor = await resolveRealtimeVendor(db).catch(() => undefined);
