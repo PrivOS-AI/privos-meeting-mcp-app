@@ -111,7 +111,11 @@ export const SCHEMAS: readonly CollectionSchema[] = [
     collection: 'meeting_speakers',
     scope: 'room',
     fields: [
-      { name: 'meeting', type: 'reference', refCollection: 'meetings', onDelete: 'cascade' },
+      // The Hub validates a `reference` field as bsonType:object ({_ref:"coll/id"})
+      // and matches it via `field._ref`; we only ever store + query the meeting id
+      // by plain equality and never use Hub populate/cascade, so a plain string is
+      // both correct and what all our where-clauses expect.
+      { name: 'meeting', type: 'string' },
       { name: 'speakerId', type: 'string' },
       { name: 'sessionSpeakerId', type: 'string' },
       // Merged realtime `speaker` labels, `s{sessionIndex}:{label}[@n]`.
@@ -140,10 +144,12 @@ export const SCHEMAS: readonly CollectionSchema[] = [
     collection: 'action_items',
     scope: 'room',
     fields: [
-      { name: 'meeting', type: 'reference', refCollection: 'meetings', onDelete: 'cascade' },
+      { name: 'meeting', type: 'string' },
       { name: 'task', type: 'string', required: true, maxLength: 2000 },
       { name: 'owner', type: 'string', maxLength: 200 },
-      { name: 'due', type: 'date' },
+      // Free-text due as the summarizer emits it ("Friday", "next sprint"), not a
+      // strict date — a `date` field would reject those and fail the whole insert.
+      { name: 'due', type: 'string', maxLength: 200 },
       { name: 'atSec', type: 'number' },
       { name: 'done', type: 'boolean' },
       { name: 'listItemId', type: 'string' },
@@ -154,7 +160,7 @@ export const SCHEMAS: readonly CollectionSchema[] = [
     collection: 'bookmarks',
     scope: 'room',
     fields: [
-      { name: 'meeting', type: 'reference', refCollection: 'meetings', onDelete: 'cascade' },
+      { name: 'meeting', type: 'string' },
       { name: 'atSec', type: 'number', required: true },
       { name: 'quote', type: 'string', maxLength: 2000 },
       { name: 'createdBy', type: 'string' },

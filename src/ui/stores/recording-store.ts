@@ -19,6 +19,7 @@ import { MeetingClock } from '../data/meeting-clock.js';
 import { MediaRecorderService } from '../data/media-recorder-service.js';
 import { startHostMicStream } from '../data/host-mic-stream.js';
 import { listParts, notifyChunkReady, uploadPart } from '../data/meeting-part-upload.js';
+import { uploadLiveCaptions, type CaptionExportLine } from '../data/meeting-caption-upload.js';
 import { PartUploadQueue } from '../data/part-upload-queue.js';
 import { createRealtimeClient, type CaptionEvent, type CaptionStatus, type LiveTurn, type RealtimeConnection } from '../data/realtime-client.js';
 import { LiveSpeakerPoll, type LiveSpeaker } from '../data/live-speaker-poll.js';
@@ -568,6 +569,30 @@ export class RecordingStore {
         .map((t) => ({ speaker: t.speakerKey, startMs: t.startMs, endMs: t.endMs, final: t.final }));
       await notifyChunkReady(this.app, { roomId: this.ctx.roomId, meetingId, seq: part.seq, durationMs, segments });
     }
+
+    // Persist the caption TEXT alongside the audio, on the same ~60s cadence, so
+    // the on-screen transcript survives a closed tab before reprocessing runs.
+    await this.pushLiveCaptions(meetingId, folderId);
+  }
+
+  /** Best-effort snapshot of the finalized caption lines (with resolved speaker names) to Files. Never throws. */
+  private async pushLiveCaptions(meetingId: string, folderId: string): Promise<void> {
+    const speakerKeys = Object.keys(this.state.speakerMap);
+    const lines: CaptionExportLine[] = this.state.lines
+      .filter((line) => line.isFinal && line.text.trim())
+      .map((line) => {
+        const key = resolveLineSpeakerKey(this.state, line);
+        const speakerName = key
+          ? this.state.speakerMap[key]?.displayName ?? `#${speakerKeys.indexOf(key) + 1}`
+          : undefined;
+        return { atSec: Math.round(line.atSec), speakerKey: key, speakerName, text: line.text.trim(), translation: line.translation };
+      });
+    if (lines.length === 0) return;
+    try {
+      await uploadLiveCaptions(this.app, { roomId: this.ctx.roomId, folderId, meetingId, title: this.state.title, lines });
+    } catch (error) {
+      console.warn('uploadLiveCaptions failed (captions will still be reprocessed from audio):', error);
+    }
   }
 
   // -------------------------------------------------------------- controls
@@ -637,6 +662,9 @@ export class RecordingStore {
     while ((this.uploadQueue?.pendingCount ?? 0) > 0 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
+
+    // Final caption flush so the last (<60s) lines are saved before processing.
+    if (this.state.folderId) await this.pushLiveCaptions(meetingId, this.state.folderId);
 
     const parts = this.state.folderId ? await listParts(this.app, this.ctx.roomId, this.state.folderId).catch(() => []) : [];
     const durationSec = Math.floor((performance.now() - this.state.recorderEpochMs) / 1000);
