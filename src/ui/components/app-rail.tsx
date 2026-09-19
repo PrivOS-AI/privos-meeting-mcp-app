@@ -8,11 +8,13 @@
  * render as inert placeholders so the rail matches the design now without
  * inventing routes or screens this phase does not own.
  */
+import { useState } from 'react';
 import { usePrivosContext } from '@privos_ai/app-react';
 
 import type { Route } from '../app.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 import { Icon, type IconName } from './icon.js';
+import { UserMenu } from './user-menu.js';
 
 interface RailItem {
   route: Route | null;
@@ -37,6 +39,7 @@ export function AppRail({ current, onNavigate }: AppRailProps) {
   const { t } = useI18n();
   const { username } = usePrivosContext();
   const initial = username ? username.trim().charAt(0).toUpperCase() : '?';
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <nav className="ma-rail" aria-label={t('app.title')}>
@@ -61,8 +64,19 @@ export function AppRail({ current, onNavigate }: AppRailProps) {
         })}
       </div>
       <div className="ma-rail__spacer" />
-      <div className="ma-rail__avatar" title={username || undefined} aria-hidden="true">
-        {initial}
+      <div className="ma-rail__avatar-wrap">
+        <button
+          type="button"
+          className="ma-rail__avatar"
+          title={username || undefined}
+          aria-label={t('userMenu.title')}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((v) => !v)}
+        >
+          {initial}
+        </button>
+        {menuOpen ? <UserMenu username={username} onClose={() => setMenuOpen(false)} /> : null}
       </div>
     </nav>
   );

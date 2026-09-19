@@ -11,8 +11,6 @@ import { parseToolResult, usePrivosApp, usePrivosContext } from '@privos_ai/app-
 
 import { AppRail } from './components/app-rail.js';
 import { BotCredentialBanner } from './components/bot-credential-banner.js';
-import { TopBar } from './components/top-bar.js';
-import { useI18n } from './i18n/i18n-provider.js';
 import { HistoryScreen } from './screens/history-screen.js';
 import { LiveScreen } from './screens/live-screen.js';
 import { MeetingDetailScreen } from './screens/meeting-detail-screen.js';
@@ -20,21 +18,11 @@ import { NewMeetingScreen } from './screens/new-meeting-screen.js';
 import { ProcessingScreen } from './screens/processing-screen.js';
 import { RecoveryBanner } from './screens/recovery-banner.js';
 import { SettingsScreen } from './screens/settings-screen.js';
-import { RecordingStoreProvider } from './stores/recording-store.js';
+import { RecordingStoreProvider, useRecordingState } from './stores/recording-store.js';
 
 export type Route = 'new' | 'live' | 'processing' | 'detail' | 'history' | 'settings';
 
-const TITLE_KEY_BY_ROUTE: Record<Route, string> = {
-  new: 'screen.new.title',
-  live: 'screen.live.title',
-  processing: 'processing.title',
-  detail: 'screen.detail.title',
-  history: 'screen.history.title',
-  settings: 'screen.settings.title',
-};
-
 export function App() {
-  const { t } = useI18n();
   const app = usePrivosApp();
   const context = usePrivosContext();
   const [route, setRoute] = useState<Route>('new');
@@ -79,19 +67,39 @@ export function App() {
       <div className="ma-app">
         <AppRail current={route} onNavigate={setRoute} />
         <div className="ma-app__column">
-          <TopBar title={t(TITLE_KEY_BY_ROUTE[route])} />
           <BotCredentialBanner />
           <RecoveryBanner />
           <main className={route === 'live' ? 'ma-body ma-body--live' : 'ma-body'}>
-            {route === 'new' ? <NewMeetingScreen onStarted={() => setRoute('live')} /> : null}
-            {route === 'live' ? <LiveScreen onEnded={() => setRoute('processing')} /> : null}
-            {route === 'processing' ? <ProcessingScreen onDone={() => setRoute('history')} onOpenMeeting={openMeeting} /> : null}
-            {route === 'detail' && selectedMeetingId ? <MeetingDetailScreen meetingId={selectedMeetingId} onBack={() => setRoute('history')} /> : null}
-            {route === 'history' ? <HistoryScreen onStartRecording={() => setRoute('new')} onOpenMeeting={openMeeting} /> : null}
-            {route === 'settings' ? <SettingsScreen /> : null}
+            <RoutedScreens route={route} setRoute={setRoute} selectedMeetingId={selectedMeetingId} openMeeting={openMeeting} />
           </main>
         </div>
       </div>
     </RecordingStoreProvider>
+  );
+}
+
+interface RoutedScreensProps {
+  route: Route;
+  setRoute(route: Route): void;
+  selectedMeetingId: string | null;
+  openMeeting(meetingId: string): void;
+}
+
+/** Inside the store provider so it can see whether a recording is running. */
+function RoutedScreens({ route, setRoute, selectedMeetingId, openMeeting }: RoutedScreensProps) {
+  const recording = useRecordingState();
+  const recordingActive = recording.status === 'recording' || recording.status === 'paused' || recording.status === 'ending';
+  // Keep a running meeting alive in the background: navigating away and back to
+  // "New meeting" returns to the live session instead of a fresh start form.
+  const showLive = route === 'live' || (route === 'new' && recordingActive);
+  return (
+    <>
+      {route === 'new' && !recordingActive ? <NewMeetingScreen onStarted={() => setRoute('live')} /> : null}
+      {showLive ? <LiveScreen onEnded={() => setRoute('processing')} /> : null}
+      {route === 'processing' ? <ProcessingScreen onDone={() => setRoute('history')} onOpenMeeting={openMeeting} /> : null}
+      {route === 'detail' && selectedMeetingId ? <MeetingDetailScreen meetingId={selectedMeetingId} onBack={() => setRoute('history')} /> : null}
+      {route === 'history' ? <HistoryScreen onStartRecording={() => setRoute('new')} onOpenMeeting={openMeeting} /> : null}
+      {route === 'settings' ? <SettingsScreen /> : null}
+    </>
   );
 }

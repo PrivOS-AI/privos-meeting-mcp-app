@@ -4,7 +4,7 @@
  * mixes voices up — every segment can be corrected), mm:ss, the caption text
  * with its translation directly underneath, and a bookmark button.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { CaptionLine as CaptionLineData, LiveSpeakerBadge } from '../stores/recording-store.js';
 import type { RealtimeAssignChoice } from '../data/speaker-api.js';
@@ -26,6 +26,8 @@ export interface CaptionLineProps {
   onReassign?(toSpeakerKey: string, applyToVoice: boolean): void;
   onAddSpeaker?(applyToVoice: boolean): void;
   onRename?(speakerKey: string, choice: RealtimeAssignChoice): void;
+  /** Fires when this line's speaker menu opens/closes, so the transcript can stop auto-scrolling while it is open. */
+  onMenuOpenChange?(open: boolean): void;
   onBookmark?: () => void;
 }
 
@@ -35,9 +37,10 @@ function formatTimestamp(atSec: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, speakers, onReassign, onAddSpeaker, onRename, onBookmark }: CaptionLineProps) {
+export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, speakers, onReassign, onAddSpeaker, onRename, onMenuOpenChange, onBookmark }: CaptionLineProps) {
   const { t } = useI18n();
   const [menu, setMenu] = useState<'closed' | 'picker' | 'rename'>('closed');
+  useEffect(() => { onMenuOpenChange?.(menu !== 'closed'); }, [menu, onMenuOpenChange]);
   const badgeLabel = speaker?.displayName ?? (speakerKey ? t('recording.speakerBadge.numbered', { n: speakerIndex }) : t('recording.speakerBadge.speaking'));
   const interactive = Boolean(speakerKey) && speakers.length > 0;
 

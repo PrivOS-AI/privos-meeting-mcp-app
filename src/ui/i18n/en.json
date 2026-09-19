@@ -10,6 +10,11 @@
   "topbar.title": "Meeting Agent",
   "topbar.theme.toggle": "Toggle light/dark theme",
   "topbar.language.label": "Language",
+  "userMenu.title": "Account & settings",
+  "userMenu.close": "Close menu",
+  "userMenu.theme": "Appearance",
+  "userMenu.theme.dark": "Dark",
+  "userMenu.theme.light": "Light",
 
   "screen.new.title": "Start a meeting",
   "screen.new.subtitle": "Record and generate live captions for the meeting happening in this room.",

@@ -18,15 +18,13 @@ import { RecordingFooter } from '../components/recording-footer.js';
 import { StageCaption } from '../components/stage-caption.js';
 import { deleteBookmark, listBookmarks, type BookmarkRecord } from '../data/bookmark-read-model.js';
 import { useI18n } from '../i18n/i18n-provider.js';
-import { resolveLineSpeakerKey, useRecordingState, useRecordingStore, type StageCaptionSize } from '../stores/recording-store.js';
+import { resolveLineSpeakerKey, useRecordingState, useRecordingStore } from '../stores/recording-store.js';
 
 export interface LiveScreenProps {
   onEnded(): void;
 }
 
 type ViewMode = 'transcript' | 'stage';
-
-const SIZE_CYCLE: StageCaptionSize[] = ['small', 'medium', 'large'];
 
 export function LiveScreen({ onEnded }: LiveScreenProps) {
   const { t } = useI18n();
@@ -42,10 +40,11 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
   // scrolled up to read history (only follow when already near the bottom).
   const linesRef = useRef<HTMLDivElement | null>(null);
   const followRef = useRef(true);
+  const menuOpenRef = useRef(false);
   const lastLine = state.lines[state.lines.length - 1];
   useEffect(() => {
     const el = linesRef.current;
-    if (el && followRef.current) el.scrollTop = el.scrollHeight;
+    if (el && followRef.current && !menuOpenRef.current) el.scrollTop = el.scrollHeight;
   }, [state.lines.length, lastLine?.text, lastLine?.translation]);
   // (hooks above must stay before the idle early-return below — Rules of Hooks)
 
@@ -69,11 +68,9 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
     <RecordingFooter
       muted={state.muted}
       paused={state.status === 'paused'}
-      stageCaptionSize={state.stageCaptionSize}
       ending={state.status === 'ending'}
+      waveform={<VoiceWaveform stream={store.getStream()} muted={state.muted} speakers={pickerSpeakers} activeKey={activeSpeakerKey} />}
       onToggleMute={() => store.toggleMute()}
-      onCycleSize={() => store.setStageCaptionSize(SIZE_CYCLE[(SIZE_CYCLE.indexOf(state.stageCaptionSize) + 1) % SIZE_CYCLE.length])}
-      onBookmark={() => void store.addBookmark()}
       onTogglePause={() => store.togglePause()}
       onEnd={() => void handleEnd()}
     />
@@ -139,6 +136,11 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
             <p className="ma-live__meta">
               <Icon name="person-multiple" size={14} />
               {speakerKeys.length > 0 ? t('recording.speakerCount', { n: speakerKeys.length }) : t('recording.speakerCount.unknown')}
+              {state.liveSpeakersDegraded ? (
+                <button type="button" className="ma-live__degraded" title={t('recording.speakerChips.degraded')} aria-label={t('recording.speakerChips.degraded')}>
+                  <Icon name="alert-circle" size={14} />
+                </button>
+              ) : null}
             </p>
           </div>
           <div className="ma-live__topbar-actions">
@@ -175,13 +177,13 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
                   onReassign={(toKey, applyToVoice) => store.reassignLine(line.id, toKey, applyToVoice)}
                   onAddSpeaker={(applyToVoice) => store.reassignLine(line.id, store.addManualSpeaker(), applyToVoice)}
                   onRename={(speakerKey, choice) => store.assignRealtimeSpeaker(speakerKey, choice)}
+                  onMenuOpenChange={(open) => { menuOpenRef.current = open; }}
                   onBookmark={() => void store.addBookmark()}
                 />
               );
             })
           )}
         </div>
-        <VoiceWaveform stream={store.getStream()} muted={state.muted} speakers={pickerSpeakers} activeKey={activeSpeakerKey} />
         {footer}
       </div>
       <aside className="ma-live__side">
@@ -191,7 +193,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
   );
 }
 
-type SideTab = 'summary' | 'actions' | 'bookmarks';
+type SideTab = 'summary' | 'bookmarks';
 
 interface LiveSidePanelProps {
   meetingId: string | null;
@@ -211,9 +213,11 @@ function LiveSidePanel({ meetingId, bookmarkAtSec }: LiveSidePanelProps) {
   const { t } = useI18n();
   const [tab, setTab] = useState<SideTab>('summary');
   const [bookmarks, setBookmarks] = useState<BookmarkRecord[]>([]);
-  const TABS: Array<{ id: SideTab; icon: 'sparkle' | 'checkmark-circle' | 'bookmark'; labelKey: string }> = [
+  // Summary + action items share ONE tab (action items render under the summary),
+  // matching the design; both are written by the post-meeting job, so they show
+  // the "available after the meeting ends" note during a live session.
+  const TABS: Array<{ id: SideTab; icon: 'sparkle' | 'bookmark'; labelKey: string }> = [
     { id: 'summary', icon: 'sparkle', labelKey: 'recording.side.summary' },
-    { id: 'actions', icon: 'checkmark-circle', labelKey: 'recording.side.actions' },
     { id: 'bookmarks', icon: 'bookmark', labelKey: 'recording.side.bookmarks' },
   ];
 
@@ -247,7 +251,20 @@ function LiveSidePanel({ meetingId, bookmarkAtSec }: LiveSidePanelProps) {
         ))}
       </div>
       <div className="ma-side-panel__body">
-        {tab === 'bookmarks' ? <BookmarksPanel bookmarks={bookmarks} onDelete={(id) => void removeBookmark(id)} /> : <p className="ma-side-panel__empty">{t('recording.side.emptyAfterEnd')}</p>}
+        {tab === 'bookmarks' ? (
+          <BookmarksPanel bookmarks={bookmarks} onDelete={(id) => void removeBookmark(id)} />
+        ) : (
+          <div className="ma-side-panel__overview">
+            <section>
+              <h3 className="ma-side-panel__section-title">{t('recording.side.summary')}</h3>
+              <p className="ma-side-panel__empty">{t('recording.side.emptyAfterEnd')}</p>
+            </section>
+            <section>
+              <h3 className="ma-side-panel__section-title">{t('recording.side.actions')}</h3>
+              <p className="ma-side-panel__empty">{t('recording.side.emptyAfterEnd')}</p>
+            </section>
+          </div>
+        )}
       </div>
     </div>
   );
