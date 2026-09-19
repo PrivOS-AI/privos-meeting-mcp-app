@@ -1,7 +1,7 @@
 /**
- * SPIKE: getUserMedia trong tab phòng Hub
+ * SPIKE: getUserMedia in a Hub room tab
  *
- * Xác nhận getUserMedia() hoạt động khi tool khai _meta.ui.permissions:['microphone']. Chạy trong iframe phòng Hub thật, bấm Bắt đầu ghi, xác nhận hộp thoại xin quyền hiện ra.
+ * Confirm getUserMedia() works when the tool declares _meta.ui.permissions:['microphone']. Run inside a real Hub room iframe, click "Start recording", and confirm the permission prompt appears.
  *
  * This is a foundational Phase-1 spike (see plan.md § Spikes). It CANNOT run
  * without live credentials / a live PrivOS Hub, so offline it only verifies its
@@ -11,7 +11,7 @@
 const REQUIRED: string[] = [];
 
 function main(): void {
-  console.log('SPIKE: getUserMedia trong tab phòng Hub');
+  console.log('SPIKE: getUserMedia in a Hub room tab');
   const missing = REQUIRED.filter((k) => !process.env[k] || !process.env[k]!.trim());
   if (missing.length) {
     console.warn('Prerequisites missing (spike not run):', missing.join(', '));

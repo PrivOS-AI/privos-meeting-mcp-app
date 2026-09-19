@@ -65,19 +65,19 @@ describe('concatParts', () => {
       { fileId: 'f2', seq: 2, name: `audio.part-0002-${DIGEST}.webm` },
     ];
     const hub = fakeHub({ f0: Buffer.from('AAA'), f2: Buffer.from('CCC') });
-    await expect(concatParts(hub, MEETING_ID, parts, ['f0', 'f2'], dest, new AbortController().signal)).rejects.toThrow(/thiếu phần/i);
+    await expect(concatParts(hub, MEETING_ID, parts, ['f0', 'f2'], dest, new AbortController().signal)).rejects.toThrow(/missing part/i);
   });
 
   it("rejects a part whose fileId is not in the job's own partFileIds", async () => {
     const parts: PartRef[] = [{ fileId: 'foreign', seq: 0, name: `audio.part-0000-${DIGEST}.webm` }];
     const hub = fakeHub({ foreign: Buffer.from('AAA') });
-    await expect(concatParts(hub, MEETING_ID, parts, ['f0'], dest, new AbortController().signal)).rejects.toThrow(/không khớp/i);
+    await expect(concatParts(hub, MEETING_ID, parts, ['f0'], dest, new AbortController().signal)).rejects.toThrow(/does not match/i);
   });
 
   it("rejects a part whose name does not carry this meeting's digest (a different meeting's part)", async () => {
     const parts: PartRef[] = [{ fileId: 'f0', seq: 0, name: 'audio.part-0000-otherid8.webm' }];
     const hub = fakeHub({ f0: Buffer.from('AAA') });
-    await expect(concatParts(hub, MEETING_ID, parts, ['f0'], dest, new AbortController().signal)).rejects.toThrow(/dấu cuộc họp/i);
+    await expect(concatParts(hub, MEETING_ID, parts, ['f0'], dest, new AbortController().signal)).rejects.toThrow(/meeting signature/i);
   });
 
   it('deletePartFiles only deletes the given fileIds, never scans a folder', async () => {

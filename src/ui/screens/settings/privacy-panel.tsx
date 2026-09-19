@@ -2,7 +2,7 @@
  * Settings › Privacy & storage (plan.md § Settings item 6). `keepOriginalAudio`
  * (default off) and `autoDeleteAudioDays`/`interruptedPartsRetentionDays` are
  * real `app_settings` writes (admin-only — they set the DEFAULT/retention
- * window for every future meeting in the workspace). "Xoá toàn bộ voiceprint"
+ * window for every future meeting in the workspace). "Delete all voiceprints"
  * has no dedicated bulk tool — it lists every profile (`speaker_profile_list`,
  * open to any verified user) and deletes each one (`speaker_profile_delete`,
  * gated server-side to the creator or an admin — a non-admin's delete calls
@@ -24,7 +24,7 @@ import { useWorkspaceAdmin } from './use-workspace-admin.js';
 import publisherManifest from '../../../../privos-app.json';
 
 /** Must be typed verbatim (case-insensitive) to enable the bulk-delete button — see file header. */
-const CONFIRM_PHRASE = 'XOA VOICEPRINT';
+const CONFIRM_PHRASE = 'DELETE VOICEPRINTS';
 
 export function PrivacyPanel() {
   const app = usePrivosApp();

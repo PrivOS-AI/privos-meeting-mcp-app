@@ -11,7 +11,7 @@ import { hasSpeechEnergy } from '../speaker/pcm-utils.js';
 /** Generous ceiling on turns per ~60s part — guards against a malformed/hostile payload. */
 export const MAX_SEGMENTS_PER_CHUNK = 200;
 
-/** Edges may miss the server-tracked part window by up to this much (clock rounding, QĐ-17). */
+/** Edges may miss the server-tracked part window by up to this much (clock rounding, D-17). */
 export const PART_WINDOW_TOLERANCE_MS = 1500;
 
 export interface ChunkSegment {
@@ -47,7 +47,7 @@ export function asChunkSegment(value: unknown): ChunkSegment | null {
  * matching the P2 contract this phase keeps.
  */
 export function assertStructuralSpans(segments: readonly ChunkSegment[], durationMs: number): string | null {
-  if (segments.length > MAX_SEGMENTS_PER_CHUNK) return 'Quá nhiều turn trong một phần ghi âm.';
+  if (segments.length > MAX_SEGMENTS_PER_CHUNK) return 'Too many turns in one recording part.';
 
   const bySpeaker = new Map<string, ChunkSegment[]>();
   let totalDurationMs = 0;
@@ -60,10 +60,10 @@ export function assertStructuralSpans(segments: readonly ChunkSegment[], duratio
   for (const list of bySpeaker.values()) {
     const sorted = [...list].sort((a, b) => a.startMs - b.startMs);
     for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i].startMs < sorted[i - 1].endMs) return 'Hai turn của cùng một người nói chồng lấn thời gian.';
+      if (sorted[i].startMs < sorted[i - 1].endMs) return 'Two turns from the same speaker overlap in time.';
     }
   }
-  if (totalDurationMs > durationMs + PART_WINDOW_TOLERANCE_MS) return 'Tổng thời lượng các turn vượt quá phần ghi âm.';
+  if (totalDurationMs > durationMs + PART_WINDOW_TOLERANCE_MS) return 'Total turn duration exceeds the recording part.';
   return null;
 }
 

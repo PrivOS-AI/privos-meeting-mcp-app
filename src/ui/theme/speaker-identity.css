@@ -1,5 +1,5 @@
 /*
- * P4 — speaker identity & voice fingerprint UI: the "Xác nhận người nói"
+ * P4 — speaker identity & voice fingerprint UI: the "Resolve speakers"
  * modal, member picker, speaker avatar, speaker label editor and the
  * Settings › Speaker identification panel. Split out of app-shell.css /
  * recording.css to keep each theme file under ~200 lines (repo convention).

@@ -1,5 +1,5 @@
 /**
- * "Xác nhận người nói" modal (plan.md § UI). Opens when a meeting finishes
+ * "Confirm speaker" modal (plan.md § UI). Opens when a meeting finishes
  * processing with `result.speakers` still containing an unresolved entry.
  * Each row lets the owner pick one of 3 modes (`speaker_resolve`'s `user` /
  * `name` / `merge`) or skip; submit calls `speaker_resolve` once for every

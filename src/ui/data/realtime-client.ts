@@ -1,6 +1,6 @@
 /**
  * Shared contract for the realtime caption connection — the app never touches
- * a wire protocol itself (QĐ-01). Each vendor SDK self-captures audio from the
+ * a wire protocol itself (D-01). Each vendor SDK self-captures audio from the
  * `MediaStream` it is given (or, for ElevenLabs, its own internal microphone
  * capture — see `elevenlabs-realtime-client.ts`) and the wrapper only
  * translates its callbacks into these two shapes.

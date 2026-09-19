@@ -83,7 +83,7 @@ export async function upsertMeetingSpeakers(db: AppDbBotClient, meetingId: strin
   }
 }
 
-/** Priority rank for `nameSource` — higher wins (plan.md: "tên theo nameSource: user > async > live"). */
+/** Priority rank for `nameSource` — higher wins (plan.md: "name follows nameSource: user > async > live"). */
 function nameSourceRank(nameSource: unknown): number {
   if (nameSource === 'user') return 3;
   if (nameSource === 'async') return 2;
@@ -103,7 +103,7 @@ function nameSourceRank(nameSource: unknown): number {
  * live to async when the async row does not already have a higher-or-equal
  * priority name (`user` > `async` > `live`) — segmentation is always async's,
  * but an unresolved async speaker still gets a name from a live quick-assign
- * or live auto-match rather than staying "Người nói N" forever.
+ * or live auto-match rather than staying "Speaker N" forever.
  */
 export async function mergeLiveIntoAsyncSpeaker(db: AppDbBotClient, meetingId: string, speakerId: string, sessionSpeakerId: string): Promise<void> {
   const result = await db.query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 });

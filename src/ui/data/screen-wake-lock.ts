@@ -1,7 +1,7 @@
 /**
  * Screen Wake Lock — keeps the screen (and, on many mobile OSes, the mic)
- * alive while recording. `acquire()` MUST be called from inside the "Bắt đầu
- * ghi" click handler (a user gesture is required by the API). Re-acquires on
+ * alive while recording. `acquire()` MUST be called from inside the "Start
+ * recording" click handler (a user gesture is required by the API). Re-acquires on
  * `visibilitychange` (the sentinel is revoked whenever the tab is hidden) and
  * releases on pause/End/error. The iframe is `srcdoc` opaque-origin, so this
  * only works once the Hub grants `allow="screen-wake-lock"` — until then

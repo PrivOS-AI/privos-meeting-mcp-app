@@ -33,10 +33,10 @@ export async function downloadPartBySeq(
   const expectedName = partFileName(seq, meetingId);
   const file = files.find((f) => f.name === expectedName);
   if (!file) {
-    throw new AppError(`Không tìm thấy phần ghi âm #${seq} của cuộc họp trong Files (có thể chưa upload xong).`);
+    throw new AppError(`Recording part #${seq} of the meeting was not found in Files (it may not have finished uploading).`);
   }
   if (!file.name.includes(meetingId8(meetingId))) {
-    throw new AppError(`Phần ghi âm #${seq} không mang đúng dấu cuộc họp.`);
+    throw new AppError(`Recording part #${seq} does not carry the correct meeting signature.`);
   }
   await downloadRoomFile(hub, file._id, destPath, signal);
 }

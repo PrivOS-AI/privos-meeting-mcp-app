@@ -1,5 +1,5 @@
 /**
- * Max-overlap alignment between two sets of time spans (QĐ-17). Built for P3's
+ * Max-overlap alignment between two sets of time spans (D-17). Built for P3's
  * reconcile hook — mapping the async pass's segments against P5's
  * `live-turns.json` — but generic enough for P5 to reuse verbatim for its own
  * in-session matching.
@@ -12,7 +12,7 @@ export interface TimeSpan {
 export interface AlignOptions {
   /** Edges may miss by up to this much and still count as overlapping. */
   toleranceMs?: number;
-  /** Added to every `b` span's timestamps before comparing (resyncs clock drift, QĐ-17). */
+  /** Added to every `b` span's timestamps before comparing (resyncs clock drift, D-17). */
   skewMs?: number;
 }
 

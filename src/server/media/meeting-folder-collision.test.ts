@@ -82,7 +82,7 @@ describe('two meetings — same room, same date, same title', () => {
 
     await expect(
       concatParts(hub, meetingA, partsClaimedForA, ['file-a0', 'file-b1'], dest, new AbortController().signal),
-    ).rejects.toThrow(/dấu cuộc họp/i);
+    ).rejects.toThrow(/meeting signature/i);
   });
 
   it('concatParts each meeting on its own job produces independent, non-overwriting output', async () => {

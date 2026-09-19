@@ -114,7 +114,7 @@ async function reconcileWithLiveSpeakers(
   return mapped;
 }
 
-/** Best-effort parse of the model's free-text `due` into an ISO date App DB's `date` field accepts; unparseable text is dropped rather than sent as an invalid date (the task text itself still carries any human phrasing like "cuối tuần này"). */
+/** Best-effort parse of the model's free-text `due` into an ISO date App DB's `date` field accepts; unparseable text is dropped rather than sent as an invalid date (the task text itself still carries any human phrasing like "this weekend"). */
 function parseDueDate(due: string | null): string | undefined {
   if (!due) return undefined;
   const parsed = new Date(due);
@@ -129,8 +129,8 @@ export interface SummarizeStepResult {
 }
 
 /**
- * P6 hook: Hub AI translate (optional, QĐ-12 batch path) + map-reduce
- * summarize (QĐ-07) + `summary.md` upload + `action_items` replace, for one
+ * P6 hook: Hub AI translate (optional, D-12 batch path) + map-reduce
+ * summarize (D-07) + `summary.md` upload + `action_items` replace, for one
  * meeting's already reconciled/named segments. Throws on any failure — the
  * caller (`runMeetingJob`) treats that as NON-FATAL to the job itself
  * (plan.md: record `meetings.summaryError`, job still `completed`, transcript
@@ -267,7 +267,7 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       sampleEndSec: s.sampleRange?.endSec,
       profileId: s.profileId,
       // plan.md § Requirements: unmatched speakers keep the numbered placeholder until `speaker_resolve` confirms a real name.
-      displayName: s.resolved ? s.displayName : `Người nói ${i + 1}`,
+      displayName: s.resolved ? s.displayName : `Speaker ${i + 1}`,
       confidence: s.confidence,
       resolved: s.resolved,
       // A previous pass' pendingEmbedding is replaced by this pass' result — '' clears it when this pass resolved the speaker.
@@ -323,7 +323,7 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       });
     } catch (error) {
       summaryError = error instanceof Error ? error.message : String(error);
-      console.warn('[meeting-job] tóm tắt/dịch thất bại (transcript vẫn được giữ, job vẫn hoàn tất):', summaryError);
+      console.warn('[meeting-job] summarize/translate failed (transcript is kept, job still completes):', summaryError);
     }
     const finalSegments = summarized?.translatedSegments ?? segments;
 
@@ -387,7 +387,7 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       await deleteRoomFile(agentBotHub, audioUpload.fileId, signal)
         .then(() => upsertMeeting(db, job.meetingId, { audioDeletedAt: new Date().toISOString() }))
         .catch((error) => {
-          console.warn('[meeting-job] xoá audio.webm thất bại (không chặn job hoàn tất):', error instanceof Error ? error.message : error);
+          console.warn('[meeting-job] failed to delete audio.webm (does not block job completion):', error instanceof Error ? error.message : error);
         });
     }
 

@@ -1,6 +1,6 @@
 /**
  * `meeting_settings_set {key, value}` — the single backend write path into
- * global `app_settings` (QĐ-14: workspace-admin only, since these keys affect
+ * global `app_settings` (D-14: workspace-admin only, since these keys affect
  * the whole workspace, not just the calling user's room). The allowlist,
  * defaults and validators live in `src/shared/app-settings.ts` — the same
  * module the iframe's `settings-store.ts` reads for its DEFAULTS, so the two
@@ -16,8 +16,8 @@ import type { AppTool } from './registry.js';
 
 export const settingsSetTool: AppTool = {
   name: 'meeting_settings_set',
-  title: 'Cập nhật cấu hình workspace',
-  description: 'Ghi một cấu hình toàn workspace (nhà cung cấp STT, ngưỡng nhận diện người nói, lưu trữ…) — chỉ quản trị viên workspace.',
+  title: 'Update workspace settings',
+  description: 'Write a workspace-wide setting (STT provider, speaker-match thresholds, retention…) — workspace admins only.',
   inputSchema: {
     type: 'object',
     required: ['key', 'value'],
@@ -29,12 +29,12 @@ export const settingsSetTool: AppTool = {
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
     if (!canManageRoomSettings(actor)) {
-      throw new AppError('Chỉ thành viên của phòng mới thay đổi được cấu hình của phòng này.');
+      throw new AppError('Only a member of this room can change its settings.');
     }
 
     const key = typeof args.key === 'string' ? args.key.trim() : '';
     if (!isWorkspaceSettingKey(key)) {
-      throw new AppError(`Cấu hình "${key}" không được hỗ trợ.`);
+      throw new AppError(`Setting "${key}" is not supported.`);
     }
     const value = WORKSPACE_SETTING_VALIDATORS[key](args.value);
 

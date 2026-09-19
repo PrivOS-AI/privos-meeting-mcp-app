@@ -1,7 +1,10 @@
 /**
- * SPIKE: A/B tiếng Việt: soniox-async vs elevenlabs-batch
+ * SPIKE: Vietnamese A/B quality test: soniox-async vs elevenlabs-batch
  *
- * KHÔNG chặn P2+. Chạy cùng >=30 phút audio VN+EN qua cả hai async provider đã cài. Đo WER (vi+en), độ chính xác gán người nói 50 lượt, độ trễ nhãn đầu. Kết quả chỉ chỉnh mặc định STT_*_PROVIDER, ghi vào docs/system-architecture.md.
+ * Does NOT block P2+. Run >=30 minutes of VN+EN audio through both installed
+ * async providers. Measure WER (vi+en), speaker-assignment accuracy over 50
+ * turns, and first-label latency. Results only adjust the STT_*_PROVIDER
+ * default; record them in docs/system-architecture.md.
  *
  * This is a foundational Phase-1 spike (see plan.md § Spikes). It CANNOT run
  * without live credentials / a live PrivOS Hub, so offline it only verifies its
@@ -11,7 +14,7 @@
 const REQUIRED: string[] = ['SONIOX_API_KEY','ELEVENLABS_API_KEY'];
 
 function main(): void {
-  console.log('SPIKE: A/B tiếng Việt: soniox-async vs elevenlabs-batch');
+  console.log('SPIKE: Vietnamese A/B quality test: soniox-async vs elevenlabs-batch');
   const missing = REQUIRED.filter((k) => !process.env[k] || !process.env[k]!.trim());
   if (missing.length) {
     console.warn('Prerequisites missing (spike not run):', missing.join(', '));

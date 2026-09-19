@@ -1,7 +1,7 @@
 /**
  * Screen 1d — History (phase-07 § Requirements): 4 stat cards, filter chips,
  * sort, keyword search, paginated table with a row menu. Rows/aux data load
- * once per page ("Tải thêm" appends the next 50), never an unbounded query.
+ * once per page ("Load more" appends the next 50), never an unbounded query.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';

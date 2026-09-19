@@ -1,7 +1,7 @@
 /**
- * SPIKE: Cả hai SDK boot trong tab phòng dưới CSP
+ * SPIKE: Both SDKs boot in a room tab under CSP
  *
- * Mở tool trong phòng: chạy wrapper Soniox và @elevenlabs/client Scribe.connect({microphone:false,token}). Xác nhận không Refused to connect, ghi directive CSP thật, origin hai SDK chạm, và giới hạn đồng thời ElevenLabs realtime.
+ * Open the tool in a room: run the Soniox wrapper and @elevenlabs/client Scribe.connect({microphone:false,token}). Confirm no "Refused to connect", record the real CSP directive, the origins both SDKs touch, and the ElevenLabs realtime concurrency limit.
  *
  * This is a foundational Phase-1 spike (see plan.md § Spikes). It CANNOT run
  * without live credentials / a live PrivOS Hub, so offline it only verifies its
@@ -11,7 +11,7 @@
 const REQUIRED: string[] = ['SONIOX_API_KEY','ELEVENLABS_API_KEY'];
 
 function main(): void {
-  console.log('SPIKE: Cả hai SDK boot trong tab phòng dưới CSP');
+  console.log('SPIKE: Both SDKs boot in a room tab under CSP');
   const missing = REQUIRED.filter((k) => !process.env[k] || !process.env[k]!.trim());
   if (missing.length) {
     console.warn('Prerequisites missing (spike not run):', missing.join(', '));

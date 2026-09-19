@@ -1,9 +1,9 @@
 /**
  * `meeting_realtime_token {roomId, meetingId}` — mints a short-lived realtime
  * STT credential for the iframe SDK of whichever provider the workspace has
- * active (QĐ-15). Enforces, in order: caller is the meeting owner and it is
+ * active (D-15). Enforces, in order: caller is the meeting owner and it is
  * still `recording`; a per-(user,meeting) mint budget; and a workspace-wide
- * concurrent-recording cap applied to BOTH providers (QĐ-19 — ElevenLabs
+ * concurrent-recording cap applied to BOTH providers (D-19 — ElevenLabs
  * realtime's true concurrency limit is unverified, open question #8).
  */
 import { AppError } from '../../shared/app-error.js';
@@ -47,15 +47,15 @@ async function countFreshRecordings(freshSinceIso: string): Promise<number> {
       // A known room the bot can no longer read (removed from the room, room
       // deleted) must not block captions everywhere else — it simply has no
       // countable recordings.
-      console.warn('[meeting_realtime_token] bỏ qua phòng không đọc được khi đếm phiên:', { roomId, error: error instanceof Error ? error.message : error });
+      console.warn('[meeting_realtime_token] skipping unreadable room while counting sessions:', { roomId, error: error instanceof Error ? error.message : error });
     }
   }
   return total;
 }
 
 /**
- * Exported for `stt-status-tool.ts`'s admin view ("số phiên realtime đang
- * chạy / LIVE_MAX_CONCURRENT_RECORDINGS") — same freshness window and query
+ * Exported for `stt-status-tool.ts`'s admin view ("active realtime sessions /
+ * LIVE_MAX_CONCURRENT_RECORDINGS") — same freshness window and query
  * this tool's own concurrency gate uses, so the two numbers a caller sees
  * (the cap that blocked them here, the count shown in Settings) never drift.
  */
@@ -76,35 +76,35 @@ export const realtimeTokenTool: AppTool = {
   async execute(args, context) {
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId và meetingId là bắt buộc.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
 
     const actor = context.actor;
     if (!actor || actor.roomId !== roomId) {
-      throw new AppError('Yêu cầu không hợp lệ cho phòng này.');
+      throw new AppError('Invalid request for this room.');
     }
 
     const db = new AppDbBotClient(roomId);
     const meeting = await db.getById('meetings', 'room', meetingId);
     if (!meeting || meeting.roomId !== roomId) {
-      throw new AppError('Không tìm thấy cuộc họp trong phòng này.');
+      throw new AppError('Meeting not found in this room.');
     }
     if (meeting.ownerUserId !== actor.userId) {
-      throw new AppError('Chỉ chủ cuộc họp mới lấy được token phụ đề trực tiếp.');
+      throw new AppError('Only the meeting owner can get a live caption token.');
     }
     if (meeting.status !== 'recording') {
-      throw new AppError('Cuộc họp không ở trạng thái đang ghi.');
+      throw new AppError('Meeting is not currently recording.');
     }
 
     if (!checkRateLimit('meeting_realtime_token', `${actor.userId}:${meetingId}`, BUDGET_PER_HOUR, BUDGET_WINDOW_MS)) {
-      throw new AppError('Đã vượt quá số lần lấy token phụ đề trực tiếp cho phép trong 1 giờ. Vui lòng thử lại sau.');
+      throw new AppError('Exceeded the allowed number of live caption token requests per hour. Please try again later.');
     }
 
     const freshSince = new Date(Date.now() - CONCURRENCY_FRESHNESS_MS).toISOString();
     const activeCount = await countFreshRecordings(freshSince);
     if (activeCount >= env.liveMaxConcurrentRecordings) {
       throw new AppError(
-        `Hệ thống đang ghi tối đa ${env.liveMaxConcurrentRecordings} cuộc họp, phụ đề trực tiếp tạm không khả dụng — ` +
-          'bản ghi vẫn chạy và tên người nói sẽ có sau khi xử lý.',
+        `The system is already recording the maximum of ${env.liveMaxConcurrentRecordings} meetings, so live captions are temporarily unavailable — ` +
+          'the recording keeps running and speaker names will be available after processing.',
       );
     }
 
@@ -114,7 +114,7 @@ export const realtimeTokenTool: AppTool = {
     if (!status.configured) {
       const keyName = vendor === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY';
       throw new AppError(
-        `Nhà cung cấp phụ đề trực tiếp đang chọn (sttRealtimeProvider=${vendor}) thiếu khoá API — kiểm tra biến môi trường ${keyName}.`,
+        `The selected live-caption provider (sttRealtimeProvider=${vendor}) is missing an API key — check the ${keyName} environment variable.`,
       );
     }
 

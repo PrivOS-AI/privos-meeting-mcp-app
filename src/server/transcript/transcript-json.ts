@@ -1,5 +1,5 @@
 /**
- * `transcript.json` — the stored transcript's source of truth (QĐ-04). Shape
+ * `transcript.json` — the stored transcript's source of truth (D-04). Shape
  * is provider-agnostic: both async providers already normalize into the same
  * `SttToken[]`/`Segment[]`. `displayName` is filled in by P4; `translation` by
  * P6 — both left `null`/absent here.

@@ -6,8 +6,8 @@
  * or parks a sealed embedding in `meeting_speakers.pendingEmbedding` for
  * later confirmation via `speaker_resolve`.
  *
- * Cluster-coherence gate (plan.md § Requirements + risk table "chặn enrol
- * TỰ ĐỘNG"): a diarization turn that actually blends two voices produces an
+ * Cluster-coherence gate (plan.md § Requirements + risk table "block
+ * automatic enrolment"): a diarization turn that actually blends two voices produces an
  * embedding that can spuriously score close to a real profile. Rather than
  * embedding once from the concatenated PCM of all picked ranges (which would
  * hide exactly this failure mode), this module embeds EACH range
@@ -171,7 +171,7 @@ export async function resolveSpeakers(db: AppDbBotClient, wavPath: string, segme
       // auto-enrol AND never auto-label from a match, however close it
       // scores: the representative vector itself is untrustworthy. Park it
       // so a human can resolve it via `speaker_resolve` (which will see the
-      // same `minPairwiseCosine` and offer "Không phải một người").
+      // same `minPairwiseCosine` and offer "not the same person").
       const pendingEmbeddingJson = sealPendingEmbedding(representative, {
         profileId: `pending:${meetingId}:${plan.speakerId}`,
         minPairwiseCosine: coherence,

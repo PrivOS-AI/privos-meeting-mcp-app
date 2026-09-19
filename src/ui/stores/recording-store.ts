@@ -71,9 +71,9 @@ export interface RecordingState {
   lineSpeaker: Record<string, string>;
   /** "Apply to every line of this voice": a diarized voice key remapped wholesale to another speaker key. */
   voiceAlias: Record<string, string>;
-  /** Raw list from the last `meeting_live_speakers` poll — drives the "Ai đang nói?" chip row. */
+  /** Raw list from the last `meeting_live_speakers` poll — drives the "Who's speaking?" chip row. */
   liveSpeakers: LiveSpeaker[];
-  /** True once any chunk for this meeting was dropped/failed (S2-08) — "một số đoạn chưa nhận diện được". */
+  /** True once any chunk for this meeting was dropped/failed (S2-08) — "some segments could not be identified". */
   liveSpeakersDegraded: boolean;
   stageCaptionSize: StageCaptionSize;
   showTranslation: boolean;
@@ -287,7 +287,7 @@ export class RecordingStore {
       // Guard the async host context: without a room every downstream call
       // (meeting row, Files folder, realtime token) is meaningless, and a
       // create would persist an orphaned meeting with an empty roomId.
-      if (!this.ctx.roomId) throw new Error('Chưa nhận được ngữ cảnh phòng từ Hub — thử lại sau giây lát.');
+      if (!this.ctx.roomId) throw new Error('Room context not received from Hub yet — try again in a moment.');
       // This document runs in an opaque origin, where the browser refuses
       // `getUserMedia` even with `allow="microphone"` delegated. Capture through
       // the host (it records under its own origin) and rebuild a MediaStream the
@@ -385,10 +385,10 @@ export class RecordingStore {
       token = parseToolResult(raw) as unknown as RealtimeToken;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      // Only the server's concurrency-cap refusal ("Hệ thống đang ghi tối đa N cuộc họp") is a
-      // capacity problem; any other failure is plain "captions off" — never mislabel it as capacity.
-      // Either way the recording itself keeps going.
-      this.setState({ captionStatus: /tối đa \d+ cuộc họp/.test(message) ? 'capacity' : 'off', error: message });
+      // Only the server's concurrency-cap refusal ("The system is already recording the maximum
+      // of N meetings") is a capacity problem; any other failure is plain "captions off" — never
+      // mislabel it as capacity. Either way the recording itself keeps going.
+      this.setState({ captionStatus: /recording the maximum of \d+ meetings/.test(message) ? 'capacity' : 'off', error: message });
       return;
     }
     this.setState({ provider: token.provider, capabilities: token.capabilities });

@@ -1,7 +1,7 @@
 /**
- * SPIKE: Dựng wrapper + ghim SDK Soniox
+ * SPIKE: Build a wrapper + pin the Soniox SDK
  *
- * Chứng minh gói chọn (@soniox/speech-to-text-web@1.4.0 vs @soniox/client@2.3.0) nhận MediaStream ta cấp, trả token speaker, stop() flush, reconnect key mới, lộ lỗi/backpressure ra callback. Ghim version.
+ * Prove the chosen package (@soniox/speech-to-text-web@1.4.0 vs @soniox/client@2.3.0) accepts the MediaStream we provide, returns speaker tokens, stop() flushes, reconnect with a new key works, and errors/backpressure surface to the callback. Pin the version.
  *
  * This is a foundational Phase-1 spike (see plan.md § Spikes). It CANNOT run
  * without live credentials / a live PrivOS Hub, so offline it only verifies its
@@ -11,7 +11,7 @@
 const REQUIRED: string[] = ['SONIOX_API_KEY'];
 
 function main(): void {
-  console.log('SPIKE: Dựng wrapper + ghim SDK Soniox');
+  console.log('SPIKE: Build a wrapper + pin the Soniox SDK');
   const missing = REQUIRED.filter((k) => !process.env[k] || !process.env[k]!.trim());
   if (missing.length) {
     console.warn('Prerequisites missing (spike not run):', missing.join(', '));

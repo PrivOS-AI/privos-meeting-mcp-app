@@ -45,5 +45,5 @@ export async function resolveFileUrl(app: McpApp, fileId: string, fallbackMimeTy
   if (typeof downloaded === 'string') {
     return { url: URL.createObjectURL(base64ToBlob(downloaded, meta.file?.mimeType ?? fallbackMimeType)), isBlobUrl: true };
   }
-  throw new Error(`Không lấy được đường dẫn tải tệp ${fileId} (thiếu downloadUrl và fallback nhị phân không đúng định dạng mong đợi).`);
+  throw new Error(`Could not resolve a download URL for file ${fileId} (missing downloadUrl and the binary fallback was not in the expected format).`);
 }

@@ -26,7 +26,7 @@ describe('mergeLiveIntoAsyncSpeaker', () => {
 
   it('folds the live row into the async row and deletes the standalone live row', async () => {
     store.meeting_speakers.push(
-      { _id: 'async-1', meeting: 'm1', speakerId: 'spkA', displayName: 'Người nói 1', nameSource: 'async', resolved: false },
+      { _id: 'async-1', meeting: 'm1', speakerId: 'spkA', displayName: 'Speaker 1', nameSource: 'async', resolved: false },
       { _id: 'live-1', meeting: 'm1', sessionSpeakerId: 'ss-1', sonioxLabels: ['s0:1'], liveSpeechSec: 12, liveConfidence: 0.7, nameSource: 'live', displayName: 'Some Name', resolved: true },
     );
 
@@ -40,13 +40,13 @@ describe('mergeLiveIntoAsyncSpeaker', () => {
     expect(merged.sonioxLabels).toEqual(['s0:1']);
     expect(merged.liveSpeechSec).toBe(12);
     // live (rank 1) does NOT outrank async's already-set name source (rank 2) — async keeps its own placeholder name.
-    expect(merged.displayName).toBe('Người nói 1');
+    expect(merged.displayName).toBe('Speaker 1');
     expect(merged.nameSource).toBe('async');
   });
 
   it("adopts the live row's user-confirmed name when the async row is still unresolved", async () => {
     store.meeting_speakers.push(
-      { _id: 'async-1', meeting: 'm1', speakerId: 'spkA', displayName: 'Người nói 1', nameSource: undefined, resolved: false },
+      { _id: 'async-1', meeting: 'm1', speakerId: 'spkA', displayName: 'Speaker 1', nameSource: undefined, resolved: false },
       { _id: 'live-1', meeting: 'm1', sessionSpeakerId: 'ss-1', displayName: 'Thanh', nameSource: 'user', profileId: 'profile-9', resolved: true },
     );
 
@@ -94,10 +94,10 @@ describe('replaceActionItems', () => {
   });
 
   it('creates the given items for a meeting with no prior action_items', async () => {
-    await replaceActionItems(db(), 'm1', [{ task: 'Viết tài liệu', owner: 'Thanh', due: '2026-09-25T00:00:00.000Z', atSec: 12 }]);
+    await replaceActionItems(db(), 'm1', [{ task: 'Write documentation', owner: 'Thanh', due: '2026-09-25T00:00:00.000Z', atSec: 12 }]);
     const rows = extractDbRecords(await db().query('action_items', 'room', { where: [{ field: 'meeting', op: '==', value: 'm1' }] }));
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ meeting: 'm1', task: 'Viết tài liệu', owner: 'Thanh', done: false });
+    expect(rows[0]).toMatchObject({ meeting: 'm1', task: 'Write documentation', owner: 'Thanh', done: false });
   });
 
   it('re-running with the same items does not duplicate rows (deletes stale rows first)', async () => {

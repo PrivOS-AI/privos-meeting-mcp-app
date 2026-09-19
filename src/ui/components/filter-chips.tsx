@@ -1,6 +1,6 @@
 /**
- * History screen's filter-chip row (phase-07 § Requirements: "Tất cả / Có
- * action item / Đã bookmark / Của tôi"). Generic over the chip value type so
+ * History screen's filter-chip row (phase-07 § Requirements: "All / Has
+ * action item / Bookmarked / Mine"). Generic over the chip value type so
  * `history-screen.tsx` owns the actual option set/labels.
  */
 export interface FilterChipOption<T extends string> {

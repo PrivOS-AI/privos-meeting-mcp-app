@@ -1,7 +1,7 @@
 /**
  * SPIKE: Collection scope:global room-less
  *
- * registerCollection(scope:'global') KHÔNG truyền roomId -> getSchema phải trả scope:'global' và KHÔNG có roomId. Nếu bị đóng dấu room thì drop + re-register khi rỗng.
+ * registerCollection(scope:'global') does NOT pass roomId -> getSchema must return scope:'global' with NO roomId. If it gets room-stamped, drop it and re-register while empty.
  *
  * This is a foundational Phase-1 spike (see plan.md § Spikes). It CANNOT run
  * without live credentials / a live PrivOS Hub, so offline it only verifies its

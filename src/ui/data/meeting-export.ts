@@ -5,7 +5,7 @@
  *
  * SRT: downloads the artifact already written by the backend job
  * (`meetings.srtFileId`), never regenerated client-side. DOCX: generated in
- * the iframe (QĐ-11) from `transcript.json` + the meeting's own stored
+ * the iframe (D-11) from `transcript.json` + the meeting's own stored
  * fields; `decisions[]` is always empty here — `meeting-job.ts` only
  * persists `payload.summary`/`payload.key_topics` onto `meetings`, decisions
  * live solely in the saved `summary.md` (not re-derivable from App DB).
@@ -31,15 +31,15 @@ function triggerDownload(blob: Blob, fileName: string): void {
 }
 
 export async function downloadMeetingSrt(app: McpApp, meeting: MeetingReadModel): Promise<void> {
-  if (!meeting.srtFileId) throw new Error('Cuộc họp chưa có tệp phụ đề SRT.');
+  if (!meeting.srtFileId) throw new Error('This meeting has no SRT subtitle file yet.');
   const { url } = await resolveFileUrl(app, meeting.srtFileId, 'application/x-subrip');
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`Không tải được transcript.srt (HTTP ${response.status}).`);
+  if (!response.ok) throw new Error(`Failed to download transcript.srt (HTTP ${response.status}).`);
   triggerDownload(await response.blob(), `${meeting.title || 'meeting'}.srt`);
 }
 
 export async function downloadMeetingDocx(app: McpApp, meeting: MeetingReadModel): Promise<void> {
-  if (!meeting.transcriptJsonFileId) throw new Error('Cuộc họp chưa có transcript để xuất DOCX.');
+  if (!meeting.transcriptJsonFileId) throw new Error('This meeting has no transcript to export as DOCX.');
   const [transcript, actionItems] = await Promise.all([loadTranscript(app, meeting.transcriptJsonFileId), listActionItems(app, meeting._id)]);
 
   const summary: DocxSummary | undefined = meeting.summaryText

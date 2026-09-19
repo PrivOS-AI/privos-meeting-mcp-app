@@ -1,7 +1,7 @@
 /**
  * Picks which transcript segments to spend an embedding pass on for each
  * speaker, before `resolve-speakers.ts` cuts PCM and calls the extractor
- * (plan.md § Backend — chọn segment enrol). Prefers longer, higher-confidence
+ * (plan.md § Backend — pick enrolment segment). Prefers longer, higher-confidence
  * segments so the resulting embedding is built from clean speech rather than
  * short interjections.
  */

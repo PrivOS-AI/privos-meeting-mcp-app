@@ -15,7 +15,7 @@ describe('generateWithHubAi', () => {
   it('rejects a prompt at/over PROMPT_LIMIT before ever calling the Hub', async () => {
     const authorizedFetch = vi.fn();
     const hub = { authorizedFetch } as unknown as RoomBoundHubClient;
-    await expect(generateWithHubAi(hub, { roomId: 'r1', prompt: 'x'.repeat(PROMPT_LIMIT) })).rejects.toThrow(/vượt quá giới hạn/);
+    await expect(generateWithHubAi(hub, { roomId: 'r1', prompt: 'x'.repeat(PROMPT_LIMIT) })).rejects.toThrow(/exceeds the allowed limit/i);
     expect(authorizedFetch).not.toHaveBeenCalled();
   });
 
@@ -90,7 +90,7 @@ describe('generateAsyncWithHubAi', () => {
 
     const promise = generateAsyncWithHubAi(hub, { roomId: 'r1', prompt: 'summarize this' }, controller.signal);
     controller.abort();
-    await expect(promise).rejects.toThrow(/huỷ/);
+    await expect(promise).rejects.toThrow(/cancelled/i);
   });
 
   it('rejects when generate-async never returns an attemptId', async () => {

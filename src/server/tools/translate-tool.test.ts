@@ -91,7 +91,7 @@ describe('meeting_translate', () => {
         context('user-1'),
         runtime(),
       ),
-    ).rejects.toThrow(/không hợp lệ/);
+    ).rejects.toThrow(/Invalid request/);
   });
 
   it('rate-limits repeated calls for the same meeting', async () => {
@@ -108,6 +108,6 @@ describe('meeting_translate', () => {
         context('user-1'),
         runtime(),
       ),
-    ).rejects.toThrow(/giới hạn tần suất/);
+    ).rejects.toThrow(/rate-limited/);
   });
 });

@@ -7,7 +7,7 @@ import { SCHEMAS } from '../../shared/app-db-schema.js';
  * row (see `fromRow`/`claim`/`patch`/`finish`/`fail`). Kept as a flat list here,
  * independent of the `JobRecord` TS type, so this test breaks the moment either
  * side drifts from the other — the exact failure mode plan.md's contract test
- * exists to catch ("ghi/lọc trường chưa đăng ký").
+ * exists to catch ("writing/filtering an unregistered field").
  */
 const JOB_RECORD_DB_FIELDS = [
   'meetingId',

@@ -1,7 +1,7 @@
 /**
- * One row of the history table (phase-07 § Requirements: "tiêu đề + ngày,
- * avatar người nói, thời lượng (mono), số action, badge trạng thái, menu
- * ⋯"). Split out of `history-screen.tsx` to keep that screen under the
+ * One row of the history table (phase-07 § Requirements: "title + date,
+ * speaker avatar, duration (mono), action count, status badge, ⋯
+ * menu"). Split out of `history-screen.tsx` to keep that screen under the
  * repo's ~200-line convention.
  */
 import type { MeetingReadModel, MeetingSpeakerSummary } from '../data/meeting-read-model.js';

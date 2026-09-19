@@ -1,5 +1,5 @@
 /**
- * Reusable "sửa nhãn người nói" control (plan.md § UI) — pick an existing
+ * Reusable "edit speaker label" control (plan.md § UI) — pick an existing
  * profile or type a new name, then calls `meeting_relabel_speaker` (which
  * back-propagates the voiceprint on the backend). Meant to be mounted inside
  * the meeting-detail speaker list once P7 builds that screen; kept

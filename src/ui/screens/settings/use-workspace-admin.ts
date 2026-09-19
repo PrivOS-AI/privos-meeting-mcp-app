@@ -6,7 +6,7 @@
  * use this hook — one probe call is enough there). `meeting_stt_status` is
  * reused here rather than adding a dedicated "am I admin" tool: an admin
  * caller gets the full `{providers: [...]}` shape back, anyone else gets
- * `{ok}` only — the shape itself is the signal (plan.md § Tool trạng thái STT).
+ * `{ok}` only — the shape itself is the signal (plan.md § STT status tool).
  */
 import { useEffect, useState } from 'react';
 import { parseToolResult, usePrivosApp } from '@privos_ai/app-react';

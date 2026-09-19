@@ -67,13 +67,13 @@ describe('meeting_realtime_token', () => {
   it('rejects a caller who is not the meeting owner', async () => {
     await expect(
       realtimeTokenTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('user-2'), {} as never),
-    ).rejects.toThrow(/chủ cuộc họp/);
+    ).rejects.toThrow(/meeting owner/);
   });
 
   it('rejects a roomId that does not match the verified actor room', async () => {
     await expect(
       realtimeTokenTool.execute({ roomId: 'room-other', meetingId: 'meeting-1' }, context('user-1'), {} as never),
-    ).rejects.toThrow(/không hợp lệ/);
+    ).rejects.toThrow(/Invalid request/);
   });
 
   it('rejects once the per-(user,meeting) budget is exceeded', async () => {
@@ -82,14 +82,14 @@ describe('meeting_realtime_token', () => {
     }
     await expect(
       realtimeTokenTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('user-1'), {} as never),
-    ).rejects.toThrow(/vượt quá số lần/);
+    ).rejects.toThrow(/Exceeded the allowed number/);
   });
 
-  it('rejects with a Vietnamese capacity message once LIVE_MAX_CONCURRENT_RECORDINGS is reached', async () => {
+  it('rejects with a capacity message once LIVE_MAX_CONCURRENT_RECORDINGS is reached', async () => {
     env.liveMaxConcurrentRecordings = 1;
     await expect(
       realtimeTokenTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('user-1'), {} as never),
-    ).rejects.toThrow(/tối đa 1 cuộc họp/);
+    ).rejects.toThrow(/maximum of 1 meetings/);
   });
 
   it('names the missing env key when the selected provider has no key configured', async () => {

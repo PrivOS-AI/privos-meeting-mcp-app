@@ -1,6 +1,6 @@
 /**
  * Pulsing REC dot + mm:ss timer. The timer is the RECORDER's clock
- * (`elapsedSec`), never a separate wall clock (QĐ-17).
+ * (`elapsedSec`), never a separate wall clock (D-17).
  */
 export interface RecIndicatorProps {
   elapsedSec: number;

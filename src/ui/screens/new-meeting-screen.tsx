@@ -1,5 +1,5 @@
 /**
- * "Bắt đầu ghi" form: title, primary language, read-only room + active STT
+ * "Start recording" form: title, primary language, read-only room + active STT
  * provider name, start button. `getUserMedia` runs inside this button's own
  * click handler (both for the mic permission gesture requirement AND the
  * Screen Wake Lock gesture requirement).

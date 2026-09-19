@@ -59,8 +59,8 @@ function asInputSegment(value: unknown, index: number): InputSegment | null {
 
 export const liveSummaryTool: AppTool = {
   name: 'meeting_live_summary',
-  title: 'Tóm tắt nhanh khi đang họp',
-  description: 'Tóm tắt phần cuộc họp đã diễn ra từ phụ đề trực tiếp, không cần transcript đã lưu — dùng cho bảng tóm tắt cập nhật mỗi ~10 phút.',
+  title: 'Live meeting summary',
+  description: 'Summarize the meeting so far from live captions, without a saved transcript — used for the summary panel refreshed about every 10 minutes.',
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId', 'segments'],
@@ -75,32 +75,32 @@ export const liveSummaryTool: AppTool = {
   async execute(args, context, runtime: ToolRuntime) {
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId và meetingId là bắt buộc.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
 
     const actor = context.actor;
     if (!actor || actor.roomId !== roomId) {
-      throw new AppError('Yêu cầu không hợp lệ cho phòng này.');
+      throw new AppError('Invalid request for this room.');
     }
 
     const rawSegments = Array.isArray(args.segments) ? args.segments : [];
-    if (rawSegments.length === 0) throw new AppError('Chưa có nội dung phụ đề để tóm tắt.');
-    if (rawSegments.length > MAX_SEGMENTS) throw new AppError('Quá nhiều dòng phụ đề trong một lượt tóm tắt.');
+    if (rawSegments.length === 0) throw new AppError('No caption content to summarize yet.');
+    if (rawSegments.length > MAX_SEGMENTS) throw new AppError('Too many caption lines in one summary batch.');
 
     const db = new AppDbBotClient(roomId);
     const meeting = await db.getById('meetings', 'room', meetingId);
     if (!meeting || meeting.roomId !== roomId) {
-      throw new AppError('Không tìm thấy cuộc họp trong phòng này.');
+      throw new AppError('Meeting not found in this room.');
     }
 
     if (!checkRateLimit('meeting_live_summary', meetingId, LIVE_SUMMARY_LIMIT_PER_5MIN, 5 * 60_000)) {
-      throw new AppError('Tóm tắt trực tiếp đang bị giới hạn tần suất cho cuộc họp này. Vui lòng thử lại sau.');
+      throw new AppError('Live summary is rate-limited for this meeting. Please try again later.');
     }
 
     const lines = rawSegments
       .map((value, index) => asInputSegment(value, index))
       .filter((s): s is InputSegment => s !== null)
       .sort((a, b) => a.startSec - b.startSec);
-    if (lines.length === 0) throw new AppError('Chưa có nội dung phụ đề để tóm tắt.');
+    if (lines.length === 0) throw new AppError('No caption content to summarize yet.');
 
     // Build the Segment[] + names map the shared chunker/summarizer expect. endSec
     // is the next line's start (last line: its own start) — only used for the

@@ -1,6 +1,6 @@
 /**
  * Meeting detail's speaker list with inline relabel (phase-07 §
- * Requirements: "Sửa nhãn người nói ngay trên dòng transcript... → tool
+ * Requirements: "Edit the speaker label right on the transcript line... → tool
  * `meeting_relabel_speaker`"). Names shown here come from the RECONCILED
  * `meeting_speakers` rows (P3/P5), not live labels (plan.md). Reuses P4's
  * `speaker-label-editor.tsx` as-is; only one row is ever in edit mode.

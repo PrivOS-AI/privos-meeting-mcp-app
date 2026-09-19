@@ -80,7 +80,7 @@ export interface ListMeetingsResult {
 
 const MAX_PAGE_SIZE = 200; // App DB's own `mcpapp.db.query` cap is 1000; the history screen pages 50 at a time (phase-07 § Requirements).
 
-/** One page of a room's meetings — always paginated, never an unbounded query (phase-07 risk table: "`db.query` limit 1000 làm thiếu dữ liệu"). */
+/** One page of a room's meetings — always paginated, never an unbounded query (phase-07 risk table: "`db.query` limit 1000 causes missing data"). */
 export async function listMeetings(app: McpApp, roomId: string, options: ListMeetingsOptions = {}): Promise<ListMeetingsResult> {
   const limit = Math.min(options.limit ?? 50, MAX_PAGE_SIZE);
   const field = options.orderBy === 'durationSec_desc' ? 'durationSec' : 'startedAt';
@@ -151,7 +151,7 @@ export async function listSpeakersForMeetings(app: McpApp, meetingIds: readonly 
 
 /**
  * Which meetings on the current page have at least one bookmark — backs the
- * "Đã bookmark" history filter chip. One batched `in` query per page,
+ * "Bookmarked" history filter chip. One batched `in` query per page,
  * applied client-side (phase-07 § Requirements accepts this as a documented
  * client-side approximation over the current page, same as keyword search).
  */
@@ -170,7 +170,7 @@ export interface ActionItemCounts {
   open: number;
 }
 
-/** Batched action-item totals per meeting — backs the "số action" column and the "Có action item" filter chip. */
+/** Batched action-item totals per meeting — backs the "action count" column and the "Has action item" filter chip. */
 export async function listActionItemCountsForMeetings(app: McpApp, meetingIds: readonly string[]): Promise<Record<string, ActionItemCounts>> {
   if (meetingIds.length === 0) return {};
   const { records } = await new AppDbClient(app).query({

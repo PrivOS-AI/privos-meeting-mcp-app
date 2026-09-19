@@ -77,10 +77,10 @@ async function uploadFile(filePath: string, signal?: AbortSignal): Promise<strin
   const form = new FormData();
   form.append('file', blob, basename(filePath));
   const response = await fetch(`${BASE_URL}/v1/files`, { method: 'POST', headers: authHeaders(), body: form, signal });
-  if (!response.ok) throw new SonioxHttpError(response.status, `Soniox từ chối nhận tệp âm thanh (HTTP ${response.status}).`);
+  if (!response.ok) throw new SonioxHttpError(response.status, `Soniox refused to accept the audio file (HTTP ${response.status}).`);
   const body = await readJson(response);
   const id = typeof body?.id === 'string' ? body.id : undefined;
-  if (!id) throw new AppError('Soniox không trả về id tệp sau khi upload.');
+  if (!id) throw new AppError('Soniox did not return a file id after upload.');
   return id;
 }
 
@@ -103,10 +103,10 @@ async function createTranscription(
     }),
     signal,
   });
-  if (!response.ok) throw new SonioxHttpError(response.status, `Soniox từ chối tạo phiên xử lý (HTTP ${response.status}).`);
+  if (!response.ok) throw new SonioxHttpError(response.status, `Soniox refused to create a processing session (HTTP ${response.status}).`);
   const body = await readJson(response);
   const id = typeof body?.id === 'string' ? body.id : undefined;
-  if (!id) throw new AppError('Soniox không trả về id phiên xử lý.');
+  if (!id) throw new AppError('Soniox did not return a processing session id.');
   return { id };
 }
 
@@ -114,21 +114,21 @@ async function pollTranscription(id: string, signal?: AbortSignal): Promise<void
   const deadline = Date.now() + POLL_TIMEOUT_MS;
   let interval = POLL_INTERVAL_START_MS;
   while (Date.now() < deadline) {
-    if (signal?.aborted) throw new AppError('Job đã huỷ trong lúc chờ Soniox xử lý.');
+    if (signal?.aborted) throw new AppError('Job was cancelled while waiting for Soniox to finish processing.');
     const response = await fetch(`${BASE_URL}/v1/transcriptions/${encodeURIComponent(id)}`, { headers: authHeaders(), signal });
-    if (!response.ok) throw new SonioxHttpError(response.status, `Soniox trả lỗi khi kiểm tra tiến trình (HTTP ${response.status}).`);
+    if (!response.ok) throw new SonioxHttpError(response.status, `Soniox returned an error while checking progress (HTTP ${response.status}).`);
     const body = await readJson(response);
     const status = typeof body?.status === 'string' ? body.status : 'unknown';
     if (status === 'completed') return;
     if (status === 'error') {
-      const message = typeof body?.error_message === 'string' ? body.error_message : 'Soniox báo lỗi xử lý không rõ nguyên nhân.';
-      throw new AppError(`Soniox xử lý thất bại: ${message}`);
+      const message = typeof body?.error_message === 'string' ? body.error_message : 'Soniox reported a processing error with no known cause.';
+      throw new AppError(`Soniox processing failed: ${message}`);
     }
-    if (signal?.aborted) throw new AppError('Job đã huỷ trong lúc chờ Soniox xử lý.');
+    if (signal?.aborted) throw new AppError('Job was cancelled while waiting for Soniox to finish processing.');
     await new Promise((resolve) => setTimeout(resolve, interval));
     interval = Math.min(interval * 1.5, POLL_INTERVAL_MAX_MS);
   }
-  throw new AppError('Soniox xử lý quá thời gian chờ cho phép.');
+  throw new AppError('Soniox processing exceeded the allowed wait time.');
 }
 
 function mapToken(raw: Record<string, unknown>): SttToken | null {
@@ -148,7 +148,7 @@ function mapToken(raw: Record<string, unknown>): SttToken | null {
 
 async function fetchTranscript(id: string, signal?: AbortSignal): Promise<{ tokens: SttToken[]; languageCode?: string }> {
   const response = await fetch(`${BASE_URL}/v1/transcriptions/${encodeURIComponent(id)}/transcript`, { headers: authHeaders(), signal });
-  if (!response.ok) throw new SonioxHttpError(response.status, `Soniox trả lỗi khi lấy kết quả (HTTP ${response.status}).`);
+  if (!response.ok) throw new SonioxHttpError(response.status, `Soniox returned an error while fetching results (HTTP ${response.status}).`);
   const body = await readJson(response);
   const rawTokens = Array.isArray(body?.tokens) ? (body!.tokens as Record<string, unknown>[]) : [];
   const tokens = rawTokens.map(mapToken).filter((t): t is SttToken => t !== null);
@@ -185,7 +185,7 @@ export const sonioxAsyncProvider: AsyncSttProvider = {
   vendor: 'soniox',
 
   async transcribeFile(input: TranscribeInput): Promise<SttResult> {
-    if (!env.sonioxApiKey) throw new AppError('Thiếu SONIOX_API_KEY — không chạy được soniox-async.');
+    if (!env.sonioxApiKey) throw new AppError('Missing SONIOX_API_KEY — cannot run soniox-async.');
     const languageHints = input.languageHints?.length ? input.languageHints : ['vi', 'en'];
 
     let fileId = input.resumeProviderFileId;
@@ -220,7 +220,7 @@ export const sonioxAsyncProvider: AsyncSttProvider = {
       configured: probe.reason !== 'not_configured',
       ok: probe.ok,
       models: [env.sonioxAsyncModel],
-      detail: probe.ok ? undefined : probe.reason === 'not_configured' ? 'Thiếu SONIOX_API_KEY.' : 'Không kết nối được tới Soniox.',
+      detail: probe.ok ? undefined : probe.reason === 'not_configured' ? 'Missing SONIOX_API_KEY.' : 'Could not connect to Soniox.',
       reason: probe.ok ? undefined : probe.reason,
     };
   },

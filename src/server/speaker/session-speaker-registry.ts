@@ -1,6 +1,6 @@
 /**
  * In-memory (per `meetingId`) live speaker registry — P5's core state machine
- * (QĐ-16/S2-05). A realtime provider's `speaker` label (`s{sessionIndex}:{n}`)
+ * (D-16/S2-05). A realtime provider's `speaker` label (`s{sessionIndex}:{n}`)
  * is only a HINT, never an identity: every embedding this module receives is
  * re-verified against the centroid of whichever session speaker currently
  * owns that label BEFORE being folded in. A label the provider recycles for a
@@ -188,7 +188,7 @@ export class MeetingSessionRegistry {
 
   // --------------------------------------------------------------- defer
 
-  /** Turn vắt biên part (S2-03) — its audio is not fully decoded yet; retried on the NEXT chunk instead of being dropped. */
+  /** Turn straddling a part boundary (S2-03) — its audio is not fully decoded yet; retried on the NEXT chunk instead of being dropped. */
   defer(seg: ChunkSegment): void {
     this.deferredSegments.push(seg);
   }
@@ -223,7 +223,7 @@ export class MeetingSessionRegistry {
    */
   decodedSecBefore(seq: number): number {
     if (this.lastProcessedSeq !== -1 && seq <= this.lastProcessedSeq) {
-      console.warn('[session-speaker-registry] seq trùng/lùi so với chunk đã xử lý — dùng lại đồng hồ tích luỹ hiện có.', {
+      console.warn('[session-speaker-registry] seq duplicate/behind the already-processed chunk — reusing the existing accumulated clock.', {
         meetingId: this.meetingId,
         seq,
         lastProcessedSeq: this.lastProcessedSeq,
@@ -268,7 +268,7 @@ export class MeetingSessionRegistry {
   /**
    * Verifies + folds one embedding into the session speaker currently bound
    * to `label`. Re-verifies from scratch every time — nothing is ever
-   * trusted purely because the label matches (QĐ-16). Deduplicates by
+   * trusted purely because the label matches (D-16). Deduplicates by
    * `(speaker, startMs)`: a turn already embedded (draft, then resent as
    * final) is a silent no-op.
    */

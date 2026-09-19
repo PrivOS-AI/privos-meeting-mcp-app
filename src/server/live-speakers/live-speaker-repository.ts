@@ -4,7 +4,7 @@
  * owned by `jobs/meeting-repository.ts`). Both upserts only ever write the
  * fields present on their own input, so a live write and an async write
  * landing on the SAME row never clobber each other's fields (plan.md's
- * "merge trường live, không ghi đè" requirement holds by construction, not by
+ * "merge live fields, never overwrite" requirement holds by construction, not by
  * a runtime merge step).
  *
  * `upsertAll` seals the centroid the same way P4 seals every other embedding
@@ -68,7 +68,7 @@ export async function loadForMeeting(db: AppDbBotClient, meetingId: string): Pro
 /**
  * Get-or-create this meeting's in-memory registry. On first touch after a
  * restart/eviction (the store did not already have it), rebuilds it from
- * `meeting_speakers` so live labels never reset to "Người nói 1".
+ * `meeting_speakers` so live labels never reset to "Speaker 1".
  */
 export async function ensureRegistry(db: AppDbBotClient, meetingId: string): Promise<MeetingSessionRegistry> {
   const existed = sessionRegistries.has(meetingId);

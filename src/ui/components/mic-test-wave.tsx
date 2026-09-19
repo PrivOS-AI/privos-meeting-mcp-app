@@ -1,5 +1,5 @@
 /**
- * Settings › Microphone "Kiểm tra mic" button: opens its OWN short-lived
+ * Settings › Microphone "Test mic" button: opens its OWN short-lived
  * `getUserMedia` stream (never the recording stream — this runs outside any
  * meeting), draws a 3s live level bar via `AnalyserNode`, then releases every
  * track. Reuses the exact analyser technique `mic-level-meter.tsx` already

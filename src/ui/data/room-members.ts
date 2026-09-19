@@ -1,5 +1,5 @@
 /**
- * Search the current room's members for the "Xác nhận người nói" modal's
+ * Search the current room's members for the "Confirm speaker" modal's
  * member picker. Uses the Hub's `channels.members` route (the app's
  * OPTIONAL `rooms:read` grant) — same pattern as the genealogy app's
  * `room-members.ts`. A caller without the grant sees `success:false` or a

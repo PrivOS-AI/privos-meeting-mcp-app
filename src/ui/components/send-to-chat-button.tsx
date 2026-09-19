@@ -1,7 +1,7 @@
 /**
  * "Send to Chat room" button (phase-06 § Requirements/Architecture).
  * `meeting_send_to_chat` builds the text server-side and NEVER swallows a
- * Hub rejection (see `send-to-chat-tool.ts`) — "không lỗi im lặng". Whether
+ * Hub rejection (see `send-to-chat-tool.ts`) — "no silent failure". Whether
  * the bot can actually post depends on its identity (spike P1-6,
  * `mcpapp.bot.getMe`), never observed against a live Hub in this static-only
  * phase; plan default: the button stays ENABLED whenever the room grants

@@ -88,7 +88,7 @@ describe('createElevenLabsConnection', () => {
     expect('stream' in (lastConnectOptions ?? {})).toBe(false);
   });
 
-  it('never emits a LiveTurn (ElevenLabs realtime has no diarization, QĐ-18)', async () => {
+  it('never emits a LiveTurn (ElevenLabs realtime has no diarization, D-18)', async () => {
     const stub = new RealtimeConnectionCallbacksStub();
     createElevenLabsConnection({ ...stub.options(), mintToken: async () => token(), stream: {} as MediaStream, recorderEpochMs: 0, translate: false });
     await vi.waitFor(() => expect(lastConnection).toBeDefined());

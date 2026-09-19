@@ -1,12 +1,12 @@
 /**
  * `meeting_stt_status` — reports the status of BOTH STT vendors (realtime +
  * async), including the one not currently selected, so an admin can compare
- * before switching (QĐ-15). There is no API-key input field (QĐ-08); this
+ * before switching (D-15). There is no API-key input field (D-08); this
  * only ever exposes configured/ok booleans, model names and (for ElevenLabs)
  * account usage figures — never a key.
  *
- * Admin-only: a non-admin verified caller gets `{ ok }` only (plan.md § Tool
- * trạng thái STT — "người khác chỉ { ok }"), computed from whichever provider
+ * Admin-only: a non-admin verified caller gets `{ ok }` only (plan.md § STT
+ * status tool — "everyone else gets only { ok }"), computed from whichever provider
  * is currently ACTIVE so a non-admin still sees "is live captioning up" without
  * seeing which vendor or its usage.
  */

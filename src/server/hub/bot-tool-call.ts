@@ -8,7 +8,7 @@
  *
  * `roomId` is OPTIONAL. Only collections registered with `scope:'room'` need it;
  * `scope:'global'` collections (speaker_profiles, app_settings) register and
- * read room-lessly (mcp-apps.ts:2495 `roomId?: string`, verified QĐ-05).
+ * read room-lessly (mcp-apps.ts:2495 `roomId?: string`, verified D-05).
  */
 import { createAgentBotHubClient } from '@privos_ai/app-server';
 
@@ -37,8 +37,8 @@ export async function callAppPlatformTool(
   const mcpAppId = await resolveOwnMcpAppId();
   if (!mcpAppId) {
     throw new AppError(
-      'Chưa phân giải được mcpAppId của ứng dụng — không gọi được App Platform. '
-        + 'Ở chế độ development, chạy lại `npm run pair` (hoặc `npm run dev`) để cache có MCP_APP_ID.',
+      "Could not resolve the app's mcpAppId — cannot call the App Platform. "
+        + 'In development mode, rerun `npm run pair` (or `npm run dev`) so the cache has MCP_APP_ID.',
     );
   }
 

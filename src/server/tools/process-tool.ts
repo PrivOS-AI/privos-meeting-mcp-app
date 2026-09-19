@@ -51,8 +51,8 @@ async function discoverParts(runtime: ToolRuntime, roomId: string, folderId: str
 
 export const processTool: AppTool = {
   name: 'meeting_process',
-  title: 'Xử lý cuộc họp',
-  description: 'Ghép các phần ghi âm, nhận diện người nói và tạo transcript cho cuộc họp bằng nhà cung cấp STT đang chọn.',
+  title: 'Process meeting',
+  description: 'Merge recording parts, identify speakers, and produce the meeting transcript with the selected STT provider.',
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId'],
@@ -62,7 +62,7 @@ export const processTool: AppTool = {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId và meetingId là bắt buộc.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
 
     const db = new AppDbBotClient(roomId);
     const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
@@ -79,9 +79,9 @@ export const processTool: AppTool = {
     }
 
     const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
-    if (!folderId) throw new AppError('Cuộc họp chưa có thư mục lưu trữ — chưa thể xử lý.');
+    if (!folderId) throw new AppError('Meeting has no storage folder yet — cannot process.');
     const parts = await discoverParts(runtime, roomId, folderId, meetingId);
-    if (parts.length === 0) throw new AppError('Cuộc họp không có phần ghi âm nào để xử lý.');
+    if (parts.length === 0) throw new AppError('Meeting has no recording parts to process.');
 
     const asyncVendor = await resolveAsyncVendor(db);
     const sttProvider = asyncVendor === 'elevenlabs' ? ('elevenlabs-batch' as const) : ('soniox-async' as const);

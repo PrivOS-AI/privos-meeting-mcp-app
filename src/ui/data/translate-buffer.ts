@@ -1,5 +1,5 @@
 /**
- * Hub AI translation path (QĐ-12b) — used only when `!capabilities.translation`
+ * Hub AI translation path (D-12b) — used only when `!capabilities.translation`
  * (ElevenLabs, or Soniox when native two-way translation turns out to conflict
  * with diarization). Batches finalized caption lines every 3-5s and calls
  * `meeting_translate`; a failed/timed-out batch is dropped, never retried and
@@ -42,7 +42,7 @@ export class TranslateBuffer {
     this.timer = setInterval(() => void this.flush(), opts.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS);
   }
 
-  /** Only bring in a finalized line already in a DIFFERENT language than the target — see QĐ-12. */
+  /** Only bring in a finalized line already in a DIFFERENT language than the target — see D-12. */
   push(line: TranslateBufferLine): void {
     if (!this.enabled) return;
     if (line.lang && line.lang === this.opts.target) return;

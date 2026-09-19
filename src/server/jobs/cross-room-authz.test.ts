@@ -46,25 +46,25 @@ describe('cross-room authz — room B cannot touch room A data', () => {
   it('meeting_process: room B actor cannot enqueue processing for room A\'s meeting', async () => {
     await expect(
       processTool.execute({ roomId: ROOM_A, meetingId: 'meeting-a1' }, actorContext('user-b', ROOM_B), { agentBotHub: fakeHub }),
-    ).rejects.toThrow(/không hợp lệ/);
+    ).rejects.toThrow(/invalid request/i);
   });
 
   it('meeting_process: even a room-B actor claiming roomId=room-B cannot reach room A\'s meeting row', async () => {
     await expect(
       processTool.execute({ roomId: ROOM_B, meetingId: 'meeting-a1' }, actorContext('user-b', ROOM_B), { agentBotHub: fakeHub }),
-    ).rejects.toThrow(/Không tìm thấy/);
+    ).rejects.toThrow(/not found/i);
   });
 
   it('meeting_status: room B actor cannot poll room A\'s meeting status', async () => {
     await expect(
       statusTool.execute({ roomId: ROOM_A, meetingId: 'meeting-a1' }, actorContext('user-b', ROOM_B), { agentBotHub: fakeHub }),
-    ).rejects.toThrow(/không hợp lệ/);
+    ).rejects.toThrow(/invalid request/i);
   });
 
   it('speaker_profile_delete: a different (non-admin, non-creator) user cannot delete room A\'s speaker profile', async () => {
     await expect(
       speakerProfileDeleteTool.execute({ profileId: 'profile-a1' }, actorContext('user-b', ROOM_B), { agentBotHub: fakeHub }),
-    ).rejects.toThrow(/quản trị viên/);
+    ).rejects.toThrow(/workspace admin/i);
     expect(store.speaker_profiles).toHaveLength(1);
   });
 });

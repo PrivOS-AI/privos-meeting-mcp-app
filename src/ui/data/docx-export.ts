@@ -1,9 +1,9 @@
 /**
- * Client-side DOCX export (QĐ-11: generated in the iframe with the `docx`
+ * Client-side DOCX export (D-11: generated in the iframe with the `docx`
  * npm package + `Packer.toBlob`/`Packer.toBuffer` — no backend DOCX tool).
  * Mirrors `summary-markdown.ts`'s section order so the exported Word file
  * and the stored `summary.md` never diverge in structure: title → meta →
- * Tóm tắt → Quyết định → Việc cần làm → Biên bản (one paragraph per
+ * Summary → Decisions → Action items → Minutes (one paragraph per
  * transcript segment, bilingual when a `translation` is present).
  */
 import { Document, HeadingLevel, Packer, Paragraph, TextRun } from 'docx';

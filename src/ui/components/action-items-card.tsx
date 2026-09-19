@@ -1,5 +1,5 @@
 /**
- * Phase 6 "Việc cần làm" panel: checkbox toggle `done`, owner/due display,
+ * Phase 6 "To-do" panel: checkbox toggle `done`, owner/due display,
  * click a timestamp to seek the (P7) audio player, and "Push to Smart List"
  * (idempotent — `action-list-provisioner.ts` skips items that already carry
  * a `listItemId`). The push button is hidden when the room lacks

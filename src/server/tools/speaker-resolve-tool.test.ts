@@ -48,26 +48,26 @@ describe('speaker_resolve', () => {
   it('rejects a non-owner', async () => {
     await expect(
       speakerResolveTool.execute({ roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'skip' }] }, ctx('someone-else'), {} as never),
-    ).rejects.toThrow(/chủ cuộc họp/);
+    ).rejects.toThrow(/meeting owner/);
   });
 
   it('mode "name" creates a new profile and enrols when the cluster is coherent', async () => {
     const result = (await speakerResolveTool.execute(
-      { roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'name', displayName: 'An Nguyễn' }] },
+      { roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'name', displayName: 'Alex Smith' }] },
       ctx(),
       {} as never,
     )) as { resolved: Array<{ speakerId: string; enrolled: boolean; profileId?: string }> };
 
     expect(result.resolved[0].enrolled).toBe(true);
     expect(store.speaker_profiles).toHaveLength(1);
-    expect(store.speaker_profiles[0].displayName).toBe('An Nguyễn');
+    expect(store.speaker_profiles[0].displayName).toBe('Alex Smith');
     expect(store.meeting_speakers[0].resolved).toBe(true);
   });
 
   it('mode "name" sets the display name but does NOT enrol when the cluster is incoherent (bimodal)', async () => {
     store.meeting_speakers[0].pendingEmbedding = incoherentPending();
     const result = (await speakerResolveTool.execute(
-      { roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'name', displayName: 'Nhóm hai người' }] },
+      { roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'name', displayName: 'Two-person group' }] },
       ctx(),
       {} as never,
     )) as { resolved: Array<{ enrolled: boolean; reason?: string }> };
@@ -75,7 +75,7 @@ describe('speaker_resolve', () => {
     expect(result.resolved[0].enrolled).toBe(false);
     expect(result.resolved[0].reason).toBe('cluster_not_coherent');
     expect(store.speaker_profiles).toHaveLength(0);
-    expect(store.meeting_speakers[0].displayName).toBe('Nhóm hai người');
+    expect(store.meeting_speakers[0].displayName).toBe('Two-person group');
   });
 
   it('mode "user" is rejected per-assignment when the cluster is incoherent', async () => {
@@ -106,7 +106,7 @@ describe('speaker_resolve', () => {
     store.meeting_speakers[0].resolved = true;
     store.meeting_speakers[0].profileId = 'profile-y';
     const result = (await speakerResolveTool.execute(
-      { roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'name', displayName: 'Khác' }] },
+      { roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'name', displayName: 'Other' }] },
       ctx(),
       {} as never,
     )) as { resolved: Array<{ enrolled: boolean; reason?: string; profileId?: string }> };

@@ -48,9 +48,9 @@ function asFileMeta(value: unknown): RoomFileMeta | null {
 function mapFileHttpError(status: number, body: Record<string, unknown> | null): AppError {
   const message = typeof body?.error === 'string' ? body.error : typeof body?.message === 'string' ? body.message : undefined;
   if (message?.includes('Not authorized to access this channel')) {
-    return new AppError('Trợ lý Cuộc họp chưa được thêm vào phòng này. Hãy thêm bot vào phòng rồi thử lại.');
+    return new AppError('The Meeting Agent bot has not been added to this room. Add the bot to the room and try again.');
   }
-  return new AppError(`Không truy cập được tệp trong phòng (HTTP ${status}): ${message ?? 'Lỗi không xác định từ Hub.'}`);
+  return new AppError(`Could not access the file in the room (HTTP ${status}): ${message ?? 'Unknown error from Hub.'}`);
 }
 
 /** One file's own metadata, or `null` when it does not exist. Never throws on a plain 404. */
@@ -84,7 +84,7 @@ export async function listRoomFolderFiles(
 export async function fetchFileReadable(hub: RoomBoundHubClient, fileId: string, signal?: AbortSignal): Promise<Readable> {
   const response = await hub.authorizedFetch(fileDownloadPath(fileId), { method: 'GET', requiredScope: 'files:read', signal });
   if (!response.ok || !response.body) {
-    throw new AppError(`Không tải được tệp ${fileId} từ Files (HTTP ${response.status}).`);
+    throw new AppError(`Could not download file ${fileId} from Files (HTTP ${response.status}).`);
   }
   // `Response.body` is a DOM `ReadableStream`; `Readable.fromWeb` expects Node's `stream/web` type
   // of the same shape. The two are structurally identical (WHATWG streams) — safe cast, no data loss.

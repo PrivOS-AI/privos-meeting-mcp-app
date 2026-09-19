@@ -67,7 +67,7 @@ describe('meeting_summarize', () => {
 
   it('re-summarizes from transcript.json, rewrites transcript files, and updates the meeting row', async () => {
     summarizeTranscript.mockResolvedValueOnce({
-      payload: { summary: 'Tóm tắt mới.', decisions: [], action_items: [], key_topics: ['a'] },
+      payload: { summary: 'New summary.', decisions: [], action_items: [], key_topics: ['a'] },
       summaryFileId: 'summary-file-1',
       translatedSegments: transcriptDoc.segments,
     });
@@ -76,7 +76,7 @@ describe('meeting_summarize', () => {
       summary: { summary: string };
     };
 
-    expect(result.summary.summary).toBe('Tóm tắt mới.');
+    expect(result.summary.summary).toBe('New summary.');
     expect(summarizeTranscript).toHaveBeenCalledTimes(1);
     const call = summarizeTranscript.mock.calls[0][0];
     // Uses the CURRENT meeting_speakers display name ("Thanh"), not the one frozen in transcript.json.
@@ -85,12 +85,12 @@ describe('meeting_summarize', () => {
     expect(uploadCalls.map((c) => c.fileName).sort()).toEqual(['transcript.json', 'transcript.md', 'transcript.srt']);
     const updated = store.meetings.find((m) => m._id === 'meeting-1');
     expect(updated?.summaryFileId).toBe('summary-file-1');
-    expect(updated?.summaryText).toBe('Tóm tắt mới.');
+    expect(updated?.summaryText).toBe('New summary.');
     expect(updated?.summaryError).toBe('');
   });
 
   it('records summaryError and rejects when Hub AI fails', async () => {
-    summarizeTranscript.mockRejectedValueOnce(new Error('Hub AI trả lỗi: quota exceeded'));
+    summarizeTranscript.mockRejectedValueOnce(new Error('Hub AI error: quota exceeded'));
 
     await expect(summarizeTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('user-1'), runtime())).rejects.toThrow(/quota exceeded/);
 
@@ -106,6 +106,6 @@ describe('meeting_summarize', () => {
   });
 
   it('rejects a caller who does not own the meeting', async () => {
-    await expect(summarizeTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('someone-else'), runtime())).rejects.toThrow(/chủ cuộc họp/);
+    await expect(summarizeTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('someone-else'), runtime())).rejects.toThrow(/meeting owner/);
   });
 });

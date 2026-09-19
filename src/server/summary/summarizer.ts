@@ -1,13 +1,12 @@
 /**
- * Map-reduce summarizer — the ONLY summarization path (QĐ-07, Hub AI via the
+ * Map-reduce summarizer — the ONLY summarization path (D-07, Hub AI via the
  * installation bot). Map pass: one Hub AI call per chunk, producing short
  * notes + decisions + action items. Reduce pass: one call combining every
  * chunk's notes into the final structured summary.
  *
  * OPEN QUESTION — map concurrency vs rolling context: plan.md's Architecture
- * section asks for BOTH "map song song tối đa 3 request giữ thứ tự" AND
- * "rolling context = notes chunk liền trước" (the immediately preceding
- * chunk's own notes). Those two are in tension — chunk i's rolling context is
+ * section asks for BOTH "map up to 3 requests in parallel, keeping order" AND
+ * "rolling context = the immediately preceding chunk's own notes". Those two are in tension — chunk i's rolling context is
  * only available once chunk i-1's call has actually completed, which forces a
  * dependency chain. This implementation keeps the ACCURACY requirement (a
  * real, completed previous-chunk context) and processes chunks sequentially;
@@ -71,7 +70,7 @@ function formatTimestamp(totalSec: number): string {
 function extractJsonObject(text: string): unknown {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1 || end < start) throw new AppError('Hub AI trả về dữ liệu không đúng định dạng JSON.');
+  if (start === -1 || end === -1 || end < start) throw new AppError('Hub AI returned data that is not valid JSON.');
   return JSON.parse(text.slice(start, end + 1));
 }
 
@@ -110,7 +109,7 @@ async function callAndValidate<S extends z.ZodTypeAny>(
   const secondParsed = schema.safeParse(safeExtract(second));
   if (secondParsed.success) return secondParsed.data;
 
-  throw new AppError('Hub AI trả về JSON không đúng schema sau khi đã thử sửa lại.');
+  throw new AppError('Hub AI returned JSON that does not match the schema even after a retry.');
 }
 
 function safeExtract(text: string): unknown {
@@ -142,7 +141,7 @@ export async function summarizeTranscript(
   signal?: AbortSignal,
 ): Promise<SummaryPayload> {
   if (input.chunks.length === 0) {
-    throw new AppError('Không có nội dung transcript để tóm tắt.');
+    throw new AppError('No transcript content to summarize.');
   }
 
   const notesByChunk: ChunkNotes[] = [];

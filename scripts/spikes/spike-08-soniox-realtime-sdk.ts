@@ -1,7 +1,7 @@
 /**
- * SPIKE: Soniox realtime qua SDK ~5 phút
+ * SPIKE: Soniox realtime via SDK, ~5 minutes
  *
- * Mint temporary-api-key -> new SonioxClient().start({...,stream,enableSpeakerDiarization,translation:two_way}). Ghi: JSON token thô, translation có sống chung diarization không, speaker trên token is_final, mã đóng thật, độ trễ, origin SDK chạm tới.
+ * Mint temporary-api-key -> new SonioxClient().start({...,stream,enableSpeakerDiarization,translation:two_way}). Record: the raw JSON token, whether translation coexists with diarization, speaker on the is_final token, the actual close code, latency, and which origins the SDK touches.
  *
  * This is a foundational Phase-1 spike (see plan.md § Spikes). It CANNOT run
  * without live credentials / a live PrivOS Hub, so offline it only verifies its
@@ -11,7 +11,7 @@
 const REQUIRED: string[] = ['SONIOX_API_KEY'];
 
 function main(): void {
-  console.log('SPIKE: Soniox realtime qua SDK ~5 phút');
+  console.log('SPIKE: Soniox realtime via SDK, ~5 minutes');
   const missing = REQUIRED.filter((k) => !process.env[k] || !process.env[k]!.trim());
   if (missing.length) {
     console.warn('Prerequisites missing (spike not run):', missing.join(', '));

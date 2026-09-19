@@ -1,7 +1,7 @@
 /**
  * SPIKE: CSP + presigned Files origin
  *
- * Đọc URL presigned của một file, lấy origin -> PRIVOS_FILES_ORIGIN; fetch transcript.json và <audio src=presigned> trong tab phòng để xác nhận CSP media-src/connect-src.
+ * Read a file's presigned URL, take its origin -> PRIVOS_FILES_ORIGIN; fetch transcript.json and <audio src=presigned> in a room tab to confirm CSP media-src/connect-src.
  *
  * This is a foundational Phase-1 spike (see plan.md § Spikes). It CANNOT run
  * without live credentials / a live PrivOS Hub, so offline it only verifies its

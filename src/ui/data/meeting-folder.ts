@@ -52,7 +52,7 @@ async function findOrCreateFolder(app: McpApp, roomId: string, name: string, fat
 
   const raced = (await listFolders(app, roomId, fatherId)).find((folder) => folder.name === name);
   if (raced) return raced._id;
-  throw new Error(`Không tạo được thư mục "${name}" trong Files.`);
+  throw new Error(`Failed to create folder "${name}" in Files.`);
 }
 
 /**

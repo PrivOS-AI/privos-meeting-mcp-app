@@ -28,12 +28,12 @@ export interface BuildTranscriptMarkdownInput {
 
 export function buildTranscriptMarkdown(input: BuildTranscriptMarkdownInput): string {
   const lines: string[] = [];
-  lines.push(`# ${input.title || 'Cuộc họp'}`);
+  lines.push(`# ${input.title || 'Meeting'}`);
   lines.push('');
-  lines.push(`- Bắt đầu: ${input.startedAt}`);
-  lines.push(`- Thời lượng: ${formatTimestamp(input.durationSec)}`);
-  lines.push(`- Ngôn ngữ: ${input.languageCode}`);
-  lines.push(`- Nhà cung cấp: ${input.provider}`);
+  lines.push(`- Started: ${input.startedAt}`);
+  lines.push(`- Duration: ${formatTimestamp(input.durationSec)}`);
+  lines.push(`- Language: ${input.languageCode}`);
+  lines.push(`- Provider: ${input.provider}`);
   lines.push('');
 
   for (const segment of input.segments) {

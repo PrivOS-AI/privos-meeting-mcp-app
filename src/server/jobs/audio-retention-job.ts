@@ -1,6 +1,6 @@
 /**
  * Retention sweep, single source of configuration = `app_settings` (never an
- * env var — plan.md § job dọn dẹp: "Không còn env MEETING_AUDIO_RETENTION_DAYS"):
+ * env var — plan.md § cleanup job: "no more MEETING_AUDIO_RETENTION_DAYS env var"):
  *
  *  1. Kept audio past `autoDeleteAudioDays` (default 90, `0` = disabled): a
  *     `summarized` meeting with `keepAudio` whose `endedAt` is old enough and
@@ -13,8 +13,8 @@
  *     still in the meeting's folder gets deleted (best-effort per file).
  *  3. `pendingEmbedding` left over on a `meeting_speakers` row whose meeting
  *     ended 30+ days ago and was never confirmed via `speaker_resolve` — the
- *     deferred item from phase-04's risk table ("`meeting_bootstrap` xoá
- *     `pendingEmbedding` cũ hơn 30 ngày"). The row keeps its "Người nói N"
+ *     deferred item from phase-04's risk table ("`meeting_bootstrap` clears
+ *     `pendingEmbedding` older than 30 days"). The row keeps its "Speaker N"
  *     label; only the pending biometric ciphertext is cleared.
  *
  * Runs at boot and every 6h across every room in the node-local known-rooms
@@ -65,7 +65,7 @@ async function purgeKeptAudio(hub: RoomBoundHubClient, roomId: string, days: num
       await db.update('meetings', 'room', meeting._id, { audioDeletedAt: new Date().toISOString() });
       deleted++;
     } catch (error) {
-      console.warn('[audio-retention-job] xoá audio thất bại:', meeting._id, error instanceof Error ? error.message : error);
+      console.warn('[audio-retention-job] failed to delete audio:', meeting._id, error instanceof Error ? error.message : error);
     }
   }
   return deleted;
@@ -91,7 +91,7 @@ async function purgeInterruptedParts(hub: RoomBoundHubClient, roomId: string, da
       if (!file.name.startsWith('audio.part-')) continue;
       await deleteRoomFile(hub, file._id)
         .then(() => deleted++)
-        .catch((error) => console.warn('[audio-retention-job] xoá part mồ côi thất bại:', file._id, error instanceof Error ? error.message : error));
+        .catch((error) => console.warn('[audio-retention-job] failed to delete orphaned part:', file._id, error instanceof Error ? error.message : error));
     }
   }
   return deleted;
@@ -116,7 +116,7 @@ async function purgeStalePendingEmbeddings(roomId: string): Promise<number> {
       await db
         .update('meeting_speakers', 'room', row._id, { pendingEmbedding: '' })
         .then(() => cleared++)
-        .catch((error) => console.warn('[audio-retention-job] xoá pendingEmbedding thất bại:', row._id, error instanceof Error ? error.message : error));
+        .catch((error) => console.warn('[audio-retention-job] failed to clear pendingEmbedding:', row._id, error instanceof Error ? error.message : error));
     }
   }
   return cleared;
@@ -133,7 +133,7 @@ export async function purgeExpiredAudio(hub: RoomBoundHubClient, roomId: string)
   const audioDeleted = await purgeKeptAudio(hub, roomId, autoDeleteAudioDays);
   const orphanPartsDeleted = await purgeInterruptedParts(hub, roomId, interruptedPartsRetentionDays);
   const pendingEmbeddingsCleared = await purgeStalePendingEmbeddings(roomId).catch((error) => {
-    console.warn('[audio-retention-job] purgeStalePendingEmbeddings thất bại:', roomId, error instanceof Error ? error.message : error);
+    console.warn('[audio-retention-job] purgeStalePendingEmbeddings failed:', roomId, error instanceof Error ? error.message : error);
     return 0;
   });
 
@@ -144,7 +144,7 @@ async function sweepAllKnownRooms(hub: RoomBoundHubClient): Promise<void> {
   const knownRooms = await readKnownRooms();
   for (const roomId of knownRooms) {
     await purgeExpiredAudio(hub, roomId).catch((error) => {
-      console.warn('[audio-retention-job] room sweep thất bại:', roomId, error instanceof Error ? error.message : error);
+      console.warn('[audio-retention-job] room sweep failed:', roomId, error instanceof Error ? error.message : error);
     });
   }
 }
@@ -152,11 +152,11 @@ async function sweepAllKnownRooms(hub: RoomBoundHubClient): Promise<void> {
 /** Runs the sweep immediately (boot) then every 6h across `knownRooms`. Returns a stop function for graceful shutdown. */
 export function startAudioRetention(hub: RoomBoundHubClient): () => void {
   void sweepAllKnownRooms(hub).catch((error) => {
-    console.warn('[audio-retention-job] boot sweep thất bại:', error instanceof Error ? error.message : error);
+    console.warn('[audio-retention-job] boot sweep failed:', error instanceof Error ? error.message : error);
   });
   const timer = setInterval(() => {
     void sweepAllKnownRooms(hub).catch((error) => {
-      console.warn('[audio-retention-job] interval sweep thất bại:', error instanceof Error ? error.message : error);
+      console.warn('[audio-retention-job] interval sweep failed:', error instanceof Error ? error.message : error);
     });
   }, SIX_HOURS_MS);
   timer.unref();

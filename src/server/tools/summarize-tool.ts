@@ -1,7 +1,7 @@
 /**
  * `meeting_summarize {roomId, meetingId}` — re-runs ONLY the summarize (+
  * bundled translate) step from the already-written `transcript.json`,
- * without re-transcribing/re-embedding. Backs the UI's "Tạo lại tóm tắt"
+ * without re-transcribing/re-embedding. Backs the UI's "Regenerate summary"
  * button — most useful right after Hub AI failed during the original job
  * (`meetings.summaryError` set, transcript intact) or after speakers were
  * renamed via `speaker_resolve` and the user wants the summary to use the
@@ -39,8 +39,8 @@ function isTranscriptJson(value: unknown): value is TranscriptJson {
 
 export const summarizeTool: AppTool = {
   name: 'meeting_summarize',
-  title: 'Tóm tắt lại cuộc họp',
-  description: 'Chạy lại riêng bước tóm tắt bằng Hub AI từ transcript đã lưu, không xử lý lại toàn bộ.',
+  title: 'Re-summarize meeting',
+  description: 'Re-run only the summary step with Hub AI from the saved transcript, without reprocessing everything.',
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId'],
@@ -50,15 +50,15 @@ export const summarizeTool: AppTool = {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId và meetingId là bắt buộc.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
 
     const db = new AppDbBotClient(roomId);
     const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
     if (!meeting.transcriptJsonFileId || typeof meeting.transcriptJsonFileId !== 'string') {
-      throw new AppError('Cuộc họp chưa có transcript để tóm tắt.');
+      throw new AppError('Meeting has no transcript to summarize.');
     }
     const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
-    if (!folderId) throw new AppError('Cuộc họp chưa có thư mục lưu trữ.');
+    if (!folderId) throw new AppError('Meeting has no storage folder yet.');
 
     const readable = await fetchFileReadable(runtime.agentBotHub, meeting.transcriptJsonFileId);
     const raw = await streamToText(readable);
@@ -66,10 +66,10 @@ export const summarizeTool: AppTool = {
     try {
       transcriptDoc = JSON.parse(raw);
     } catch {
-      throw new AppError('Không đọc được transcript.json — tệp không hợp lệ.');
+      throw new AppError('Could not read transcript.json — invalid file.');
     }
     if (!isTranscriptJson(transcriptDoc)) {
-      throw new AppError('transcript.json không đúng định dạng mong đợi.');
+      throw new AppError('transcript.json is not in the expected format.');
     }
 
     // Prefer the CURRENT `meeting_speakers` display names (may have been corrected by `speaker_resolve` since the
@@ -116,8 +116,8 @@ export const summarizeTool: AppTool = {
     }
 
     if (!summarized) {
-      await upsertMeeting(db, meetingId, { summaryError: (summaryError ?? 'Tóm tắt thất bại.').slice(0, 4000) });
-      throw new AppError(summaryError ?? 'Tóm tắt bằng Hub AI thất bại.');
+      await upsertMeeting(db, meetingId, { summaryError: (summaryError ?? 'Summary failed.').slice(0, 4000) });
+      throw new AppError(summaryError ?? 'Summarizing with Hub AI failed.');
     }
 
     const finalSegments = summarized.translatedSegments;

@@ -1,5 +1,5 @@
 /**
- * Screen 1f — "Đang xử lý": polls `meeting_status` every 3s while the
+ * Screen 1f — "Processing": polls `meeting_status` every 3s while the
  * background job concats parts, transcribes, segments and writes the
  * transcript. The 8 steps mirror `JobStep` in `src/server/jobs/job-repository.ts`
  * 1:1 so this screen never silently drifts from the backend's step enum.
@@ -20,7 +20,7 @@ import { useRecordingState } from '../stores/recording-store.js';
 
 export interface ProcessingScreenProps {
   onDone(): void;
-  /** Phase-07: lets "Xem chi tiết" jump straight to the meeting detail screen instead of History. */
+  /** Phase-07: lets "View details" jump straight to the meeting detail screen instead of History. */
   onOpenMeeting(meetingId: string): void;
 }
 
@@ -51,7 +51,7 @@ interface MeetingStatusResult {
   stale: boolean;
   provider?: string;
   error?: string;
-  // P4: present once the job completes — drives the "Xác nhận người nói" modal below.
+  // P4: present once the job completes — drives the "Confirm speaker" modal below.
   result?: { speakers?: JobResultSpeakerDto[] };
 }
 
@@ -80,7 +80,7 @@ export function ProcessingScreen({ onDone, onOpenMeeting }: ProcessingScreenProp
   const [resolveModalDismissed, setResolveModalDismissed] = useState(false);
 
   // Phase 6/7: once the job completes, load the finished meeting record + action items and auto-open the
-  // "Save to Files" confirmation once (dismissible) — phase-06 § Implementation Steps 12: "kết thúc → mở save-to-files-modal".
+  // "Save to Files" confirmation once (dismissible) — phase-06 § Implementation Steps 12: "finishes → opens save-to-files-modal".
   const [completedMeeting, setCompletedMeeting] = useState<MeetingReadModel | null>(null);
   const [completedActionItems, setCompletedActionItems] = useState<ActionItemRecord[]>([]);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -138,7 +138,7 @@ export function ProcessingScreen({ onDone, onOpenMeeting }: ProcessingScreenProp
   const showRetry = status?.status === 'failed' || status?.stale === true;
 
   // P4: job `completed` with any `resolved:false` speaker -> open the modal
-  // right away (plan.md § Implementation Steps 11). Dismissible ("Để sau")
+  // right away (plan.md § Implementation Steps 11). Dismissible ("Later")
   // without blocking the user from moving on — the numbered placeholder
   // stays until they confirm later via Settings/meeting detail (P7).
   const unresolvedSpeakers: UnresolvedSpeaker[] = (status?.result?.speakers ?? [])

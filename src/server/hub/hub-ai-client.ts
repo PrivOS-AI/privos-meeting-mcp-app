@@ -1,6 +1,6 @@
 /**
  * Hub AI (Sandbox agent) client — the ONLY summarization/translation backend
- * this app calls (QĐ-07). No third-party LLM key: the same installation-bot
+ * this app calls (D-07). No third-party LLM key: the same installation-bot
  * credential already used for `mcpapp.db.*` also carries `agents.sandbox.*`,
  * so this reuses `ToolRuntime.agentBotHub` (`RoomBoundHubClient`) instead of a
  * second transport.
@@ -72,10 +72,10 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function validateGenerateInput(input: HubAiGenerateInput): void {
   if (!input.prompt || input.prompt.length >= PROMPT_LIMIT) {
-    throw new AppError('Nội dung gửi Hub AI trống hoặc vượt quá giới hạn cho phép.');
+    throw new AppError('Content sent to Hub AI is empty or exceeds the allowed limit.');
   }
   if (input.systemContext && input.systemContext.length >= SYSTEM_LIMIT) {
-    throw new AppError('Ngữ cảnh hệ thống gửi Hub AI vượt quá giới hạn cho phép.');
+    throw new AppError('System context sent to Hub AI exceeds the allowed limit.');
   }
 }
 
@@ -108,16 +108,16 @@ export async function generateWithHubAi(hub: RoomBoundHubClient, input: HubAiGen
       }),
     });
   } catch {
-    throw new AppError('Không gọi được Hub AI — vui lòng thử lại sau.');
+    throw new AppError('Could not call Hub AI — please try again later.');
   }
 
   const parsed = await readJsonBody(response);
   if (!response.ok) {
     const reason = typeof parsed.error === 'string' ? parsed.error : `HTTP ${response.status}`;
-    throw new AppError(`Hub AI trả lỗi: ${reason}`);
+    throw new AppError(`Hub AI returned an error: ${reason}`);
   }
   if (typeof parsed.text !== 'string') {
-    throw new AppError('Hub AI trả về dữ liệu không hợp lệ.');
+    throw new AppError('Hub AI returned invalid data.');
   }
   return { text: parsed.text, source: typeof parsed.source === 'string' ? parsed.source : 'unknown' };
 }
@@ -151,7 +151,7 @@ function extractAttemptError(parsed: Record<string, unknown>): string | undefine
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      reject(new AppError('Yêu cầu Hub AI đã bị huỷ.'));
+      reject(new AppError('The Hub AI request was cancelled.'));
       return;
     }
     const timer = setTimeout(resolve, ms);
@@ -159,7 +159,7 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       'abort',
       () => {
         clearTimeout(timer);
-        reject(new AppError('Yêu cầu Hub AI đã bị huỷ.'));
+        reject(new AppError('The Hub AI request was cancelled.'));
       },
       { once: true },
     );
@@ -197,17 +197,17 @@ export async function generateAsyncWithHubAi(
       }),
     });
   } catch {
-    throw new AppError('Không gọi được Hub AI (generate-async) — vui lòng thử lại sau.');
+    throw new AppError('Could not call Hub AI (generate-async) — please try again later.');
   }
 
   const startBody = await readJsonBody(startResponse);
   if (!startResponse.ok) {
     const reason = typeof startBody.error === 'string' ? startBody.error : `HTTP ${startResponse.status}`;
-    throw new AppError(`Hub AI trả lỗi khi khởi tạo: ${reason}`);
+    throw new AppError(`Hub AI returned an error during initialization: ${reason}`);
   }
   const attemptId = typeof startBody.attemptId === 'string' ? startBody.attemptId : typeof startBody.id === 'string' ? startBody.id : undefined;
   if (!attemptId) {
-    throw new AppError('Hub AI không trả về attemptId.');
+    throw new AppError('Hub AI did not return an attemptId.');
   }
 
   let backoffMs = POLL_START_MS;
@@ -227,28 +227,28 @@ export async function generateAsyncWithHubAi(
         },
       );
     } catch {
-      throw new AppError('Không kiểm tra được trạng thái Hub AI — vui lòng thử lại sau.');
+      throw new AppError('Could not check Hub AI status — please try again later.');
     }
 
     const pollBody = await readJsonBody(pollResponse);
     if (!pollResponse.ok) {
       const reason = typeof pollBody.error === 'string' ? pollBody.error : `HTTP ${pollResponse.status}`;
-      throw new AppError(`Hub AI trả lỗi khi kiểm tra tiến độ: ${reason}`);
+      throw new AppError(`Hub AI returned an error while checking progress: ${reason}`);
     }
 
     const status = extractAttemptStatus(pollBody);
     if (FAILURE_STATES.has(status)) {
-      throw new AppError(`Hub AI xử lý thất bại: ${extractAttemptError(pollBody) ?? status}`);
+      throw new AppError(`Hub AI processing failed: ${extractAttemptError(pollBody) ?? status}`);
     }
     if (SUCCESS_STATES.has(status)) {
       const text = extractAttemptText(pollBody);
       if (typeof text !== 'string') {
-        throw new AppError('Hub AI trả về dữ liệu không hợp lệ.');
+        throw new AppError('Hub AI returned invalid data.');
       }
       return { text, source: typeof pollBody.source === 'string' ? pollBody.source : 'unknown' };
     }
     // queued/processing/unknown — keep polling.
   }
 
-  throw new AppError('Hub AI xử lý quá lâu — vui lòng thử lại sau.');
+  throw new AppError('Hub AI processing took too long — please try again later.');
 }

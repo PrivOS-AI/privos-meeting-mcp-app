@@ -1,6 +1,6 @@
 /**
- * Meeting status badge (phase-07 § Requirements: "Summarized xanh / Processing
- * cam / Failed đỏ / Private xám"). `meetings.status` values are
+ * Meeting status badge (phase-07 § Requirements: "Summarized green / Processing
+ * orange / Failed red / Private gray"). `meetings.status` values are
  * `recording|uploading|processing|failed|interrupted|summarized`
  * (`shared/app-db-schema.ts`); anything not explicitly green/orange/red falls
  * back to the neutral "Private" tone — matching the design's 4th badge state

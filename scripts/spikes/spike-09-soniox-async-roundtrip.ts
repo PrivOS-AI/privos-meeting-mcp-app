@@ -1,7 +1,7 @@
 /**
  * SPIKE: Soniox async round-trip webm 60s + 2h
  *
- * POST /v1/files -> /v1/transcriptions -> poll completed. Lưu JSON output thô, tên trường thật, thời gian quay vòng; thử file ~2h để đo giới hạn kích thước/thời lượng.
+ * POST /v1/files -> /v1/transcriptions -> poll completed. Save the raw JSON output, actual field names, round-trip time; try a ~2h file to measure the size/duration limit.
  *
  * This is a foundational Phase-1 spike (see plan.md § Spikes). It CANNOT run
  * without live credentials / a live PrivOS Hub, so offline it only verifies its

@@ -1,6 +1,6 @@
 /**
  * Lazy, process-wide singleton around `sherpa-onnx-node`'s
- * `SpeakerEmbeddingExtractor` (QĐ-02). Both the P3/P4 post-meeting job and
+ * `SpeakerEmbeddingExtractor` (D-02). Both the P3/P4 post-meeting job and
  * the P5 live chunk worker call `computeEmbedding` — the model loads AT MOST
  * ONCE per process no matter how many callers/how many times it's invoked.
  *
@@ -42,8 +42,8 @@ let singleton: Promise<ExtractorHandle> | null = null;
 async function loadExtractor(): Promise<ExtractorHandle> {
   if (!existsSync(env.speakerModelPath)) {
     throw new AppError(
-      `Không tìm thấy model nhận diện giọng nói tại "${env.speakerModelPath}" (biến môi trường SPEAKER_MODEL_PATH). `
-        + 'Model ONNX được tải lúc triển khai (xem docs/deployment-guide.md), không nằm trong mã nguồn.',
+      `Speaker recognition model not found at "${env.speakerModelPath}" (env var SPEAKER_MODEL_PATH). `
+        + 'The ONNX model is fetched at deploy time (see docs/deployment-guide.md), it is not part of the source code.',
     );
   }
 
@@ -58,13 +58,13 @@ async function loadExtractor(): Promise<ExtractorHandle> {
     };
     sherpaModule = imported.default;
   } catch (error) {
-    throw new AppError(`Không nạp được sherpa-onnx-node: ${error instanceof Error ? error.message : String(error)}`);
+    throw new AppError(`Could not load sherpa-onnx-node: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   try {
     return new sherpaModule.SpeakerEmbeddingExtractor({ model: env.speakerModelPath, numThreads: NUM_THREADS, provider: PROVIDER });
   } catch (error) {
-    throw new AppError(`Không khởi tạo được model nhận diện giọng nói: ${error instanceof Error ? error.message : String(error)}`);
+    throw new AppError(`Could not initialize the speaker recognition model: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -92,7 +92,7 @@ export async function computeEmbedding(samples: Float32Array, sampleRate = 16000
   stream.acceptWaveform({ samples, sampleRate });
   stream.inputFinished();
   if (!extractor.isReady(stream)) {
-    throw new AppError('Đoạn âm thanh quá ngắn để tính embedding giọng nói.');
+    throw new AppError('Audio segment is too short to compute a speaker embedding.');
   }
   return extractor.compute(stream, true);
 }

@@ -62,7 +62,7 @@ describe('meeting_chunk_ready', () => {
   });
 
   it('rejects a caller who is not the meeting owner, without enqueueing', async () => {
-    await expect(chunkReadyTool.execute({ ...baseArgs, segments: [] }, context('user-2'), runtime)).rejects.toThrow(/chủ cuộc họp/);
+    await expect(chunkReadyTool.execute({ ...baseArgs, segments: [] }, context('user-2'), runtime)).rejects.toThrow(/meeting owner/);
     expect(enqueueChunk).not.toHaveBeenCalled();
   });
 
@@ -79,7 +79,7 @@ describe('meeting_chunk_ready', () => {
   it('rejects a total claimed duration far beyond the part (anti-abuse bound)', async () => {
     await expect(
       chunkReadyTool.execute({ ...baseArgs, segments: [{ speaker: 's0:1', startMs: 0, endMs: 300_000, final: true }] }, context('user-1'), runtime),
-    ).rejects.toThrow(/vượt quá/);
+    ).rejects.toThrow(/exceeds/);
     expect(enqueueChunk).not.toHaveBeenCalled();
   });
 
@@ -96,13 +96,13 @@ describe('meeting_chunk_ready', () => {
         context('user-1'),
         runtime,
       ),
-    ).rejects.toThrow(/chồng lấn/);
+    ).rejects.toThrow(/overlap/);
     expect(enqueueChunk).not.toHaveBeenCalled();
   });
 
   it('rejects when the meeting is no longer recording or uploading', async () => {
     store.meetings[0].status = 'summarized';
-    await expect(chunkReadyTool.execute({ ...baseArgs, segments: [] }, context('user-1'), runtime)).rejects.toThrow(/không ở trạng thái/);
+    await expect(chunkReadyTool.execute({ ...baseArgs, segments: [] }, context('user-1'), runtime)).rejects.toThrow(/not in a state/);
     expect(enqueueChunk).not.toHaveBeenCalled();
   });
 

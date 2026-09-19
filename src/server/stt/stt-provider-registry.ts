@@ -1,7 +1,7 @@
 /**
  * Provider selection. The active realtime/async vendor is read from
  * `app_settings` (workspace admin choice) with the env default as fallback
- * (QĐ-15). Switching provider is a Settings change, never a code change — all
+ * (D-15). Switching provider is a Settings change, never a code change — all
  * four shells are always wired in.
  */
 import type { AppDbBotClient } from '../hub/app-db-bot-client.js';

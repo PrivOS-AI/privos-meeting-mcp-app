@@ -6,7 +6,7 @@ import { planEnrolment } from './segment-picker.js';
 function seg(overrides: Partial<Segment> & Pick<Segment, 'speakerId' | 'startSec' | 'endSec'>): Segment {
   return {
     id: `seg-${overrides.startSec}`,
-    text: overrides.text ?? 'xin chào mọi người hôm nay',
+    text: overrides.text ?? 'hello everyone welcome today',
     lang: 'vi',
     tokenCount: 5,
     avgConfidence: 0.9,
@@ -36,8 +36,8 @@ describe('planEnrolment', () => {
 
   it('filters out segments with too few words even if long enough', () => {
     const segments: Segment[] = [
-      seg({ speakerId: 'spk1', startSec: 0, endSec: 10, text: 'ừ' }),
-      seg({ speakerId: 'spk1', startSec: 20, endSec: 40, text: 'đây là một câu nói đầy đủ có nhiều từ' }),
+      seg({ speakerId: 'spk1', startSec: 0, endSec: 10, text: 'um' }),
+      seg({ speakerId: 'spk1', startSec: 20, endSec: 40, text: 'this is a complete sentence with many words' }),
     ];
     const [plan] = planEnrolment(segments, { minSegSec: 2, targetSec: 15 });
     expect(plan.ranges).toEqual([{ startSec: 20, endSec: 40 }]);

@@ -1,5 +1,5 @@
 /**
- * The meeting clock IS the recorder's clock (QĐ-17). `recorderEpochMs` is
+ * The meeting clock IS the recorder's clock (D-17). `recorderEpochMs` is
  * captured once, right before `MediaRecorder.start()`; every realtime
  * session's tokens are converted onto that single timeline via the offset
  * captured at the SDK's "stream actually started" callback — never at mint

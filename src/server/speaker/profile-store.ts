@@ -1,6 +1,6 @@
 /**
  * CRUD over the GLOBAL `speaker_profiles` collection (App DB `scope:'global'`,
- * addressed room-lessly per QĐ-05 — never construct `AppDbBotClient` with a
+ * addressed room-lessly per D-05 — never construct `AppDbBotClient` with a
  * `roomId` for this collection). Every embedding/centroid round-trips through
  * `voiceprint-crypto.ts` — this module never holds a plaintext vector longer
  * than the current call, and never writes one anywhere except inside a sealed
@@ -236,7 +236,7 @@ export interface EnrolInput {
 export async function enrolEmbedding(db: AppDbBotClient, profileId: string, input: EnrolInput): Promise<void> {
   await withProfileLock(profileId, async () => {
     const row = await db.getById(COLLECTION, SCOPE, profileId);
-    if (!row) throw new Error(`enrolEmbedding: profile ${profileId} không còn tồn tại.`);
+    if (!row) throw new Error(`enrolEmbedding: profile ${profileId} no longer exists.`);
     const current = rowToProfile(row);
     const createdAt = new Date().toISOString();
 
@@ -312,7 +312,7 @@ export async function deleteProfile(db: AppDbBotClient, profileId: string, known
         await roomDb.update('meeting_speakers', 'room', row._id, { profileId: '', pendingEmbedding: '' });
       }
     } catch (error) {
-      console.warn('[profile-store] xoá liên kết profile thất bại ở phòng', roomId, error instanceof Error ? error.message : error);
+      console.warn('[profile-store] failed to clear profile link in room', roomId, error instanceof Error ? error.message : error);
     }
   }
   await db.delete(COLLECTION, SCOPE, profileId);

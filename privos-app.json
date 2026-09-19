@@ -12,7 +12,7 @@
     "url": "https://privos.ai"
   },
   "homepage": "https://privos.ai",
-  "repository": "https://github.com/techcomthanh/meeting-agent",
+  "repository": "https://github.com/privos-ai/privos-meeting-mcp-app",
   "port": 3012,
   "stateless": false,
   "capabilities": {

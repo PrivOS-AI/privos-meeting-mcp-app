@@ -36,7 +36,7 @@ function assertVerifiedActor(context: ToolCallContext): void {
   const verified = Boolean(context.actor) && context.identityState === 'verified';
   if (verified) return;
   if (isDevelopmentRuntime() && env.allowUnverifiedActor) return;
-  throw new AppError('Yêu cầu bị từ chối: cần một người dùng đã xác minh danh tính.');
+  throw new AppError('Request denied: a verified user identity is required.');
 }
 
 export function createMcpHandler(ctx: ServeAppHandlerContext): AppMcpHandler {

@@ -1,7 +1,7 @@
 /**
  * Integration test for `runMeetingJob` (plan.md test matrix: "meeting-queue +
- * meeting-job với Soniox/Hub AI giả, ffmpeg thật trên wav mẫu 30s; timeout
- * abort thật sự kill child"). REAL: `decodeToWav16k` spawns the real
+ * meeting-job with a fake Soniox/Hub AI, real ffmpeg on a 30s sample wav;
+ * timeout abort actually kills the child"). REAL: `decodeToWav16k` spawns the real
  * `@ffmpeg-installer/ffmpeg` binary against a committed 30s wav fixture
  * (`__fixtures__/sample-30s.wav` — two 15s tones, no real speech; STT/speaker
  * content is faked, only the ffmpeg decode itself is real). FAKE: the async
@@ -37,7 +37,7 @@ vi.mock('../speaker/embedding-extractor.js', () => ({
 
 vi.mock('../summary/summarizer.js', () => ({
   summarizeTranscript: vi.fn(async () => ({
-    summary: 'Tóm tắt giả cho test tích hợp.',
+    summary: 'Fake summary for the integration test.',
     decisions: [],
     key_topics: ['test'],
     action_items: [],
@@ -119,7 +119,7 @@ function freshJob(overrides: Partial<JobRecord> = {}): JobRecord {
     partFileIds: ['part-0'],
     sttProvider: 'soniox-async',
     language: 'vi',
-    title: 'Cuộc họp test tích hợp',
+    title: 'Integration test meeting',
     keepAudio: true,
     status: 'queued',
     step: null,
@@ -180,14 +180,14 @@ describe('runMeetingJob — integration (real ffmpeg decode)', () => {
   });
 
   it('a job whose transcribe step fails is recorded failed(...) without uploading a half-finished result', async () => {
-    fakeAsyncProvider.transcribeFile.mockRejectedValueOnce(new Error('Soniox giả lập lỗi'));
+    fakeAsyncProvider.transcribeFile.mockRejectedValueOnce(new Error('Soniox mock failure'));
     const hub = buildJobHub(fixtureBytes);
     const parts = [{ fileId: 'part-0', seq: 0, name: `audio.part-0000-${DIGEST}.webm` }];
     const job = freshJob();
 
     await expect(
       runMeetingJob({ job, roomId: ROOM_ID, folderId: FOLDER_ID, parts, agentBotHub: hub, signal: new AbortController().signal }),
-    ).rejects.toThrow(/Soniox giả lập lỗi/);
+    ).rejects.toThrow(/Soniox mock failure/);
 
     const jobRow = store.processing_jobs.find((r) => r._id === 'job-row-1');
     expect(jobRow?.status).toBe('failed');
@@ -205,7 +205,7 @@ describe('decodeToWav16k — real ffmpeg abort kills the child process', () => {
     try {
       const promise = decodeToWav16k(FIXTURE_PATH, outPath, controller.signal);
       controller.abort();
-      await expect(promise).rejects.toThrow(/huỷ/);
+      await expect(promise).rejects.toThrow(/cancelled/i);
     } finally {
       await rm(outPath, { force: true });
     }

@@ -2,7 +2,7 @@
  * `meeting_translate {roomId, meetingId, target, segments}` — the Hub AI
  * translation path used when the live realtime provider has no native
  * bilingual output (ElevenLabs), or when native `translation:two_way` turns
- * out to conflict with diarization (QĐ-12/QĐ-18). The client batches finalized
+ * out to conflict with diarization (D-12/D-18). The client batches finalized
  * caption lines every 3-5s (`translate-buffer.ts`); this tool rate-limits per
  * meeting and forwards a single Hub AI call for the whole batch.
  */
@@ -68,15 +68,15 @@ function parseTranslationResponse(text: string, requested: InputSegment[]): Tran
   const start = text.indexOf('[');
   const end = text.lastIndexOf(']');
   if (start === -1 || end === -1 || end < start) {
-    throw new AppError('Hub AI trả về dữ liệu dịch không hợp lệ.');
+    throw new AppError('Hub AI returned invalid translation data.');
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(text.slice(start, end + 1));
   } catch {
-    throw new AppError('Hub AI trả về dữ liệu dịch không hợp lệ.');
+    throw new AppError('Hub AI returned invalid translation data.');
   }
-  if (!Array.isArray(parsed)) throw new AppError('Hub AI trả về dữ liệu dịch không hợp lệ.');
+  if (!Array.isArray(parsed)) throw new AppError('Hub AI returned invalid translation data.');
 
   const requestedIds = new Set(requested.map((s) => s.id));
   const out: TranslatedSegment[] = [];
@@ -94,8 +94,8 @@ function parseTranslationResponse(text: string, requested: InputSegment[]): Tran
 
 export const translateTool: AppTool = {
   name: 'meeting_translate',
-  title: 'Dịch phụ đề trực tiếp',
-  description: 'Dịch một lô dòng phụ đề đã chốt bằng Hub AI khi nhà cung cấp STT không dịch song ngữ trực tiếp.',
+  title: 'Translate live captions',
+  description: "Translate a batch of finalized caption lines with Hub AI when the STT provider doesn't translate bilingually in realtime.",
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId', 'target', 'segments'],
@@ -111,28 +111,28 @@ export const translateTool: AppTool = {
     const meetingId = asString(args.meetingId);
     const target = asString(args.target);
     if (!roomId || !meetingId || !TARGETS.has(target)) {
-      throw new AppError('roomId, meetingId và target (vi|en) là bắt buộc.');
+      throw new AppError('roomId, meetingId, and target (vi|en) are required.');
     }
 
     const actor = context.actor;
     if (!actor || actor.roomId !== roomId) {
-      throw new AppError('Yêu cầu không hợp lệ cho phòng này.');
+      throw new AppError('Invalid request for this room.');
     }
 
     const segmentsRaw = Array.isArray(args.segments) ? args.segments : [];
     if (segmentsRaw.length === 0) return { translations: [] };
     if (segmentsRaw.length > MAX_SEGMENTS_PER_CALL) {
-      throw new AppError('Quá nhiều dòng trong một lượt dịch.');
+      throw new AppError('Too many lines in one translation batch.');
     }
 
     const db = new AppDbBotClient(roomId);
     const meeting = await db.getById('meetings', 'room', meetingId);
     if (!meeting || meeting.roomId !== roomId) {
-      throw new AppError('Không tìm thấy cuộc họp trong phòng này.');
+      throw new AppError('Meeting not found in this room.');
     }
 
     if (!checkRateLimit('meeting_translate', meetingId, TRANSLATE_LIMIT_PER_MINUTE, 60_000)) {
-      throw new AppError('Dịch trực tiếp đang bị giới hạn tần suất cho cuộc họp này. Vui lòng thử lại sau.');
+      throw new AppError('Live translation is rate-limited for this meeting. Please try again later.');
     }
 
     const segments = segmentsRaw.map(asInputSegment).filter((s): s is InputSegment => s !== null);

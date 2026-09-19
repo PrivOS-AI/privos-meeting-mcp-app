@@ -1,5 +1,5 @@
 /**
- * Shown when `!capabilities.speakerLabels` (ElevenLabs realtime, QĐ-18):
+ * Shown when `!capabilities.speakerLabels` (ElevenLabs realtime, D-18):
  * captions stay unlabeled during the meeting; real names/badges only arrive
  * from the post-meeting pass.
  */

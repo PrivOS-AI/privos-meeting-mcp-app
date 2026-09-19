@@ -1,7 +1,7 @@
 /**
- * SPIKE: Ngưỡng base64 của app.uploadFile qua bridge
+ * SPIKE: app.uploadFile base64 ceiling over the bridge
  *
- * Đo kích thước base64 lớn nhất truyền được qua bridge uploadFile để chốt độ dài timeslice (~4-6MB) của MediaRecorder ở P2.
+ * Measure the largest base64 payload that can pass through the uploadFile bridge, to settle the MediaRecorder timeslice length (~4-6MB) in P2.
  *
  * This is a foundational Phase-1 spike (see plan.md § Spikes). It CANNOT run
  * without live credentials / a live PrivOS Hub, so offline it only verifies its
@@ -11,7 +11,7 @@
 const REQUIRED: string[] = [];
 
 function main(): void {
-  console.log('SPIKE: Ngưỡng base64 của app.uploadFile qua bridge');
+  console.log('SPIKE: app.uploadFile base64 ceiling over the bridge');
   const missing = REQUIRED.filter((k) => !process.env[k] || !process.env[k]!.trim());
   if (missing.length) {
     console.warn('Prerequisites missing (spike not run):', missing.join(', '));

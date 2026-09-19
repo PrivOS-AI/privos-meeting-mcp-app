@@ -1,8 +1,8 @@
 /**
  * Cheap, real "is this vendor account usable right now" probes — one call per
  * vendor, never a full transcription, never logs or returns the key itself
- * (plan.md § Tool trạng thái STT). Shared by all four provider `status()`
- * implementations so `meeting_stt_status`'s "Kiểm tra kết nối" reflects a real
+ * (plan.md § STT status tool). Shared by all four provider `status()`
+ * implementations so `meeting_stt_status`'s "Check connection" reflects a real
  * round trip instead of just "an env var is set".
  *
  * Soniox: mint a temporary key with a 10s TTL and let it expire unused — the

@@ -1,5 +1,5 @@
 /**
- * Settings › Speech recognition (plan.md § Settings item 2, QĐ-08): no API
+ * Settings › Speech recognition (plan.md § Settings item 2, D-08): no API
  * key input field, ever. Two admin-only selects (realtime/async provider)
  * write through `meeting_settings_set`; the status table comes straight from
  * `meeting_stt_status`, which itself decides how much detail to return based

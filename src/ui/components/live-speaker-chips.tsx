@@ -1,5 +1,5 @@
 /**
- * "Ai đang nói?" chip row on the live screen. One chip per REALTIME speaker
+ * "Who's speaking?" chip row on the live screen. One chip per REALTIME speaker
  * (Soniox `speaker` label) — so a chip appears from the first token, letting the
  * user name a speaker immediately. Clicking a chip opens `QuickAssignPopover`;
  * the chosen name is applied to every line of that speaker at once and the

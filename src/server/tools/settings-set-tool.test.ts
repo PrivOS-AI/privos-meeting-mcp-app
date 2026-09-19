@@ -33,17 +33,17 @@ describe('meeting_settings_set', () => {
   it('rejects a caller that is not bound to a room', async () => {
     const roomless = context();
     (roomless.actor as { roomId?: string }).roomId = undefined;
-    await expect(settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 0.5 }, roomless, {} as never)).rejects.toThrow(/thành viên của phòng/);
+    await expect(settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 0.5 }, roomless, {} as never)).rejects.toThrow(/member of this room/);
   });
 
   it('rejects an unsupported key even for an admin', async () => {
-    await expect(settingsSetTool.execute({ key: 'notARealKey', value: 1 }, context({ isAdmin: true }), {} as never)).rejects.toThrow(/không được hỗ trợ/);
+    await expect(settingsSetTool.execute({ key: 'notARealKey', value: 1 }, context({ isAdmin: true }), {} as never)).rejects.toThrow(/not supported/);
   });
 
   it('rejects an out-of-range threshold', async () => {
     await expect(
       settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 1.5 }, context({ isAdmin: true }), {} as never),
-    ).rejects.toThrow(/khoảng/);
+    ).rejects.toThrow(/range/);
   });
 
   it('lets an admin persist a valid setting into app_settings', async () => {

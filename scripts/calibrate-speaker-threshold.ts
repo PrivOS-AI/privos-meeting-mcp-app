@@ -59,7 +59,7 @@ function wavDurationSec(filePath: string): number {
 async function loadSamples(rootDir: string): Promise<Sample[]> {
   const people = readdirSync(rootDir, { withFileTypes: true }).filter((e) => e.isDirectory());
   if (people.length === 0) {
-    throw new Error(`Không tìm thấy thư mục người nói nào trong "${rootDir}" (kỳ vọng cấu trúc <dir>/<person>/<file>.wav).`);
+    throw new Error(`No speaker folders found in "${rootDir}" (expected structure <dir>/<person>/<file>.wav).`);
   }
 
   const samples: Sample[] = [];
@@ -70,7 +70,7 @@ async function loadSamples(rootDir: string): Promise<Sample[]> {
       const filePath = path.join(personDir, file);
       const durationSec = wavDurationSec(filePath);
       if (durationSec < 0.5) {
-        console.warn(`  bỏ qua "${filePath}" — quá ngắn (${durationSec.toFixed(2)}s).`);
+        console.warn(`  skipping "${filePath}" — too short (${durationSec.toFixed(2)}s).`);
         continue;
       }
       const pcm = await readWavPcm(filePath, 0, durationSec);
@@ -147,30 +147,30 @@ async function main(): Promise<void> {
   const sessionMode = args.includes('--session');
   const dir = args.find((a) => !a.startsWith('--'));
   if (!dir) {
-    console.error('Cách dùng: npm run calibrate:speaker -- <thư mục mẫu> [--session]');
+    console.error('Usage: npm run calibrate:speaker -- <sample-dir> [--session]');
     process.exitCode = 1;
     return;
   }
 
-  console.log(`Đang trích embedding từ "${dir}"...`);
+  console.log(`Extracting embeddings from "${dir}"...`);
   let samples: Sample[];
   try {
     samples = await loadSamples(path.resolve(dir));
   } catch (error) {
-    console.error('Lỗi:', error instanceof Error ? error.message : error);
+    console.error('Error:', error instanceof Error ? error.message : error);
     process.exitCode = 1;
     return;
   }
 
   const byPerson = new Map<string, number>();
   for (const s of samples) byPerson.set(s.person, (byPerson.get(s.person) ?? 0) + 1);
-  console.log(`\nĐã embed ${samples.length} mẫu từ ${byPerson.size} người:`, Object.fromEntries(byPerson));
+  console.log(`\nEmbedded ${samples.length} samples from ${byPerson.size} people:`, Object.fromEntries(byPerson));
 
   const { genuine, impostor } = pairwiseScores(samples);
-  console.log(`\nCặp cùng người (genuine): ${genuine.length} · Cặp khác người (impostor): ${impostor.length}\n`);
+  console.log(`\nSame-person pairs (genuine): ${genuine.length} · Different-person pairs (impostor): ${impostor.length}\n`);
 
   if (genuine.length === 0 || impostor.length === 0) {
-    console.error('Cần ít nhất 2 người và mỗi người ≥2 mẫu để tính FAR/FRR có ý nghĩa.');
+    console.error('Need at least 2 people with >=2 samples each for a meaningful FAR/FRR.');
     process.exitCode = 1;
     return;
   }
@@ -191,10 +191,10 @@ async function main(): Promise<void> {
     if (diff < best.diff) best = { threshold, far, frr, diff };
   }
 
-  console.log(`\nNgưỡng đề xuất (gần EER nhất): SPEAKER_MATCH_THRESHOLD=${best.threshold.toFixed(2)} (FAR=${best.far.toFixed(3)}, FRR=${best.frr.toFixed(3)})`);
+  console.log(`\nSuggested threshold (closest to EER): SPEAKER_MATCH_THRESHOLD=${best.threshold.toFixed(2)} (FAR=${best.far.toFixed(3)}, FRR=${best.frr.toFixed(3)})`);
 }
 
 main().catch((error: unknown) => {
-  console.error('calibrate-speaker-threshold thất bại:', error instanceof Error ? error.message : error);
+  console.error('calibrate-speaker-threshold failed:', error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });

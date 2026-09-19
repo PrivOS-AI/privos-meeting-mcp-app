@@ -1,6 +1,6 @@
 /**
- * Phase 6 "Tóm tắt" panel — narrative summary (`meetings.summaryText`) +
- * `key_topics` chips + copy + "Tạo lại tóm tắt" (re-runs `meeting_summarize`,
+ * Phase 6 "Summary" panel — narrative summary (`meetings.summaryText`) +
+ * `key_topics` chips + copy + "Regenerate summary" (re-runs `meeting_summarize`,
  * useful right after a Hub AI failure or after speakers were relabeled).
  * Decisions and action-item owner/due are NOT re-shown here: `meeting-job.ts`
  * only persists `payload.summary`/`payload.key_topics` onto `meetings` —

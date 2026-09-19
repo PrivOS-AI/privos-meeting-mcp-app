@@ -28,11 +28,11 @@ function ctx(overrides: Partial<ToolCallContext> = {}): ToolCallContext {
 
 describe('requireVerifiedActor', () => {
   it('rejects a missing actor', () => {
-    expect(() => requireVerifiedActor(ctx({ actor: undefined }))).toThrow(/xác minh/);
+    expect(() => requireVerifiedActor(ctx({ actor: undefined }))).toThrow(/verified/);
   });
 
   it('rejects when identityState is not verified', () => {
-    expect(() => requireVerifiedActor(ctx({ identityState: 'invalid' }))).toThrow(/xác minh/);
+    expect(() => requireVerifiedActor(ctx({ identityState: 'invalid' }))).toThrow(/verified/);
   });
 
   it('returns the actor when verified', () => {
@@ -48,23 +48,23 @@ describe('requireMeetingOwner', () => {
 
   it('rejects when the actor room does not match roomId', async () => {
     const db = new AppDbBotClient('room-1');
-    await expect(requireMeetingOwner(db, actor({ roomId: 'room-other' }), 'room-1', 'meeting-1')).rejects.toThrow(/không hợp lệ/);
+    await expect(requireMeetingOwner(db, actor({ roomId: 'room-other' }), 'room-1', 'meeting-1')).rejects.toThrow(/Invalid request/);
   });
 
   it('rejects a meeting that does not exist', async () => {
     const db = new AppDbBotClient('room-1');
-    await expect(requireMeetingOwner(db, actor(), 'room-1', 'missing')).rejects.toThrow(/Không tìm thấy/);
+    await expect(requireMeetingOwner(db, actor(), 'room-1', 'missing')).rejects.toThrow(/not found/);
   });
 
   it('rejects a meeting belonging to a different room', async () => {
     store.meetings = [{ _id: 'meeting-2', roomId: 'room-2', ownerUserId: 'user-1' }];
     const db = new AppDbBotClient('room-1');
-    await expect(requireMeetingOwner(db, actor(), 'room-1', 'meeting-2')).rejects.toThrow(/Không tìm thấy/);
+    await expect(requireMeetingOwner(db, actor(), 'room-1', 'meeting-2')).rejects.toThrow(/not found/);
   });
 
   it('rejects a caller who is not the meeting owner', async () => {
     const db = new AppDbBotClient('room-1');
-    await expect(requireMeetingOwner(db, actor({ userId: 'user-2' }), 'room-1', 'meeting-1')).rejects.toThrow(/chủ cuộc họp/);
+    await expect(requireMeetingOwner(db, actor({ userId: 'user-2' }), 'room-1', 'meeting-1')).rejects.toThrow(/meeting owner/);
   });
 
   it('returns the meeting row for the owner', async () => {
@@ -79,12 +79,12 @@ describe('assertFileInRoom', () => {
 
   it('rejects a missing file', async () => {
     vi.mocked(getFileMetadata).mockResolvedValue(null);
-    await expect(assertFileInRoom({} as never, 'f1', 'room-1')).rejects.toThrow(/Không tìm thấy/);
+    await expect(assertFileInRoom({} as never, 'f1', 'room-1')).rejects.toThrow(/not found/);
   });
 
   it('rejects a file that belongs to a different room', async () => {
     vi.mocked(getFileMetadata).mockResolvedValue({ _id: 'f1', name: 'x', channel_id: 'room-2', folder_id: null });
-    await expect(assertFileInRoom({} as never, 'f1', 'room-1')).rejects.toThrow(/Không tìm thấy/);
+    await expect(assertFileInRoom({} as never, 'f1', 'room-1')).rejects.toThrow(/not found/);
   });
 
   it('returns the metadata for a file that belongs to the room', async () => {

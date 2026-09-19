@@ -35,7 +35,7 @@ describe('assertStructuralSpans', () => {
 
   it('rejects more than MAX_SEGMENTS_PER_CHUNK turns', () => {
     const segments = Array.from({ length: MAX_SEGMENTS_PER_CHUNK + 1 }, (_, i) => ({ speaker: 's0:1', startMs: i, endMs: i + 1, final: true }));
-    expect(assertStructuralSpans(segments, 60_000)).toMatch(/Quá nhiều turn/);
+    expect(assertStructuralSpans(segments, 60_000)).toMatch(/Too many turns/);
   });
 
   it('rejects two overlapping turns of the same speaker', () => {
@@ -43,7 +43,7 @@ describe('assertStructuralSpans', () => {
       { speaker: 's0:1', startMs: 0, endMs: 20_000, final: true },
       { speaker: 's0:1', startMs: 10_000, endMs: 30_000, final: true },
     ];
-    expect(assertStructuralSpans(segments, 60_000)).toMatch(/chồng lấn/);
+    expect(assertStructuralSpans(segments, 60_000)).toMatch(/overlap/);
   });
 
   it('allows overlap between DIFFERENT speakers', () => {
@@ -56,7 +56,7 @@ describe('assertStructuralSpans', () => {
 
   it('rejects a total claimed duration far beyond durationMs', () => {
     const segments = [{ speaker: 's0:1', startMs: 0, endMs: 120_000, final: true }];
-    expect(assertStructuralSpans(segments, 60_000)).toMatch(/vượt quá/);
+    expect(assertStructuralSpans(segments, 60_000)).toMatch(/exceeds/);
   });
 });
 

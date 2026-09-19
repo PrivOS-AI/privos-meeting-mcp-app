@@ -25,7 +25,7 @@ describe('MeetingQueue', () => {
   it('startDraining rejects a brand-new enqueue with a clear message', async () => {
     const queue = new MeetingQueue(1);
     queue.startDraining();
-    await expect(queue.enqueue('m2', async () => undefined, 1000)).rejects.toThrow(/đang tắt/);
+    await expect(queue.enqueue('m2', async () => undefined, 1000)).rejects.toThrow(/shutting down/i);
   });
 
   it('startDraining does NOT affect a job already running for the same meetingId', async () => {

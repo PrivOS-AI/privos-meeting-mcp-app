@@ -1,6 +1,6 @@
 /**
- * Per-user, local-only Settings preferences (plan.md § Settings: "Cài đặt
- * riêng của người dùng (cỡ chữ Stage, mic ưu tiên) vẫn ở app.storage cục bộ")
+ * Per-user, local-only Settings preferences (plan.md § Settings: "User-specific
+ * settings (Stage font size, preferred mic) stay in local app.storage")
  * — anyone can change these, no `meeting_settings_set` admin gate, and they
  * live in `window.localStorage` the same way `i18n-provider.tsx` already
  * persists `uiLanguage` (kept in that provider, not duplicated here). Never

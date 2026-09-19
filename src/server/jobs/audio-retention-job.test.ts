@@ -98,14 +98,14 @@ describe('purgeExpiredAudio', () => {
     store.app_settings = [{ _id: 's1', key: 'room:room-1:autoDeleteAudioDays', valueJson: JSON.stringify(0) }];
     store.meetings = [{ _id: 'm3', roomId: 'room-1', status: 'summarized', endedAt: oldIso(31) }];
     store.meeting_speakers = [
-      { _id: 'ms1', meeting: 'm3', pendingEmbedding: 'sealed-ciphertext', displayName: 'Người nói 1' },
-      { _id: 'ms2', meeting: 'm3', pendingEmbedding: '', displayName: 'Đã xong' },
+      { _id: 'ms1', meeting: 'm3', pendingEmbedding: 'sealed-ciphertext', displayName: 'Speaker 1' },
+      { _id: 'ms2', meeting: 'm3', pendingEmbedding: '', displayName: 'Done' },
     ];
     const hub = buildHub();
     const result = await purgeExpiredAudio(hub, 'room-1');
     expect(result.pendingEmbeddingsCleared).toBe(1);
     expect(store.meeting_speakers.find((r) => r._id === 'ms1')?.pendingEmbedding).toBe('');
-    expect(store.meeting_speakers.find((r) => r._id === 'ms1')?.displayName).toBe('Người nói 1');
+    expect(store.meeting_speakers.find((r) => r._id === 'ms1')?.displayName).toBe('Speaker 1');
   });
 
   it('does not clear pendingEmbedding for a meeting that ended less than 30 days ago', async () => {

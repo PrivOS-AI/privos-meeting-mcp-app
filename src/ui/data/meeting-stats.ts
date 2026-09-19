@@ -18,7 +18,7 @@ export interface MeetingStats {
   bookmarkCount: number;
 }
 
-/** Monday 00:00 local time of the week containing `now` — "tuần này" (the spec leaves the exact week-start convention to the implementation). */
+/** Monday 00:00 local time of the week containing `now` — "this week" (the spec leaves the exact week-start convention to the implementation). */
 export function startOfWeekIso(now: Date = new Date()): string {
   const day = now.getDay(); // 0 = Sunday .. 6 = Saturday
   const diffToMonday = (day + 6) % 7;

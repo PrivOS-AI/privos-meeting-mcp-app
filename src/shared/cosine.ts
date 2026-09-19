@@ -1,7 +1,7 @@
 /**
  * Speaker-embedding vector math, shared by the backend matcher (P4/P5) and any
  * calibration script. Pure functions over `Float32Array` — no crypto here; the
- * encryption boundary lives in the backend voiceprint layer (QĐ-06).
+ * encryption boundary lives in the backend voiceprint layer (D-06).
  */
 
 /**

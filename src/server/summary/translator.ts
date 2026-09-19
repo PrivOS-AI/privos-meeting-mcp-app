@@ -2,7 +2,7 @@
  * Batch translation of a meeting's stored `segments[]` via Hub AI
  * (`generateAsyncWithHubAi`) — used by `meeting-job.ts`'s translate step and
  * `meeting_summarize`'s re-run. Same "one Hub AI network, both live and batch"
- * rule as `meeting_translate` (QĐ-07/QĐ-12): batches by `PROMPT_LIMIT`,
+ * rule as `meeting_translate` (D-07/D-12): batches by `PROMPT_LIMIT`,
  * skips segments already in the target language (`segment.lang === target`),
  * and — per plan.md § Requirements — a batch that errors is SKIPPED rather
  * than failing the whole translate step (those segments simply keep no
@@ -96,7 +96,7 @@ export async function translateSegmentsBatch(hub: RoomBoundHubClient, input: Tra
         result.set(id, translation);
       }
     } catch (error) {
-      console.warn('[translator] bỏ qua một lô dịch lỗi:', error instanceof Error ? error.message : error);
+      console.warn('[translator] skipping a batch that failed to translate:', error instanceof Error ? error.message : error);
     }
   }
   return result;

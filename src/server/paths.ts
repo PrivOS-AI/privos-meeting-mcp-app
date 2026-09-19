@@ -19,7 +19,7 @@ export const uiDistDir = path.join(repoRoot, 'dist', 'ui');
 
 /**
  * Durable app-private scratch (decoded audio temp for embedding, job scratch).
- * Audio durability itself lives in PrivOS Files, not here (QĐ-13).
+ * Audio durability itself lives in PrivOS Files, not here (D-13).
  */
 export const dataDir = process.env.MEETING_DATA_DIR || path.join(repoRoot, 'data');
 

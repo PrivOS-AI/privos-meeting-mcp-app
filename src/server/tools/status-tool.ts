@@ -16,8 +16,8 @@ function asString(value: unknown): string {
 
 export const statusTool: AppTool = {
   name: 'meeting_status',
-  title: 'Trạng thái xử lý cuộc họp',
-  description: 'Xem tiến độ xử lý cuộc họp: bước hiện tại, phần trăm hoàn thành và kết quả khi xong.',
+  title: 'Meeting processing status',
+  description: 'View meeting processing progress: current step, percent complete, and the result when finished.',
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId'],
@@ -27,7 +27,7 @@ export const statusTool: AppTool = {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId và meetingId là bắt buộc.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
 
     const db = new AppDbBotClient(roomId);
     await requireRoomMeeting(db, actor, roomId, meetingId);

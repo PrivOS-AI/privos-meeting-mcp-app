@@ -1,8 +1,8 @@
 /**
  * Soniox realtime wrapper — the ONLY provider with live speaker diarization
- * (QĐ-18) and native two-way translation. The SDK self-captures from the
+ * (D-18) and native two-way translation. The SDK self-captures from the
  * `MediaStream` we give it (spike P1-10 pinned `@soniox/speech-to-text-web`);
- * this module never touches PCM, backpressure or the wire protocol (QĐ-01).
+ * this module never touches PCM, backpressure or the wire protocol (D-01).
  *
  * `onPartialResult(result)` is documented as "the current recognized state"
  * rather than a delta stream (open question #2/#3 — unverified against a live
@@ -100,7 +100,7 @@ function buildFromSnapshot(sessionIndex: number, tokens: Token[], offsetMs: numb
 
   tokens.forEach((token) => {
     if (token.translation_status === 'translation') {
-      // Translation tokens carry no timestamp and never join a LiveTurn (QĐ-12);
+      // Translation tokens carry no timestamp and never join a LiveTurn (D-12);
       // they belong to the original turn that is open (or was just closed).
       const turnId = current?.id ?? lastTurnId;
       if (!turnId) return;

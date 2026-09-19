@@ -1,6 +1,6 @@
 /**
- * Bookmarks list (phase-07 § Requirements: "Bookmark: thêm tại thời điểm
- * đang phát, xoá, click để seek"). Reused by the meeting detail screen
+ * Bookmarks list (phase-07 § Requirements: "Bookmark: add at the current
+ * playback position, delete, click to seek"). Reused by the meeting detail screen
  * (seek + delete) and the live side panel (list-only, no player to seek).
  */
 import { useI18n } from '../i18n/i18n-provider.js';

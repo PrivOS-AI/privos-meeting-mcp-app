@@ -1,7 +1,7 @@
 /**
  * Loads `transcript.json` once per `fileId` and caches it for the tab's
- * lifetime (phase-07 § Architecture / § Non-functional: "chỉ tải 1
- * lần/meeting/phiên") — a 3h meeting's transcript (~2000 segments) must not
+ * lifetime (phase-07 § Architecture / § Non-functional: "load only once
+ * per meeting/session") — a 3h meeting's transcript (~2000 segments) must not
  * be re-fetched on every re-render or tab switch.
  */
 import type { McpApp } from '@privos_ai/app-react';
@@ -42,7 +42,7 @@ const cache = new Map<string, Promise<TranscriptDoc>>();
 async function fetchTranscript(app: McpApp, fileId: string): Promise<TranscriptDoc> {
   const { url } = await resolveFileUrl(app, fileId, 'application/json');
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`Không tải được transcript.json (HTTP ${response.status}).`);
+  if (!response.ok) throw new Error(`Failed to load transcript.json (HTTP ${response.status}).`);
   return (await response.json()) as TranscriptDoc;
 }
 

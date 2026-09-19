@@ -50,7 +50,7 @@ export async function uploadPart(app: McpApp, input: UploadPartInput): Promise<{
     duplicateAction: 'keep_both',
   });
   const fileId = (response as { file?: { _id?: string } } | undefined)?.file?._id;
-  if (!fileId) throw new Error('uploadFile không trả về id của part vừa upload.');
+  if (!fileId) throw new Error('uploadFile did not return an id for the uploaded part.');
   return { fileId };
 }
 

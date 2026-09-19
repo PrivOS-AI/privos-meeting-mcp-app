@@ -25,7 +25,7 @@ const claimInput = {
   partFileIds: ['f1'],
   sttProvider: 'soniox-async' as const,
   language: 'vi',
-  title: 'Họp',
+  title: 'Meeting',
   keepAudio: true,
 };
 

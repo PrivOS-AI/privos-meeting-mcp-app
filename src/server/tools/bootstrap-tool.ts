@@ -25,7 +25,7 @@ export const bootstrapTool: AppTool = {
   inputSchema: { type: 'object', required: ['roomId'], properties: { roomId: { type: 'string' } } },
   async execute(args, _context, runtime) {
     const roomId = typeof args.roomId === 'string' ? args.roomId.trim() : '';
-    if (!roomId) throw new AppError('roomId là bắt buộc.');
+    if (!roomId) throw new AppError('roomId is required.');
 
     const db = new AppDbBotClient(roomId);
     await ensureAppDbSchema(db);
@@ -34,14 +34,14 @@ export const bootstrapTool: AppTool = {
     // Best-effort: requeue this room's stuck jobs / abandoned recordings /
     // dead vendor garbage every time the room opens, not just at process boot.
     await sweepRoom(runtime.agentBotHub, roomId).catch((error) => {
-      console.warn('[meeting_bootstrap] sweep thất bại (không chặn bootstrap):', error instanceof Error ? error.message : error);
+      console.warn('[meeting_bootstrap] sweep failed (not blocking bootstrap):', error instanceof Error ? error.message : error);
     });
 
     // Best-effort: retention (kept audio past autoDeleteAudioDays, orphaned
     // interrupted parts, stale pendingEmbedding) — same "every time the room
     // opens" cadence as the sweep above, on top of the 6h interval.
     await purgeExpiredAudio(runtime.agentBotHub, roomId).catch((error) => {
-      console.warn('[meeting_bootstrap] retention thất bại (không chặn bootstrap):', error instanceof Error ? error.message : error);
+      console.warn('[meeting_bootstrap] retention failed (not blocking bootstrap):', error instanceof Error ? error.message : error);
     });
 
     return { ok: true, roomId, knownRoomCount: knownRooms.length };

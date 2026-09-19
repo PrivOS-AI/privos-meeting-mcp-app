@@ -28,8 +28,8 @@ function asString(value: unknown): string {
 
 export const relabelSpeakerTool: AppTool = {
   name: 'meeting_relabel_speaker',
-  title: 'Sửa nhãn người nói',
-  description: 'Sửa người nói của một cuộc họp sang hồ sơ đúng hoặc một tên khác, và cập nhật lại hồ sơ giọng nói tương ứng.',
+  title: 'Relabel speaker',
+  description: "Change a meeting's speaker to the correct profile or a different name, and update the matching voiceprint profile.",
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId', 'speakerId'],
@@ -46,10 +46,10 @@ export const relabelSpeakerTool: AppTool = {
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
     const speakerId = asString(args.speakerId);
-    if (!roomId || !meetingId || !speakerId) throw new AppError('roomId, meetingId và speakerId là bắt buộc.');
+    if (!roomId || !meetingId || !speakerId) throw new AppError('roomId, meetingId, and speakerId are required.');
     const targetProfileId = asString(args.profileId);
     const rawDisplayName = typeof args.displayName === 'string' ? sanitizeDisplayName(args.displayName) : '';
-    if (!targetProfileId && !rawDisplayName) throw new AppError('Cần cung cấp profileId hoặc displayName.');
+    if (!targetProfileId && !rawDisplayName) throw new AppError('Must provide profileId or displayName.');
 
     const db = new AppDbBotClient(roomId);
     await requireMeetingOwner(db, actor, roomId, meetingId);
@@ -59,7 +59,7 @@ export const relabelSpeakerTool: AppTool = {
       limit: 1,
     });
     const row = extractDbRecords(existingResult)[0];
-    if (!row) throw new AppError('Không tìm thấy người nói này trong cuộc họp.');
+    if (!row) throw new AppError('This speaker was not found in the meeting.');
 
     const oldProfileId = typeof row.profileId === 'string' && row.profileId ? row.profileId : undefined;
 
@@ -67,7 +67,7 @@ export const relabelSpeakerTool: AppTool = {
     let target: profileStore.SpeakerProfile | null = null;
     if (targetProfileId) {
       target = await profileStore.getProfile(db, targetProfileId);
-      if (!target) throw new AppError('Không tìm thấy hồ sơ giọng nói đích.');
+      if (!target) throw new AppError('Target voiceprint profile not found.');
     } else {
       target = await profileStore.findProfileByName(db, rawDisplayName);
       if (!target) target = await profileStore.createProfile(db, { displayName: rawDisplayName, createdByUserId: actor.userId, createdInRoomId: roomId });

@@ -1,8 +1,8 @@
 /**
- * History table row "⋯" menu (phase-07 § Requirements: "Mở, Đổi tên, Xuất
- * SRT, Xuất DOCX, Xoá"). "Xoá" is only rendered for the meeting owner
+ * History table row "⋯" menu (phase-07 § Requirements: "Open, Rename, Export
+ * SRT, Export DOCX, Delete"). "Delete" is only rendered for the meeting owner
  * (`canDelete`, resolved by the caller from `ownerUserId === userId` — phase
- * risk table: "chỉ chủ cuộc họp mới thấy nút Xoá").
+ * risk table: "only the meeting owner sees the Delete button").
  */
 import { useEffect, useRef, useState } from 'react';
 

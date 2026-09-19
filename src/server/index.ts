@@ -57,7 +57,7 @@ function startManifestOnlySurface(reason: string): void {
 /** Boot-time configuration + credential self-checks (non-fatal in dev). */
 async function runBootChecks(): Promise<void> {
   for (const problem of assertProviderKeysAtBoot()) {
-    console.warn(`[boot] Cảnh báo cấu hình: ${problem}`);
+    console.warn(`[boot] Configuration warning: ${problem}`);
   }
 }
 
@@ -98,7 +98,7 @@ async function start(): Promise<void> {
       // marks abandoned recordings interrupted, sweeps dead vendor garbage —
       // across every known room. Never blocks the handler from being ready.
       void startupSweep(ctx.agentBotHub).catch((error) => {
-        console.warn('[boot] startupSweep thất bại:', error instanceof Error ? error.message : error);
+        console.warn('[boot] startupSweep failed:', error instanceof Error ? error.message : error);
       });
       // Retention sweep: boot + every 6h across every known room (P8).
       stopAudioRetention = startAudioRetention(ctx.agentBotHub);

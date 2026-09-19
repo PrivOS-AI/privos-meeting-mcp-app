@@ -13,7 +13,7 @@
  * shape is still unobserved. A failure HERE is not
  * swallowed — `callAppPlatformTool` throws an `AppError` with the Hub's own
  * message, which the UI is expected to use to disable the "Send to Chat"
- * button with a tooltip (plan.md: "không lỗi im lặng" — no silent failure).
+ * button with a tooltip (plan.md: "no silent failure").
  */
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, type DbRow } from '../hub/app-db-bot-client.js';
@@ -41,18 +41,18 @@ function truncate(text: string, maxChars: number): string {
 
 /** Server-built chat message — summary text is Hub AI's own output (already safe), the title is escaped defensively since it is raw user input. */
 function buildChatSummary(meeting: DbRow, fileLink: string | undefined): string {
-  const title = escapeMarkdown(typeof meeting.title === 'string' && meeting.title ? meeting.title : 'Cuộc họp');
+  const title = escapeMarkdown(typeof meeting.title === 'string' && meeting.title ? meeting.title : 'Meeting');
   const summary = typeof meeting.summaryText === 'string' ? meeting.summaryText : '';
-  const header = `**Tóm tắt: ${title}**\n\n`;
-  const footer = fileLink ? `\n\n[Mở summary.md](${fileLink})` : '';
+  const header = `**Summary: ${title}**\n\n`;
+  const footer = fileLink ? `\n\n[Open summary.md](${fileLink})` : '';
   const bodyBudget = Math.max(0, MAX_CHAT_CHARS - header.length - footer.length);
   return `${header}${truncate(summary, bodyBudget)}${footer}`;
 }
 
 export const sendToChatTool: AppTool = {
   name: 'meeting_send_to_chat',
-  title: 'Gửi tóm tắt vào phòng chat',
-  description: 'Gửi tóm tắt cuộc họp đã lưu vào phòng chat qua bot cài đặt — nội dung được dựng ở máy chủ, không nhận text từ máy khách.',
+  title: 'Send summary to chat',
+  description: 'Send the saved meeting summary to the room chat via the installation bot — the content is built server-side, never taken from the client.',
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId'],
@@ -62,12 +62,12 @@ export const sendToChatTool: AppTool = {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId và meetingId là bắt buộc.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
 
     const db = new AppDbBotClient(roomId);
     const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
     if (!meeting.summaryText || typeof meeting.summaryText !== 'string') {
-      throw new AppError('Cuộc họp chưa có tóm tắt để gửi.');
+      throw new AppError('Meeting has no summary to send yet.');
     }
 
     const fileLink =
@@ -77,7 +77,7 @@ export const sendToChatTool: AppTool = {
     const text = buildChatSummary(meeting, fileLink);
 
     // Never swallowed: a Hub rejection (unknown tool, missing scope, bot not in room) surfaces verbatim so the UI
-    // can show the "Send to chat unavailable" tooltip instead of silently no-op'ing (plan.md: "không lỗi im lặng").
+    // can show the "Send to chat unavailable" tooltip instead of silently no-op'ing (plan.md: "no silent failure").
     await callAppPlatformTool(BOT_SEND_MESSAGE_TOOL, { roomId, text }, SEND_MESSAGE_SCOPE, roomId);
 
     const sentAt = new Date().toISOString();

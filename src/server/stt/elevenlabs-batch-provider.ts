@@ -27,8 +27,8 @@ interface ElevenWord {
 }
 
 /**
- * Drops `spacing`-type words (spec: "bỏ type==='spacing' khi tính biên" —
- * they carry no speaker/segment-boundary information and would otherwise
+ * Drops `spacing`-type words (spec: "drop type==='spacing' when computing
+ * boundaries") — they carry no speaker/segment-boundary information and would otherwise
  * force `segment-builder.ts`'s "missing speaker inherits the previous
  * token's" rule to run on whitespace). Keeps `audio_event` as bracketed text
  * (`[laughter]`), maps `speaker_id`->`speaker`, `logprob`->`confidence`
@@ -76,7 +76,7 @@ export const elevenLabsBatchProvider: AsyncSttProvider = {
   vendor: 'elevenlabs',
 
   async transcribeFile(input: TranscribeInput): Promise<SttResult> {
-    if (!env.elevenLabsApiKey) throw new AppError('Thiếu ELEVENLABS_API_KEY — không chạy được elevenlabs-batch.');
+    if (!env.elevenLabsApiKey) throw new AppError('Missing ELEVENLABS_API_KEY — cannot run elevenlabs-batch.');
     const client = new ElevenLabsClient({ apiKey: env.elevenLabsApiKey });
     const languageCode = input.languageHints?.[0];
 
@@ -100,7 +100,7 @@ export const elevenLabsBatchProvider: AsyncSttProvider = {
       );
     } catch (error) {
       if (error instanceof ElevenLabsError) {
-        throw new AppError(`ElevenLabs xử lý thất bại (HTTP ${error.statusCode ?? '?'}): ${error.message}`);
+        throw new AppError(`ElevenLabs processing failed (HTTP ${error.statusCode ?? '?'}): ${error.message}`);
       }
       throw error;
     }
@@ -117,7 +117,7 @@ export const elevenLabsBatchProvider: AsyncSttProvider = {
       configured: probe.reason !== 'not_configured',
       ok: probe.ok,
       models: [env.elevenLabsBatchModel],
-      detail: probe.ok ? undefined : probe.reason === 'not_configured' ? 'Thiếu ELEVENLABS_API_KEY.' : 'Không kết nối được tới ElevenLabs.',
+      detail: probe.ok ? undefined : probe.reason === 'not_configured' ? 'Missing ELEVENLABS_API_KEY.' : 'Could not connect to ElevenLabs.',
       reason: probe.ok ? undefined : probe.reason,
       usage: probe.usage,
     };

@@ -130,16 +130,16 @@ export function assertProviderKeysAtBoot(config: AppEnv = env): string[] {
   const problems: string[] = [];
   if (!keyForProvider(config, config.realtimeProvider)) {
     problems.push(
-      `STT_REALTIME_PROVIDER=${config.realtimeProvider} nhưng thiếu ${config.realtimeProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'}.`,
+      `STT_REALTIME_PROVIDER=${config.realtimeProvider} but missing ${config.realtimeProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'}.`,
     );
   }
   if (!keyForProvider(config, config.asyncProvider)) {
     problems.push(
-      `STT_ASYNC_PROVIDER=${config.asyncProvider} nhưng thiếu ${config.asyncProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'}.`,
+      `STT_ASYNC_PROVIDER=${config.asyncProvider} but missing ${config.asyncProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'}.`,
     );
   }
   if (problems.length && !isDevelopmentRuntime()) {
-    throw new Error(`Cấu hình không hợp lệ khi khởi động:\n- ${problems.join('\n- ')}`);
+    throw new Error(`Invalid configuration at boot:\n- ${problems.join('\n- ')}`);
   }
   return problems;
 }

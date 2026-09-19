@@ -55,7 +55,7 @@ const VOICE_B = -0.9;
 const VOICE_C = 0.1;
 
 function seg(speakerId: string, startSec: number, endSec: number): Segment {
-  return { id: `seg-${speakerId}-${startSec}`, speakerId, startSec, endSec, text: 'đây là một câu nói khá dài', lang: 'vi', tokenCount: 6, avgConfidence: 0.9 };
+  return { id: `seg-${speakerId}-${startSec}`, speakerId, startSec, endSec, text: 'this is a fairly long sentence', lang: 'vi', tokenCount: 6, avgConfidence: 0.9 };
 }
 
 describe('resolveSpeakers', () => {
@@ -132,7 +132,7 @@ describe('resolveSpeakers', () => {
   });
 
   it('reports "too little data" (no pendingEmbedding) when a speaker has no segment long/wordy enough to pick', async () => {
-    const segments = [{ id: 's1', speakerId: 'spkShort', startSec: 0, endSec: 0.5, text: 'ừ', lang: 'vi', tokenCount: 1 }];
+    const segments = [{ id: 's1', speakerId: 'spkShort', startSec: 0, endSec: 0.5, text: 'um', lang: 'vi', tokenCount: 1 }];
     const [result] = await resolveSpeakers(db(), '/fake/wav.wav', segments, 'meeting-1');
     expect(result.resolved).toBe(false);
     expect(result.sampleSec).toBe(0);

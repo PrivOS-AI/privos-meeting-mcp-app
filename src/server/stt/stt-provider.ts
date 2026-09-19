@@ -1,9 +1,9 @@
 /**
  * Provider-agnostic STT contract. Two first-class vendors (Soniox, ElevenLabs)
- * sit behind these interfaces and are selected per workspace (QĐ-15). Realtime
+ * sit behind these interfaces and are selected per workspace (D-15). Realtime
  * providers mint a short-lived token the iframe SDK uses; async providers
  * transcribe a finished audio file server-side and are the authoritative source
- * for the stored transcript (QĐ-03).
+ * for the stored transcript (D-03).
  *
  * Phase 1 ships the interfaces + four shells; the real vendor logic lands in
  * P2 (realtime) and P3 (async).
@@ -98,7 +98,7 @@ export interface ProviderStatus {
   reason?: ProviderStatusReason;
   /** Vendor account usage from the cheap probe, when the vendor exposes one (ElevenLabs). */
   usage?: ProviderUsage;
-  /** Realtime only: sessions this workspace currently has open with the ACTIVE realtime provider (shared cap, QĐ-19). */
+  /** Realtime only: sessions this workspace currently has open with the ACTIVE realtime provider (shared cap, D-19). */
   activeSessions?: number;
 }
 

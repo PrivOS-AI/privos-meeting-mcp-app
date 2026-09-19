@@ -21,13 +21,13 @@ const CAPABILITIES: RealtimeCapabilities = { speakerLabels: true, translation: t
 
 export const sonioxRealtimeProvider: RealtimeTokenProvider = {
   vendor: 'soniox',
-  // Soniox realtime is the only provider with live speaker diarization (QĐ-18)
+  // Soniox realtime is the only provider with live speaker diarization (D-18)
   // and offers native two-way translation.
   capabilities: CAPABILITIES,
 
   async mint(meetingId: string): Promise<RealtimeToken> {
     if (!env.sonioxApiKey) {
-      throw new AppError('Thiếu SONIOX_API_KEY — không mint được token phụ đề trực tiếp Soniox.');
+      throw new AppError('Missing SONIOX_API_KEY — cannot mint a Soniox live-caption token.');
     }
     const expiresInSeconds = Math.min(env.sonioxTempKeyTtlSec, 3600);
 
@@ -45,15 +45,15 @@ export const sonioxRealtimeProvider: RealtimeTokenProvider = {
         }),
       });
     } catch {
-      throw new AppError('Không kết nối được tới Soniox để lấy token phụ đề trực tiếp.');
+      throw new AppError('Could not connect to Soniox to fetch a live-caption token.');
     }
     if (!response.ok) {
-      throw new AppError(`Soniox từ chối cấp token phụ đề trực tiếp (HTTP ${response.status}).`);
+      throw new AppError(`Soniox refused to issue a live-caption token (HTTP ${response.status}).`);
     }
 
     const body = (await response.json().catch(() => null)) as { api_key?: unknown; expires_at?: unknown } | null;
     const apiKey = typeof body?.api_key === 'string' ? body.api_key : undefined;
-    if (!apiKey) throw new AppError('Soniox trả về token không hợp lệ.');
+    if (!apiKey) throw new AppError('Soniox returned an invalid token.');
     const expiresAt =
       typeof body?.expires_at === 'string' ? body.expires_at : new Date(Date.now() + expiresInSeconds * 1000).toISOString();
 
@@ -75,7 +75,7 @@ export const sonioxRealtimeProvider: RealtimeTokenProvider = {
       configured: probe.reason !== 'not_configured',
       ok: probe.ok,
       models: [env.sonioxRtModel],
-      detail: probe.ok ? undefined : probe.reason === 'not_configured' ? 'Thiếu SONIOX_API_KEY.' : 'Không kết nối được tới Soniox.',
+      detail: probe.ok ? undefined : probe.reason === 'not_configured' ? 'Missing SONIOX_API_KEY.' : 'Could not connect to Soniox.',
       reason: probe.ok ? undefined : probe.reason,
     };
   },

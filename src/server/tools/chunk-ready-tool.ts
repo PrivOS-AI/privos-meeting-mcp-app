@@ -9,7 +9,7 @@
  * asynchronously behind `keyed-serial-queue.ts` — losing that work only
  * delays live labels, never blocks/corrupts the recording itself.
  *
- * Degraded mode (QĐ-18): a meeting whose realtime provider does not support
+ * Degraded mode (D-18): a meeting whose realtime provider does not support
  * speaker labels (currently: `elevenlabs-realtime`) never gets a real chunk
  * enqueued — the iframe should not even be calling this for such a meeting,
  * but a stray/forced call is answered with `{accepted:false,
@@ -28,8 +28,8 @@ function asString(value: unknown): string {
 
 export const chunkReadyTool: AppTool = {
   name: 'meeting_chunk_ready',
-  title: 'Báo phần ghi âm sẵn sàng',
-  description: 'Nhận và kiểm tra các turn của một phần ghi âm vừa upload xong (hàng đợi xử lý ở Phase 5).',
+  title: 'Report recording part ready',
+  description: 'Receive and validate the turns of a just-uploaded recording part.',
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId', 'seq', 'durationMs', 'segments'],
@@ -47,42 +47,42 @@ export const chunkReadyTool: AppTool = {
     const seq = Number(args.seq);
     const durationMs = Number(args.durationMs);
     if (!roomId || !meetingId || !Number.isInteger(seq) || seq < 0 || !Number.isFinite(durationMs) || durationMs <= 0) {
-      throw new AppError('Tham số meeting_chunk_ready không hợp lệ.');
+      throw new AppError('Invalid meeting_chunk_ready parameters.');
     }
 
     const actor = context.actor;
     if (!actor || actor.roomId !== roomId) {
-      throw new AppError('Yêu cầu không hợp lệ cho phòng này.');
+      throw new AppError('Invalid request for this room.');
     }
 
     const db = new AppDbBotClient(roomId);
     const meeting = await db.getById('meetings', 'room', meetingId);
     if (!meeting || meeting.roomId !== roomId) {
-      throw new AppError('Không tìm thấy cuộc họp trong phòng này.');
+      throw new AppError('Meeting not found in this room.');
     }
     if (meeting.ownerUserId !== actor.userId) {
-      throw new AppError('Chỉ chủ cuộc họp mới gửi được meeting_chunk_ready.');
+      throw new AppError('Only the meeting owner can send meeting_chunk_ready.');
     }
     if (meeting.status !== 'recording' && meeting.status !== 'uploading') {
-      throw new AppError('Cuộc họp không ở trạng thái nhận phần ghi âm.');
+      throw new AppError('Meeting is not in a state that accepts recording parts.');
     }
 
     const vendor = await resolveRealtimeVendor(db);
     if (!realtimeProviderFor(vendor).capabilities.speakerLabels) {
-      // QĐ-18 degraded mode — not an error, just nothing to do.
+      // D-18 degraded mode — not an error, just nothing to do.
       return { accepted: false, reason: 'labels_not_supported' };
     }
 
     const segmentsRaw = Array.isArray(args.segments) ? args.segments : [];
     const segments = segmentsRaw.map(asChunkSegment).filter((s): s is ChunkSegment => s !== null);
     if (segments.length !== segmentsRaw.length) {
-      throw new AppError('Một số turn có dữ liệu không hợp lệ.');
+      throw new AppError('Some turns contain invalid data.');
     }
     const structuralError = assertStructuralSpans(segments, durationMs);
     if (structuralError) throw new AppError(structuralError);
 
     const folderId = typeof meeting.folderId === 'string' && meeting.folderId ? meeting.folderId : '';
-    if (!folderId) throw new AppError('Cuộc họp chưa có thư mục lưu trữ.');
+    if (!folderId) throw new AppError('Meeting has no storage folder yet.');
 
     enqueueChunk({ db, hub: runtime.agentBotHub, folderId }, { roomId, meetingId, seq, durationMs, segments });
 

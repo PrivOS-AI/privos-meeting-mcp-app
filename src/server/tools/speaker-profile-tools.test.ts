@@ -63,7 +63,7 @@ describe('speaker_profile_list/_update/_delete', () => {
   it('update rejects a caller who is neither the creator nor an admin', async () => {
     await expect(
       speakerProfileUpdateTool.execute({ profileId: 'profile-1', displayName: 'Binh' }, ctx('someone-else'), {} as never),
-    ).rejects.toThrow(/quản trị viên/);
+    ).rejects.toThrow(/workspace admin/);
   });
 
   it('update allows the creator to rename', async () => {
@@ -77,11 +77,11 @@ describe('speaker_profile_list/_update/_delete', () => {
   });
 
   it('update rejects action:"reenrol" with a clear not-yet-supported error', async () => {
-    await expect(speakerProfileUpdateTool.execute({ profileId: 'profile-1', action: 'reenrol' }, ctx('owner-1'), {} as never)).rejects.toThrow(/chưa được hỗ trợ/);
+    await expect(speakerProfileUpdateTool.execute({ profileId: 'profile-1', action: 'reenrol' }, ctx('owner-1'), {} as never)).rejects.toThrow(/not supported/);
   });
 
   it('delete rejects a non-creator, non-admin caller', async () => {
-    await expect(speakerProfileDeleteTool.execute({ profileId: 'profile-1' }, ctx('someone-else'), {} as never)).rejects.toThrow(/quản trị viên/);
+    await expect(speakerProfileDeleteTool.execute({ profileId: 'profile-1' }, ctx('someone-else'), {} as never)).rejects.toThrow(/workspace admin/);
   });
 
   it('delete removes the profile row and purges links across every known room', async () => {

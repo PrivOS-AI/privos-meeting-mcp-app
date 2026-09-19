@@ -1,6 +1,6 @@
 /**
- * Simple fixed-row-height virtualization (phase-07 risk table: "Ưu tiên đơn
- * giản: đo chiều cao cố định theo số dòng text ước lượng" — no windowing
+ * Simple fixed-row-height virtualization (phase-07 risk table: "Favor
+ * simplicity: measure a fixed height from the estimated line count" — no windowing
  * library). Renders only the segments whose estimated slot intersects the
  * visible scroll range (+ buffer rows); top/bottom spacer `div`s keep the
  * native scrollbar's size and position correct without measuring real DOM

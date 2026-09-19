@@ -17,7 +17,7 @@ This app runs in **production on the hodao node**, managed by pm2 (systemd boot)
 Do NOT run the app locally and on the node at the same time — duplicate pairing
 identity conflicts on the relay.
 
-- Node: `ssh -i ~/.ssh/thanh-dev -p 22087 root@hub002.roxane.one` (OS hostname `hodao`)
+- Node: `ssh -i ~/.ssh/<key> -p <port> root@<node-host>` (connection details kept out of the repo)
 - Remote path: `/opt/privos/apps/meeting-agent`
 - pm2 process: `meeting-agent` · port `3012`
 - No system ffmpeg, no GPU, Node v22, python3 without torch → audio decode +

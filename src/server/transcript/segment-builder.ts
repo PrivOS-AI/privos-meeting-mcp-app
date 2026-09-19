@@ -42,7 +42,7 @@ interface BuildingSegment {
   tokenCount: number;
   confSum: number;
   confCount: number;
-  /** Per-language token counts, so the final `lang` is whichever language the MAJORITY of tokens used (QĐ-12). */
+  /** Per-language token counts, so the final `lang` is whichever language the MAJORITY of tokens used (D-12). */
   langCounts: Map<string, number>;
 }
 

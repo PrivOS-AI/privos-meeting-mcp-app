@@ -18,6 +18,11 @@ dist-source/
 /privos-standalone-identity.json.*
 /.recyclebin/
 
+# Internal-only material — excluded from the public repo
+/docs/
+/plans/
+/scripts/deploy-hodao.sh
+
 # Local agent infrastructure (symlinks to .privos) — not app source
 /.privos/
 /.agents

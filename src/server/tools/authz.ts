@@ -28,7 +28,7 @@ export function requireVerifiedActor(context: ToolCallContext): VerifiedActor {
   const verified = Boolean(context.actor) && context.identityState === 'verified';
   if (verified) return context.actor as VerifiedActor;
   if (isDevelopmentRuntime() && env.allowUnverifiedActor && context.actor) return context.actor;
-  throw new AppError('Yêu cầu bị từ chối: cần một người dùng đã xác minh danh tính.');
+  throw new AppError('Request denied: a verified user identity is required.');
 }
 
 /**
@@ -44,14 +44,14 @@ export async function requireMeetingOwner(
   meetingId: string,
 ): Promise<DbRow> {
   if (actor.roomId !== roomId) {
-    throw new AppError('Yêu cầu không hợp lệ cho phòng này.');
+    throw new AppError('Invalid request for this room.');
   }
   const meeting = await db.getById('meetings', 'room', meetingId);
   if (!meeting || meeting.roomId !== roomId) {
-    throw new AppError('Không tìm thấy cuộc họp trong phòng này.');
+    throw new AppError('Meeting not found in this room.');
   }
   if (meeting.ownerUserId !== actor.userId) {
-    throw new AppError('Chỉ chủ cuộc họp mới thực hiện được thao tác này.');
+    throw new AppError('Only the meeting owner can perform this action.');
   }
   return meeting;
 }
@@ -68,11 +68,11 @@ export async function requireRoomMeeting(
   meetingId: string,
 ): Promise<DbRow> {
   if (actor.roomId !== roomId) {
-    throw new AppError('Yêu cầu không hợp lệ cho phòng này.');
+    throw new AppError('Invalid request for this room.');
   }
   const meeting = await db.getById('meetings', 'room', meetingId);
   if (!meeting || meeting.roomId !== roomId) {
-    throw new AppError('Không tìm thấy cuộc họp trong phòng này.');
+    throw new AppError('Meeting not found in this room.');
   }
   return meeting;
 }
@@ -80,13 +80,13 @@ export async function requireRoomMeeting(
 /**
  * Re-reads a fileId's OWN metadata from Files and asserts its `channel_id`
  * equals `roomId` — never trusts a list response, a client-supplied id, or a
- * value cached from an earlier call. Throws a clear Vietnamese `AppError` when
- * the file is missing or belongs to a different room.
+ * value cached from an earlier call. Throws a clear `AppError` when the file
+ * is missing or belongs to a different room.
  */
 export async function assertFileInRoom(hub: RoomBoundHubClient, fileId: string, roomId: string, signal?: AbortSignal) {
   const meta = await getFileMetadata(hub, fileId, signal);
   if (!meta || meta.channel_id !== roomId) {
-    throw new AppError(`Không tìm thấy tệp hoặc tệp không thuộc phòng này (fileId=${fileId}).`);
+    throw new AppError(`File not found or does not belong to this room (fileId=${fileId}).`);
   }
   return meta;
 }

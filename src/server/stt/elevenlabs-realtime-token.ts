@@ -2,7 +2,7 @@
  * ElevenLabs realtime token provider. Mints a single-use `realtime_scribe`
  * token so the iframe SDK never sees `ELEVENLABS_API_KEY`. ElevenLabs realtime
  * has NO live speaker diarization, so choosing it disables live speaker naming
- * for that meeting (QĐ-18) — `capabilities.speakerLabels` is fixed `false`
+ * for that meeting (D-18) — `capabilities.speakerLabels` is fixed `false`
  * regardless of anything the vendor response contains.
  */
 import { AppError } from '../../shared/app-error.js';
@@ -22,7 +22,7 @@ export const elevenLabsRealtimeProvider: RealtimeTokenProvider = {
 
   async mint(_meetingId: string): Promise<RealtimeToken> {
     if (!env.elevenLabsApiKey) {
-      throw new AppError('Thiếu ELEVENLABS_API_KEY — không mint được token phụ đề trực tiếp ElevenLabs.');
+      throw new AppError('Missing ELEVENLABS_API_KEY — cannot mint an ElevenLabs live-caption token.');
     }
 
     let response: Response;
@@ -33,15 +33,15 @@ export const elevenLabsRealtimeProvider: RealtimeTokenProvider = {
         body: '{}',
       });
     } catch {
-      throw new AppError('Không kết nối được tới ElevenLabs để lấy token phụ đề trực tiếp.');
+      throw new AppError('Could not connect to ElevenLabs to fetch a live-caption token.');
     }
     if (!response.ok) {
-      throw new AppError(`ElevenLabs từ chối cấp token phụ đề trực tiếp (HTTP ${response.status}).`);
+      throw new AppError(`ElevenLabs refused to issue a live-caption token (HTTP ${response.status}).`);
     }
 
     const body = (await response.json().catch(() => null)) as { token?: unknown } | null;
     const token = typeof body?.token === 'string' ? body.token : undefined;
-    if (!token) throw new AppError('ElevenLabs trả về token không hợp lệ.');
+    if (!token) throw new AppError('ElevenLabs returned an invalid token.');
 
     return {
       provider: 'elevenlabs',
@@ -60,7 +60,7 @@ export const elevenLabsRealtimeProvider: RealtimeTokenProvider = {
       configured: probe.reason !== 'not_configured',
       ok: probe.ok,
       models: [env.elevenLabsRealtimeModel],
-      detail: probe.ok ? undefined : probe.reason === 'not_configured' ? 'Thiếu ELEVENLABS_API_KEY.' : 'Không kết nối được tới ElevenLabs.',
+      detail: probe.ok ? undefined : probe.reason === 'not_configured' ? 'Missing ELEVENLABS_API_KEY.' : 'Could not connect to ElevenLabs.',
       reason: probe.ok ? undefined : probe.reason,
       usage: probe.usage,
     };

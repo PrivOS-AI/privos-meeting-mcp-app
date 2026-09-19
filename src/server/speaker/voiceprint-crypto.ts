@@ -1,5 +1,5 @@
 /**
- * Voiceprint encryption boundary (QĐ-06). `db:*` scopes are granted to the
+ * Voiceprint encryption boundary (D-06). `db:*` scopes are granted to the
  * iframe on the SAME namespace as the backend (bot credential), so "the
  * vector never leaves the backend" cannot be enforced by a tool boundary
  * alone — the iframe can `mcpapp.db.query` `speaker_profiles` directly. This
@@ -104,7 +104,7 @@ export function openEmbedding(sealed: SealedEmbedding): Float32Array | null {
   try {
     ({ key, macKey } = keyMaterial());
   } catch (error) {
-    console.error('[voiceprint-crypto] thiếu/hỏng VOICEPRINT_ENC_KEY:', error instanceof Error ? error.message : error);
+    console.error('[voiceprint-crypto] missing/corrupt VOICEPRINT_ENC_KEY:', error instanceof Error ? error.message : error);
     return null;
   }
 
@@ -114,13 +114,13 @@ export function openEmbedding(sealed: SealedEmbedding): Float32Array | null {
     const tag = Buffer.from(sealed.tag, 'base64');
     const hmac = Buffer.from(sealed.hmac, 'base64');
     if (iv.length !== IV_BYTES || tag.length !== 16 || hmac.length !== 32) {
-      console.warn('[voiceprint-crypto] sealed embedding có kích thước trường không hợp lệ, bỏ qua.', { profileId: sealed.profileId });
+      console.warn('[voiceprint-crypto] sealed embedding has an invalid field size, skipping.', { profileId: sealed.profileId });
       return null;
     }
 
     const expectedHmac = computeHmac(macKey, sealed.profileId, ct, sealed.createdAt);
     if (expectedHmac.length !== hmac.length || !timingSafeEqual(expectedHmac, hmac)) {
-      console.warn('[voiceprint-crypto] hmac_mismatch — bỏ qua bản ghi (có thể bị sửa/giả mạo).', { profileId: sealed.profileId, reason: 'hmac_mismatch' });
+      console.warn('[voiceprint-crypto] hmac_mismatch — skipping record (may be tampered/forged).', { profileId: sealed.profileId, reason: 'hmac_mismatch' });
       return null;
     }
 
@@ -130,7 +130,7 @@ export function openEmbedding(sealed: SealedEmbedding): Float32Array | null {
     const usable = plain.byteLength & ~3;
     return new Float32Array(plain.buffer.slice(plain.byteOffset, plain.byteOffset + usable));
   } catch (error) {
-    console.warn('[voiceprint-crypto] giải mã thất bại, bỏ qua bản ghi.', { profileId: sealed.profileId, error: error instanceof Error ? error.message : String(error) });
+    console.warn('[voiceprint-crypto] decryption failed, skipping record.', { profileId: sealed.profileId, error: error instanceof Error ? error.message : String(error) });
     return null;
   }
 }

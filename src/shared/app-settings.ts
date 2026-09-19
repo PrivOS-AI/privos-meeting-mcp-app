@@ -1,6 +1,6 @@
 /**
  * Single source of truth for the workspace-wide `app_settings` keys this app
- * persists (QĐ-14): shape, defaults, and validators shared by the backend
+ * persists (D-14): shape, defaults, and validators shared by the backend
  * write path (`src/server/tools/settings-set-tool.ts`) and the iframe read
  * path (`src/ui/data/settings-store.ts`) — one allowlist, not two that can
  * drift. Per-user preferences (Stage caption size, preferred mic, live
@@ -50,7 +50,7 @@ type Validator = (value: unknown) => unknown;
 function enumValidator(name: string, allowed: readonly string[]): Validator {
   return (value) => {
     if (typeof value !== 'string' || !allowed.includes(value)) {
-      throw new AppError(`${name} phải là một trong: ${allowed.join(', ')}.`);
+      throw new AppError(`${name} must be one of: ${allowed.join(', ')}.`);
     }
     return value;
   };
@@ -59,7 +59,7 @@ function enumValidator(name: string, allowed: readonly string[]): Validator {
 function unitFractionValidator(name: string): Validator {
   return (value) => {
     if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || value >= 1) {
-      throw new AppError(`${name} phải là số trong khoảng (0, 1).`);
+      throw new AppError(`${name} must be a number in range (0, 1).`);
     }
     return value;
   };
@@ -68,7 +68,7 @@ function unitFractionValidator(name: string): Validator {
 function nonNegativeIntValidator(name: string): Validator {
   return (value) => {
     if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
-      throw new AppError(`${name} phải là số nguyên không âm.`);
+      throw new AppError(`${name} must be a non-negative integer.`);
     }
     return value;
   };
@@ -76,7 +76,7 @@ function nonNegativeIntValidator(name: string): Validator {
 
 function booleanValidator(name: string): Validator {
   return (value) => {
-    if (typeof value !== 'boolean') throw new AppError(`${name} phải là true/false.`);
+    if (typeof value !== 'boolean') throw new AppError(`${name} must be true/false.`);
     return value;
   };
 }

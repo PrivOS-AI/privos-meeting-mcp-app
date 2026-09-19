@@ -135,7 +135,7 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
 
   try {
     await mkdir(tmpDir, { recursive: true });
-    if (signal.aborted) throw new AppError('Chunk bị huỷ trước khi tải phần ghi âm.');
+    if (signal.aborted) throw new AppError('Chunk was cancelled before downloading the recording part.');
 
     const partPath = path.join(tmpDir, 'part.webm');
     await downloadPartBySeq(ctx.hub, req.roomId, ctx.folderId, req.meetingId, req.seq, partPath, signal);
@@ -143,7 +143,7 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
 
     const wavPath = path.join(tmpDir, 'chunk.wav');
     const decoded = await decodeToWav16k(decodeInput, wavPath, signal);
-    if (signal.aborted) throw new AppError('Chunk bị huỷ trong lúc decode.');
+    if (signal.aborted) throw new AppError('Chunk was cancelled during decode.');
 
     const chunkPcm = await readWavPcm(wavPath, 0, decoded.durationSec);
     const overlap = registry.ringTake();
@@ -160,11 +160,11 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
      * off THIS request get that check.
      */
     async function handleSegment(seg: ChunkSegment, checkWindow: boolean): Promise<void> {
-      if (signal.aborted) throw new AppError('Chunk bị huỷ trong lúc xử lý turn.');
+      if (signal.aborted) throw new AppError('Chunk was cancelled while processing the turn.');
       if (registry.alreadyProcessed(seg)) return;
 
       if (checkWindow && !isWithinPartWindow(seg, partStartMs, req.durationMs)) {
-        console.warn('[chunk-worker] span ngoài cửa sổ part — bỏ (sự kiện bảo mật).', {
+        console.warn('[chunk-worker] span outside part window — skipping (security event).', {
           meetingId: req.meetingId,
           seq: req.seq,
           speaker: seg.speaker,
@@ -176,7 +176,7 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
       const fromSec = seg.startMs / 1000 - chunkStartSec;
       const toSec = seg.endMs / 1000 - chunkStartSec;
       if (toSec > pcm.length / 16000) {
-        registry.defer(seg); // turn vắt biên part (S2-03) — retried against the next chunk's extended window.
+        registry.defer(seg); // turn straddling a part boundary (S2-03) — retried against the next chunk's extended window.
         return;
       }
       if (fromSec < 0 || toSec - fromSec < env.speakerMinSegmentSec) return;
@@ -185,7 +185,7 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
       const toSample = Math.min(pcm.length, Math.round(toSec * 16000));
       const slice = pcm.subarray(fromSample, toSample);
       if (!hasRealEnergy(slice)) {
-        console.warn('[chunk-worker] span trỏ vào khoảng lặng — bỏ (sự kiện bảo mật).', { meetingId: req.meetingId, seq: req.seq, speaker: seg.speaker });
+        console.warn('[chunk-worker] span points into silence — skipping (security event).', { meetingId: req.meetingId, seq: req.seq, speaker: seg.speaker });
         return;
       }
 
@@ -218,7 +218,7 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
       await upsertAll(ctx.db, req.meetingId, registry);
     }
   } catch (error) {
-    console.error('[chunk-worker] lỗi xử lý chunk — bỏ qua, đồng hồ vẫn tiến ở chunk sau.', {
+    console.error('[chunk-worker] chunk processing error — skipping, the clock still advances for the next chunk.', {
       meetingId: req.meetingId,
       seq: req.seq,
       error: error instanceof Error ? error.message : String(error),
@@ -245,7 +245,7 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
 const chunkQueue = new KeyedSerialQueue<{ ctx: ChunkWorkerCtx; req: ChunkReadyRequest }>({
   onDropped: (meetingId, { req }) => {
     sessionRegistries.get(meetingId).markDropped(req.seq, req.durationMs);
-    console.warn('[chunk-worker] backlog đầy — bỏ chunk, đánh dấu degraded.', { meetingId, seq: req.seq });
+    console.warn('[chunk-worker] backlog full — dropping chunk, marking degraded.', { meetingId, seq: req.seq });
   },
 });
 

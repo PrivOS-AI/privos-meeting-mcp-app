@@ -8,7 +8,7 @@
  *
  * This queue instead: serializes tasks PER KEY (`meetingId`) while running
  * different keys fully in parallel; caps the per-key backlog at `maxBacklog`
- * (default 3, "mới nhất + 2") — a key that falls behind drops its OLDEST
+ * (default 3, "latest + 2") — a key that falls behind drops its OLDEST
  * still-queued task (never the one already running) and reports it via
  * `onDropped` so the caller can still advance that meeting's clock and flag
  * `degraded`; and gives every running task an `AbortController` it can

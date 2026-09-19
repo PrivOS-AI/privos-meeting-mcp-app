@@ -13,7 +13,7 @@ let decodeShouldThrow = false;
 
 vi.mock('../media/decode-audio.js', () => ({
   decodeToWav16k: vi.fn(async () => {
-    if (decodeShouldThrow) throw new Error('ffmpeg decode thất bại (giả lập).');
+    if (decodeShouldThrow) throw new Error('ffmpeg decode failed (mock).');
     return { durationSec: decodedDurationSec };
   }),
   readWavPcm: vi.fn(async () => currentChunkPcm),

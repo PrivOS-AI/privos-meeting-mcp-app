@@ -1,6 +1,6 @@
 /**
- * "Ai đang nói?" quick-assign popover: pick a room member, type a name, or
- * "cùng người với …" (merge into an existing profile). It only COLLECTS the
+ * "Who's speaking?" quick-assign popover: pick a room member, type a name, or
+ * "same person as …" (merge into an existing profile). It only COLLECTS the
  * choice and hands it back via `onAssign` — the recording store applies the
  * label immediately and defers enrolment (`speaker_resolve`) until a session
  * speaker exists for this realtime speaker, so a user can name someone from the

@@ -40,8 +40,8 @@ function toListItem(profile: profileStore.SpeakerProfile) {
 
 export const speakerProfileListTool: AppTool = {
   name: 'speaker_profile_list',
-  title: 'Danh sách hồ sơ giọng nói',
-  description: 'Liệt kê mọi hồ sơ giọng nói trong workspace (tên, liên kết, số mẫu) — không bao giờ trả về vector.',
+  title: 'List voiceprint profiles',
+  description: 'List every voiceprint profile in the workspace (name, links, sample count) — never returns the vector.',
   inputSchema: { type: 'object', properties: {} },
   async execute(_args, context) {
     const actor = requireVerifiedActor(context);
@@ -53,8 +53,8 @@ export const speakerProfileListTool: AppTool = {
 
 export const speakerProfileUpdateTool: AppTool = {
   name: 'speaker_profile_update',
-  title: 'Cập nhật hồ sơ giọng nói',
-  description: 'Đổi tên, liên kết người dùng PrivOS hoặc ghi nhận lại giọng nói cho một hồ sơ — chỉ người tạo hồ sơ hoặc quản trị viên workspace.',
+  title: 'Update voiceprint profile',
+  description: 'Rename, link a PrivOS user, or re-enrol the voice for a profile — only the profile creator or a workspace admin.',
   inputSchema: {
     type: 'object',
     required: ['profileId'],
@@ -69,13 +69,13 @@ export const speakerProfileUpdateTool: AppTool = {
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
     const profileId = asString(args.profileId);
-    if (!profileId) throw new AppError('profileId là bắt buộc.');
+    if (!profileId) throw new AppError('profileId is required.');
 
     const db = new AppDbBotClient();
     const profile = await profileStore.getProfile(db, profileId);
-    if (!profile) throw new AppError('Không tìm thấy hồ sơ giọng nói.');
+    if (!profile) throw new AppError('Voiceprint profile not found.');
     if (profile.createdByUserId !== actor.userId && !isWorkspaceAdmin(actor)) {
-      throw new AppError('Chỉ người tạo hồ sơ hoặc quản trị viên workspace mới sửa được hồ sơ này.');
+      throw new AppError('Only the profile creator or a workspace admin can edit this profile.');
     }
 
     if (args.action === 'reenrol') {
@@ -83,12 +83,12 @@ export const speakerProfileUpdateTool: AppTool = {
       // global-scope tool does not have (no `roomId` in its input by design —
       // plan.md keeps `speaker_profile_*` room-less). Surfacing this clearly
       // beats silently accepting a request that does nothing.
-      throw new AppError('Ghi nhận lại giọng nói từ audio đã lưu chưa được hỗ trợ ở phiên bản này.');
+      throw new AppError('Re-enrolling voice from stored audio is not supported in this version.');
     }
 
     if (typeof args.displayName === 'string') {
       const displayName = sanitizeDisplayName(args.displayName);
-      if (!displayName) throw new AppError('Tên hiển thị không hợp lệ.');
+      if (!displayName) throw new AppError('Invalid display name.');
       await profileStore.renameProfile(db, profileId, displayName);
     }
     if (typeof args.privosUserId === 'string' && args.privosUserId) {
@@ -102,19 +102,19 @@ export const speakerProfileUpdateTool: AppTool = {
 
 export const speakerProfileDeleteTool: AppTool = {
   name: 'speaker_profile_delete',
-  title: 'Xoá hồ sơ giọng nói',
-  description: 'Xoá hẳn một hồ sơ giọng nói và mọi liên kết của nó trong tất cả các phòng — chỉ người tạo hồ sơ hoặc quản trị viên workspace.',
+  title: 'Delete voiceprint profile',
+  description: 'Permanently delete a voiceprint profile and all its links across every room — only the profile creator or a workspace admin.',
   inputSchema: { type: 'object', required: ['profileId'], properties: { profileId: { type: 'string' } } },
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
     const profileId = asString(args.profileId);
-    if (!profileId) throw new AppError('profileId là bắt buộc.');
+    if (!profileId) throw new AppError('profileId is required.');
 
     const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     const profile = await profileStore.getProfile(db, profileId);
-    if (!profile) throw new AppError('Không tìm thấy hồ sơ giọng nói.');
+    if (!profile) throw new AppError('Voiceprint profile not found.');
     if (profile.createdByUserId !== actor.userId && !isWorkspaceAdmin(actor)) {
-      throw new AppError('Chỉ người tạo hồ sơ hoặc quản trị viên workspace mới xoá được hồ sơ này.');
+      throw new AppError('Only the profile creator or a workspace admin can delete this profile.');
     }
 
     const knownRooms = await readKnownRooms();

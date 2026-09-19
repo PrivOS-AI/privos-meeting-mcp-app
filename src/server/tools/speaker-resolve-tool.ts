@@ -18,9 +18,9 @@
  * `sessionSpeakerId` lookup (P5 registry — falls through to "not found" until
  * P5 ships, which is expected and non-fatal for this phase).
  *
- * `pendingEmbedding` is intentionally NEVER cleared here (plan.md: "giữ tới
- * khi job async xong... không xoá ngay lúc speaker_resolve") — only
- * `profileId`/`displayName`/`resolved`/`nameSource`/`privosUserId` change.
+ * `pendingEmbedding` is intentionally NEVER cleared here (plan.md: "keep it
+ * until the async job finishes... do not clear it at speaker_resolve time")
+ * — only `profileId`/`displayName`/`resolved`/`nameSource`/`privosUserId` change.
  */
 import { sanitizeDisplayName } from '../../shared/sanitize-display-name.js';
 import { AppError } from '../../shared/app-error.js';
@@ -84,8 +84,8 @@ async function findSpeakerRow(db: AppDbBotClient, meetingId: string, speakerId: 
 
 export const speakerResolveTool: AppTool = {
   name: 'speaker_resolve',
-  title: 'Xác nhận người nói',
-  description: 'Xác nhận, đặt tên hoặc gộp người nói chưa xác định của một cuộc họp vào hồ sơ giọng nói.',
+  title: 'Resolve speakers',
+  description: "Confirm, name, or merge a meeting's unidentified speakers into voiceprint profiles.",
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId', 'assignments'],
@@ -112,11 +112,11 @@ export const speakerResolveTool: AppTool = {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId và meetingId là bắt buộc.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
 
     const assignmentsRaw = Array.isArray(args.assignments) ? args.assignments : [];
     const assignments = assignmentsRaw.map(asAssignment).filter((a): a is Assignment => a !== null);
-    if (assignments.length === 0) throw new AppError('assignments không hợp lệ hoặc rỗng.');
+    if (assignments.length === 0) throw new AppError('assignments is invalid or empty.');
 
     const db = new AppDbBotClient(roomId);
     await requireMeetingOwner(db, actor, roomId, meetingId);
@@ -185,7 +185,7 @@ export const speakerResolveTool: AppTool = {
           continue;
         }
         let profile = await profileStore.findProfileByPrivosUserId(db, assignment.privosUserId);
-        const displayName = sanitizeDisplayName(assignment.displayName ?? '') || `Người dùng ${assignment.privosUserId.slice(0, 6)}`;
+        const displayName = sanitizeDisplayName(assignment.displayName ?? '') || `User ${assignment.privosUserId.slice(0, 6)}`;
         if (!profile) {
           profile = await profileStore.createProfile(db, {
             displayName,

@@ -30,19 +30,19 @@ describe('meeting_relabel_speaker', () => {
     const sealedForWrongProfile = sealEmbedding(new Float32Array([1, 0, 0, 0]), { profileId: 'profile-wrong', createdAt: 'now' });
     store = {
       meetings: [{ _id: 'meeting-1', roomId: 'room-1', ownerUserId: 'owner-1' }],
-      meeting_speakers: [{ _id: 'ms1', meeting: 'meeting-1', speakerId: 'spk1', profileId: 'profile-wrong', resolved: true, displayName: 'Sai tên' }],
+      meeting_speakers: [{ _id: 'ms1', meeting: 'meeting-1', speakerId: 'spk1', profileId: 'profile-wrong', resolved: true, displayName: 'Wrong name' }],
       speaker_profiles: [
         {
           _id: 'profile-wrong',
-          displayName: 'Sai tên',
-          displayNameNormalized: 'sai ten',
+          displayName: 'Wrong name',
+          displayNameNormalized: 'wrong name',
           createdByUserId: 'owner-1',
           embeddings: [JSON.stringify({ ...sealedForWrongProfile, meetingId: 'meeting-1', durationSec: 15 })],
           centroid: '',
           dim: 4,
           sampleCount: 1,
         },
-        { _id: 'profile-correct', displayName: 'Đúng tên', displayNameNormalized: 'dung ten', createdByUserId: 'owner-1', embeddings: [], centroid: '', dim: 0, sampleCount: 0 },
+        { _id: 'profile-correct', displayName: 'Correct name', displayNameNormalized: 'correct name', createdByUserId: 'owner-1', embeddings: [], centroid: '', dim: 0, sampleCount: 0 },
       ],
       app_settings: [],
     };
@@ -52,7 +52,7 @@ describe('meeting_relabel_speaker', () => {
   it('rejects a non-owner', async () => {
     await expect(
       relabelSpeakerTool.execute({ roomId: 'room-1', meetingId: 'meeting-1', speakerId: 'spk1', profileId: 'profile-correct' }, ctx('someone-else'), {} as never),
-    ).rejects.toThrow(/chủ cuộc họp/);
+    ).rejects.toThrow(/meeting owner/);
   });
 
   it('moves the meeting embedding from the old profile to the new one (back-propagation)', async () => {
@@ -66,17 +66,17 @@ describe('meeting_relabel_speaker', () => {
     expect(store.speaker_profiles.find((p) => p._id === 'profile-wrong')?.embeddings).toHaveLength(0);
     expect(store.speaker_profiles.find((p) => p._id === 'profile-correct')?.embeddings).toHaveLength(1);
     expect(store.meeting_speakers[0].profileId).toBe('profile-correct');
-    expect(store.meeting_speakers[0].displayName).toBe('Đúng tên');
+    expect(store.meeting_speakers[0].displayName).toBe('Correct name');
   });
 
   it('creates a new profile by name when no profileId is given', async () => {
-    await relabelSpeakerTool.execute({ roomId: 'room-1', meetingId: 'meeting-1', speakerId: 'spk1', displayName: 'Người mới' }, ctx(), {} as never);
-    const created = store.speaker_profiles.find((p) => p.displayName === 'Người mới');
+    await relabelSpeakerTool.execute({ roomId: 'room-1', meetingId: 'meeting-1', speakerId: 'spk1', displayName: 'New person' }, ctx(), {} as never);
+    const created = store.speaker_profiles.find((p) => p.displayName === 'New person');
     expect(created).toBeDefined();
     expect(created?.embeddings).toHaveLength(1);
   });
 
   it('rejects when neither profileId nor displayName is given', async () => {
-    await expect(relabelSpeakerTool.execute({ roomId: 'room-1', meetingId: 'meeting-1', speakerId: 'spk1' }, ctx(), {} as never)).rejects.toThrow(/profileId hoặc displayName/);
+    await expect(relabelSpeakerTool.execute({ roomId: 'room-1', meetingId: 'meeting-1', speakerId: 'spk1' }, ctx(), {} as never)).rejects.toThrow(/profileId or displayName/);
   });
 });

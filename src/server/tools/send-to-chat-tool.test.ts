@@ -29,7 +29,7 @@ describe('meeting_send_to_chat', () => {
   beforeEach(() => {
     sentMessages = [];
     store = {
-      meetings: [{ _id: 'meeting-1', roomId: 'room-1', ownerUserId: 'user-1', title: 'Họp tuần', summaryText: 'Tóm tắt cuộc họp.', summaryFileId: 'file-1' }],
+      meetings: [{ _id: 'meeting-1', roomId: 'room-1', ownerUserId: 'user-1', title: 'Weekly meeting', summaryText: 'Meeting summary.', summaryFileId: 'file-1' }],
     };
     fakeHub = installFakeHub({
       store,
@@ -49,8 +49,8 @@ describe('meeting_send_to_chat', () => {
     };
     expect(result.sent).toBe(true);
     expect(sentMessages).toHaveLength(1);
-    expect(String(sentMessages[0].text)).toContain('Tóm tắt cuộc họp.');
-    expect(String(sentMessages[0].text)).toContain('Họp tuần');
+    expect(String(sentMessages[0].text)).toContain('Meeting summary.');
+    expect(String(sentMessages[0].text)).toContain('Weekly meeting');
 
     const rows = store.meetings.filter((m) => m._id === 'meeting-1');
     expect(rows[0].sentToChatAt).toBe(result.sentAt);
@@ -58,11 +58,11 @@ describe('meeting_send_to_chat', () => {
 
   it('rejects when there is no saved summary yet', async () => {
     store.meetings[0].summaryText = undefined;
-    await expect(sendToChatTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('user-1'), runtime())).rejects.toThrow(/tóm tắt/);
+    await expect(sendToChatTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('user-1'), runtime())).rejects.toThrow(/summary/);
   });
 
   it('rejects a caller who does not own the meeting', async () => {
-    await expect(sendToChatTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('someone-else'), runtime())).rejects.toThrow(/chủ cuộc họp/);
+    await expect(sendToChatTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('someone-else'), runtime())).rejects.toThrow(/meeting owner/);
   });
 
   it('surfaces the Hub error instead of silently failing when the bot tool call fails', async () => {

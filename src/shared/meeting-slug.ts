@@ -3,7 +3,7 @@
  * (file-management/stable-file-id-and-replace-semantics.md), so two meetings in
  * the same room on the same day with the same title would overwrite each other.
  * Every meeting folder therefore ends in an 8-char meeting id, and each part
- * file repeats it — see `folderName`/`partFileName` (QĐ / FM F8, S2-10).
+ * file repeats it — see `folderName`/`partFileName` (D / FM F8, S2-10).
  */
 
 const VIETNAMESE_MAP: Record<string, string> = {

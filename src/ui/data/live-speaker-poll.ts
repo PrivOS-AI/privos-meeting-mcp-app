@@ -1,9 +1,9 @@
 /**
  * Polls `meeting_live_speakers` every 3-5s while recording (provider has
- * speaker labels only — QĐ-18) and applies the returned map onto every
+ * speaker labels only — D-18) and applies the returned map onto every
  * already-rendered caption line by `speakerKey`: relabel the badge, NEVER the
- * text (plan.md § "Giao thức relabel"). Also exposes the raw session-speaker
- * list (`onSpeakersUpdate`) for the "Ai đang nói?" chip row, and the
+ * text (plan.md § "Relabel protocol"). Also exposes the raw session-speaker
+ * list (`onSpeakersUpdate`) for the "Who's speaking?" chip row, and the
  * `degraded`/`labelsSupported` flags for the UI's own notices.
  */
 import { parseToolResult } from '@privos_ai/app-react';
@@ -35,7 +35,7 @@ export interface LiveSpeakerPollOptions {
   intervalMs?: number;
   /** speakerKey -> LiveSpeaker, applied to every rendered line with that key. */
   onUpdate(map: Map<string, LiveSpeaker>): void;
-  /** The raw list every poll — drives the "Ai đang nói?" chip row. */
+  /** The raw list every poll — drives the "Who's speaking?" chip row. */
   onSpeakersUpdate?(speakers: LiveSpeaker[], meta: { degraded: boolean; labelsSupported: boolean }): void;
 }
 

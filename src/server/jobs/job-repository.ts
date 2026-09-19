@@ -12,7 +12,7 @@ export const JOB_STEPS: readonly JobStep[] = ['download', 'decode', 'transcribe'
 
 /** How often `meeting-job.ts` pings `heartbeatAt` while a single step runs long. Single source for both the timer and `meeting_status`'s `stale` threshold. */
 export const HEARTBEAT_INTERVAL_MS = 15_000;
-/** `stale = now - heartbeatAt > 2 × heartbeat cycle` (spec). Informational only — drives the UI's "Xử lý lại" prompt, not `job-repository.sweepStale`'s own (more conservative) reset threshold. */
+/** `stale = now - heartbeatAt > 2 × heartbeat cycle` (spec). Informational only — drives the UI's "Reprocess" prompt, not `job-repository.sweepStale`'s own (more conservative) reset threshold. */
 export const STALE_AFTER_MS = HEARTBEAT_INTERVAL_MS * 2;
 
 export type SttAsyncProviderName = 'soniox-async' | 'elevenlabs-batch';
@@ -34,7 +34,7 @@ export interface JobResult {
   durationSec: number;
   languageCode: string;
   sttProvider: SttAsyncProviderName;
-  /** No embedding vector — never store or return one from a job result (QĐ-06). */
+  /** No embedding vector — never store or return one from a job result (D-06). */
   speakers: JobResultSpeaker[];
   fileIds: { transcriptJson: string; transcriptMd: string; srt: string; summary?: string };
   summary?: unknown;
@@ -184,7 +184,7 @@ export class JobRepository {
       finishedAt: '',
     });
     const reset = await this.findByMeeting(input.meetingId);
-    if (!reset) throw new AppError('Không đọc lại được job vừa reset.');
+    if (!reset) throw new AppError('Could not re-read the job that was just reset.');
     return reset;
   }
 
@@ -277,7 +277,7 @@ export class JobRepository {
     const cutoff = Date.now() - olderThanMs;
     const stale = rows.filter((row) => new Date(row.heartbeatAt).getTime() < cutoff);
     for (const job of stale) {
-      await this.fail(job._id, 'interrupted: job xử lý bị gián đoạn (pm2 khởi động lại hoặc mất tiến trình).');
+      await this.fail(job._id, 'interrupted: job processing was interrupted (pm2 restarted or the process was lost).');
     }
     return stale;
   }

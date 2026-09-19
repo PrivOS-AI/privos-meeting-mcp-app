@@ -1,7 +1,7 @@
 /**
- * SPIKE: IndexedDB trong iframe opaque origin
+ * SPIKE: IndexedDB in an opaque-origin iframe
  *
- * Chạy trong iframe: thử mở IndexedDB. Chỉ quyết định có dùng làm buffer best-effort hay không (KHÔNG load-bearing; độ bền audio dựa trên Files).
+ * Run inside the iframe: try opening IndexedDB. Only decides whether it's usable as a best-effort buffer (NOT load-bearing; audio durability relies on Files).
  *
  * This is a foundational Phase-1 spike (see plan.md § Spikes). It CANNOT run
  * without live credentials / a live PrivOS Hub, so offline it only verifies its
@@ -11,7 +11,7 @@
 const REQUIRED: string[] = [];
 
 function main(): void {
-  console.log('SPIKE: IndexedDB trong iframe opaque origin');
+  console.log('SPIKE: IndexedDB in an opaque-origin iframe');
   const missing = REQUIRED.filter((k) => !process.env[k] || !process.env[k]!.trim());
   if (missing.length) {
     console.warn('Prerequisites missing (spike not run):', missing.join(', '));

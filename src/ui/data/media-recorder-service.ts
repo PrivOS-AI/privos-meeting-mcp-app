@@ -1,5 +1,5 @@
 /**
- * The storage-branch `MediaRecorder` wrapper (QĐ-13). Records the SAME
+ * The storage-branch `MediaRecorder` wrapper (D-13). Records the SAME
  * `MediaStream` the realtime SDK also consumes, in ~60s timeslices; each blob
  * is handed to the caller and then dropped immediately — the meeting is never
  * held whole in RAM (non-functional requirement: flat memory over 60 minutes).

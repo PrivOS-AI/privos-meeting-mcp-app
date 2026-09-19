@@ -10,7 +10,7 @@
  * asserts the response has no such field. `degraded:true` once any chunk for
  * this meeting has been dropped/failed; `labelsSupported:false` short-circuits
  * to an empty list when the meeting's realtime provider never had labels to
- * begin with (QĐ-18) so the iframe can stop polling.
+ * begin with (D-18) so the iframe can stop polling.
  */
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
@@ -41,8 +41,8 @@ export interface LiveSpeakerDto {
 
 export const liveSpeakersTool: AppTool = {
   name: 'meeting_live_speakers',
-  title: 'Người nói trực tiếp',
-  description: 'Danh sách người nói đã nhận diện được trong lúc đang họp, kèm tên nếu đã khớp hồ sơ giọng nói.',
+  title: 'Live speakers',
+  description: 'List of speakers detected during the meeting, with names when matched to a voiceprint profile.',
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId'],
@@ -52,7 +52,7 @@ export const liveSpeakersTool: AppTool = {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId và meetingId là bắt buộc.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
 
     const db = new AppDbBotClient(roomId);
     await requireRoomMeeting(db, actor, roomId, meetingId);

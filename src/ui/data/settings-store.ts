@@ -1,6 +1,6 @@
 /**
  * Iframe-side read/write for the WORKSPACE-WIDE settings in `app_settings`
- * (QĐ-14). Reads go straight to the App DB (any verified user may read
+ * (D-14). Reads go straight to the App DB (any verified user may read
  * `app_settings` — `db:read` is a required permission for every member);
  * writes always go through `meeting_settings_set` (admin-only, validated
  * server-side) — this module never writes `app_settings` directly. Shape,

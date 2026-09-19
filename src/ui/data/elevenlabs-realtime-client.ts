@@ -1,13 +1,13 @@
 /**
  * ElevenLabs realtime wrapper. Scribe realtime has NO speaker diarization —
  * this wrapper NEVER emits a `LiveTurn` and its provider capabilities are
- * fixed `speakerLabels:false` regardless of anything the SDK returns (QĐ-18).
+ * fixed `speakerLabels:false` regardless of anything the SDK returns (D-18).
  *
- * OPEN QUESTION (spike P1-10/P1-11, QĐ-01): the installed `@elevenlabs/client`
+ * OPEN QUESTION (spike P1-10/P1-11, D-01): the installed `@elevenlabs/client`
  * 1.25 `ScribeRealtime.connect()` has no option to hand it an existing
  * `MediaStream` — only `microphone:{...}` (the SDK does its OWN internal
  * `getUserMedia`) or manual `AudioOptions` (we would have to encode/send audio
- * ourselves, which QĐ-01 forbids). Default here: `microphone` mode — the SDK
+ * ourselves, which D-01 forbids). Default here: `microphone` mode — the SDK
  * opens a second, independent mic capture alongside our own MediaRecorder
  * stream. This means two concurrent mic opens for the same physical device
  * (functionally fine in every browser tested to date); revisit once a spike
@@ -29,7 +29,7 @@ import {
   type RealtimeConnectionOptions,
 } from './realtime-client.js';
 
-/** Every event that means "this session is over" — mirrors QĐ-01/S2 "any close/error ends the session". */
+/** Every event that means "this session is over" — mirrors D-01/S2 "any close/error ends the session". */
 const END_EVENTS: RealtimeEvents[] = [
   RealtimeEvents.CLOSE,
   RealtimeEvents.ERROR,
@@ -141,7 +141,7 @@ export function createElevenLabsConnection(opts: RealtimeConnectionOptions): Rea
               endSec: (sessionOffsetMs + lastEnd * 1000) / 1000,
               lang: msg.language_code,
             });
-            // Never a LiveTurn — ElevenLabs realtime carries no speaker id (QĐ-18).
+            // Never a LiveTurn — ElevenLabs realtime carries no speaker id (D-18).
           });
 
           connection.on(RealtimeEvents.COMMITTED_TRANSCRIPT, (msg: CommittedTranscriptMessage) => {

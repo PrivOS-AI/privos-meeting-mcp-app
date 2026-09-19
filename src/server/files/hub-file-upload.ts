@@ -58,12 +58,12 @@ export async function uploadBotFile(input: UploadBotFileInput): Promise<UploadBo
   const body = await readJson(response);
   if (!response.ok || body?.success !== true) {
     const message = typeof body?.error === 'string' ? body.error : typeof body?.message === 'string' ? body.message : `HTTP ${response.status}`;
-    throw new AppError(`Lưu tệp "${input.fileName}" vào phòng thất bại: ${message}`);
+    throw new AppError(`Failed to save file "${input.fileName}" to the room: ${message}`);
   }
   const file = body.file;
   const fileId = file && typeof file === 'object' ? (file as Record<string, unknown>)._id : undefined;
   if (typeof fileId !== 'string' || !fileId) {
-    throw new AppError(`Hub không trả về id tệp sau khi lưu "${input.fileName}".`);
+    throw new AppError(`Hub did not return a file id after saving "${input.fileName}".`);
   }
   return { fileId };
 }
