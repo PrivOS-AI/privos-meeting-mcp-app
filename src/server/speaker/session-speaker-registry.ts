@@ -128,11 +128,28 @@ export class MeetingSessionRegistry {
   private discontinuous = false;
   private degradedFlag = false;
   private lastPersistedHash = '';
+  private webmInitSegment: Buffer | null = null;
 
   /** Last time a chunk was processed (or the registry was created) — the TTL clock (S2-13). */
   lastActivityAt = Date.now();
 
   constructor(public readonly meetingId: string) {}
+
+  // -------------------------------------------------------- webm header
+
+  /**
+   * The WebM init segment cached from part 0 — prepended to header-less parts
+   * (`seq >= 1`) before decode (see `live-speakers/webm-init-segment.ts`). Not
+   * persisted: after a restart/eviction mid-meeting the worker re-fetches part
+   * 0 to repopulate it.
+   */
+  getWebmInitSegment(): Buffer | null {
+    return this.webmInitSegment;
+  }
+
+  setWebmInitSegment(bytes: Buffer): void {
+    this.webmInitSegment = bytes;
+  }
 
   private nextColor(): string {
     return PALETTE[this.byId.size % PALETTE.length];

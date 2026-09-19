@@ -16,7 +16,7 @@
  * skews the clock for every chunk after it (S2-08).
  */
 import { randomUUID } from 'node:crypto';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { RoomBoundHubClient } from '@privos_ai/app-server';
@@ -37,6 +37,7 @@ import { matchSpeaker } from '../speaker/speaker-matcher.js';
 import { KeyedSerialQueue } from '../jobs/keyed-serial-queue.js';
 import { ensureRegistry, upsertAll } from './live-speaker-repository.js';
 import { downloadPartBySeq } from './part-window.js';
+import { extractWebmInitSegment } from './webm-init-segment.js';
 import { hasRealEnergy, isWithinPartWindow, type ChunkSegment } from '../tools/span-validation.js';
 
 export interface ChunkReadyRequest {
@@ -88,6 +89,40 @@ async function matchPendingAgainstProfiles(db: AppDbBotClient, registry: Meeting
 }
 
 /**
+ * Turns the just-downloaded part into a standalone-decodable WebM path. Part 0
+ * carries the WebM header, so it decodes as-is and its init segment is cached
+ * for the meeting. Parts `seq >= 1` are bare Opus clusters — the cached init
+ * segment is prepended (re-fetching part 0 once if the cache was lost to a
+ * restart) so ffmpeg can decode them (see `webm-init-segment.ts`).
+ */
+async function resolveDecodableInput(
+  ctx: ChunkWorkerCtx,
+  req: ChunkReadyRequest,
+  registry: MeetingSessionRegistry,
+  tmpDir: string,
+  partPath: string,
+  signal: AbortSignal,
+): Promise<string> {
+  if (req.seq === 0) {
+    registry.setWebmInitSegment(extractWebmInitSegment(await readFile(partPath)));
+    return partPath;
+  }
+
+  let init = registry.getWebmInitSegment();
+  if (!init) {
+    // Cache lost (server restarted mid-meeting) — re-fetch part 0 for its header only.
+    const part0Path = path.join(tmpDir, 'part0.webm');
+    await downloadPartBySeq(ctx.hub, req.roomId, ctx.folderId, req.meetingId, 0, part0Path, signal);
+    init = extractWebmInitSegment(await readFile(part0Path));
+    registry.setWebmInitSegment(init);
+  }
+
+  const fixedPath = path.join(tmpDir, 'part-fixed.webm');
+  await writeFile(fixedPath, Buffer.concat([init, await readFile(partPath)]));
+  return fixedPath;
+}
+
+/**
  * The actual per-chunk work (plan.md's `onChunkReady` pseudocode). NEVER
  * throws past its own `catch` — any failure is logged and the registry is
  * marked discontinuous; the caller (the queue) treats this as "done", not
@@ -104,9 +139,10 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
 
     const partPath = path.join(tmpDir, 'part.webm');
     await downloadPartBySeq(ctx.hub, req.roomId, ctx.folderId, req.meetingId, req.seq, partPath, signal);
+    const decodeInput = await resolveDecodableInput(ctx, req, registry, tmpDir, partPath, signal);
 
     const wavPath = path.join(tmpDir, 'chunk.wav');
-    const decoded = await decodeToWav16k(partPath, wavPath, signal);
+    const decoded = await decodeToWav16k(decodeInput, wavPath, signal);
     if (signal.aborted) throw new AppError('Chunk bị huỷ trong lúc decode.');
 
     const chunkPcm = await readWavPcm(wavPath, 0, decoded.durationSec);

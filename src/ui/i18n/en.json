@@ -83,6 +83,12 @@
   "recording.side.actions": "Action items",
   "recording.side.bookmarks": "Bookmarks",
   "recording.side.emptyAfterEnd": "Available after the meeting ends",
+  "recording.liveSummary.waiting": "A running summary appears about 10 minutes in, then refreshes every 10 minutes.",
+  "recording.liveSummary.loading": "Summarizing…",
+  "recording.liveSummary.error": "Could not generate the summary. Try again.",
+  "recording.liveSummary.refresh": "Refresh",
+  "recording.liveSummary.updatedAt": "Updated {time}",
+  "recording.liveSummary.noActions": "No action items yet.",
 
   "recovery.banner.message": "Recover unfinished recording ({count} parts)",
   "recovery.banner.finish": "Finish & process",

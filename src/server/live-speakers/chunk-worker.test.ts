@@ -19,7 +19,23 @@ vi.mock('../media/decode-audio.js', () => ({
   readWavPcm: vi.fn(async () => currentChunkPcm),
 }));
 
-vi.mock('./part-window.js', () => ({ downloadPartBySeq: vi.fn(async () => undefined) }));
+// Writes a minimal WebM-shaped part (pseudo header bytes + a Cluster marker) so
+// the worker's readFile/init-segment-prepend step has real bytes to work with;
+// the actual decode is mocked above, so only the byte structure matters.
+vi.mock('./part-window.js', () => ({
+  downloadPartBySeq: vi.fn(async (...args: unknown[]) => {
+    const destPath = args[5] as string;
+    const { writeFile } = await import('node:fs/promises');
+    await writeFile(
+      destPath,
+      Buffer.concat([
+        Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x01, 0x02, 0x03]), // pseudo EBML/header bytes
+        Buffer.from([0x1f, 0x43, 0xb6, 0x75]), // Cluster id — init-segment boundary
+        Buffer.from([0x81, 0x00, 0x00]), // pseudo cluster body
+      ]),
+    );
+  }),
+}));
 
 const appendLiveTurns = vi.fn(async (..._args: unknown[]) => undefined);
 vi.mock('../media/live-turns-store.js', () => ({ appendLiveTurns: (...args: unknown[]) => appendLiveTurns(...args) }));

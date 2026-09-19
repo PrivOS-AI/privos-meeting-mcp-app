@@ -12,6 +12,7 @@ import { DegradedLabelsNotice } from '../components/degraded-labels-notice.js';
 import { EmptyState } from '../components/empty-state.js';
 import { Icon } from '../components/icon.js';
 import { KeepAwakeNotice } from '../components/keep-awake-notice.js';
+import { LiveSummaryPanel } from '../components/live-summary-panel.js';
 import { VoiceWaveform } from '../components/voice-waveform.js';
 import { RecIndicator } from '../components/rec-indicator.js';
 import { RecordingFooter } from '../components/recording-footer.js';
@@ -254,16 +255,7 @@ function LiveSidePanel({ meetingId, bookmarkAtSec }: LiveSidePanelProps) {
         {tab === 'bookmarks' ? (
           <BookmarksPanel bookmarks={bookmarks} onDelete={(id) => void removeBookmark(id)} />
         ) : (
-          <div className="ma-side-panel__overview">
-            <section>
-              <h3 className="ma-side-panel__section-title">{t('recording.side.summary')}</h3>
-              <p className="ma-side-panel__empty">{t('recording.side.emptyAfterEnd')}</p>
-            </section>
-            <section>
-              <h3 className="ma-side-panel__section-title">{t('recording.side.actions')}</h3>
-              <p className="ma-side-panel__empty">{t('recording.side.emptyAfterEnd')}</p>
-            </section>
-          </div>
+          <LiveSummaryPanel />
         )}
       </div>
     </div>

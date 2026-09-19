@@ -83,6 +83,12 @@
   "recording.side.actions": "Việc cần làm",
   "recording.side.bookmarks": "Đánh dấu",
   "recording.side.emptyAfterEnd": "Có sau khi kết thúc",
+  "recording.liveSummary.waiting": "Bản tóm tắt xuất hiện sau khoảng 10 phút họp, rồi tự cập nhật mỗi 10 phút.",
+  "recording.liveSummary.loading": "Đang tóm tắt…",
+  "recording.liveSummary.error": "Không tạo được tóm tắt. Vui lòng thử lại.",
+  "recording.liveSummary.refresh": "Cập nhật",
+  "recording.liveSummary.updatedAt": "Cập nhật lúc {time}",
+  "recording.liveSummary.noActions": "Chưa có việc cần làm.",
 
   "recovery.banner.message": "Khôi phục bản ghi chưa hoàn tất ({count} phần)",
   "recovery.banner.finish": "Hoàn tất & xử lý",

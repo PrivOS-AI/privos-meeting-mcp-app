@@ -9,6 +9,7 @@ import { botCredentialCheckTool } from './bot-credential-check-tool.js';
 import { bootstrapTool } from './bootstrap-tool.js';
 import { chunkReadyTool } from './chunk-ready-tool.js';
 import { liveSpeakersTool } from './live-speakers-tool.js';
+import { liveSummaryTool } from './live-summary-tool.js';
 import { processTool } from './process-tool.js';
 import { realtimeTokenTool } from './realtime-token-tool.js';
 import { registerTool } from './registry.js';
@@ -33,6 +34,7 @@ export function registerAllTools(): void {
   registerTool(processTool);
   registerTool(statusTool);
   registerTool(summarizeTool);
+  registerTool(liveSummaryTool);
   registerTool(sendToChatTool);
   registerTool(settingsSetTool);
   registerTool(speakerResolveTool);
