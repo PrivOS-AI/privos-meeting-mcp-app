@@ -130,9 +130,6 @@ export function assertProviderKeysAtBoot(config: AppEnv = env): string[] {
       `STT_ASYNC_PROVIDER=${config.asyncProvider} nhưng thiếu ${config.asyncProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'}.`,
     );
   }
-  if (!config.voiceprintEncKey) {
-    problems.push('Thiếu VOICEPRINT_ENC_KEY (AES-256-GCM 32 byte base64) — bắt buộc để mã hoá voiceprint.');
-  }
   if (problems.length && !isDevelopmentRuntime()) {
     throw new Error(`Cấu hình không hợp lệ khi khởi động:\n- ${problems.join('\n- ')}`);
   }

@@ -16,7 +16,7 @@
  * logs `{ profileId, reason: 'hmac_mismatch' }` — matching continues with
  * whatever other embeddings are still valid.
  */
-import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, hkdfSync, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import { env } from '../env.js';
 
@@ -41,30 +41,30 @@ const HKDF_HASH_BYTES = 32;
 let cachedKeyMaterial: { encKeyB64: string; key: Buffer; macKey: Buffer } | undefined;
 
 /**
+ * A fixed PrivOS default so voiceprints work with zero configuration. It is
+ * PUBLIC (it ships in the source), so it provides obfuscation, not real secrecy
+ * — set `VOICEPRINT_ENC_KEY` to your own secret for genuine protection.
+ */
+const DEFAULT_VOICEPRINT_KEY = 'privos:meeting-agent:voiceprint:v1:default';
+
+/**
  * Lazily derives (and caches) the AES key + HMAC key from `VOICEPRINT_ENC_KEY`.
- * Re-derives if the env value ever changes within the process (tests swap it);
- * production reads it once at boot and never again. Throws a clear error when
- * the key is absent or not a 32-byte base64 value — callers must not silently
- * proceed with voiceprint operations when the key is missing.
+ * AES-256 needs EXACTLY 32 bytes (a crypto requirement, not our own rule), so
+ * we accept a key of any length — or none — and derive the 32 bytes via SHA-256,
+ * falling back to {@link DEFAULT_VOICEPRINT_KEY} when unset. Re-derives if the
+ * configured value changes within the process (tests swap it).
  */
 function keyMaterial(): { key: Buffer; macKey: Buffer } {
-  const encKeyB64 = env.voiceprintEncKey;
-  if (!encKeyB64) {
-    throw new Error('VOICEPRINT_ENC_KEY chưa được cấu hình — không thể mã hoá/giải mã voiceprint.');
-  }
-  if (cachedKeyMaterial && cachedKeyMaterial.encKeyB64 === encKeyB64) {
+  const source = env.voiceprintEncKey?.trim() || DEFAULT_VOICEPRINT_KEY;
+  if (cachedKeyMaterial && cachedKeyMaterial.encKeyB64 === source) {
     return cachedKeyMaterial;
   }
-  const key = Buffer.from(encKeyB64, 'base64');
-  if (key.length !== 32) {
-    throw new Error(`VOICEPRINT_ENC_KEY phải là 32 byte base64 (đọc được ${key.length} byte).`);
-  }
+  const key = createHash('sha256').update(source, 'utf8').digest();
   const macKey = Buffer.from(hkdfSync('sha256', key, Buffer.alloc(0), HKDF_INFO, HKDF_HASH_BYTES));
-  cachedKeyMaterial = { encKeyB64, key, macKey };
+  cachedKeyMaterial = { encKeyB64: source, key, macKey };
   return cachedKeyMaterial;
 }
 
-/** Test-only: force key material to be re-derived on the next call. */
 export function resetVoiceprintKeyCacheForTests(): void {
   cachedKeyMaterial = undefined;
 }

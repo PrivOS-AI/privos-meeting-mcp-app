@@ -157,28 +157,7 @@ export function VoiceWaveform({ stream, muted, speakers, activeKey }: VoiceWavef
       ctx2d.clearRect(0, 0, width, height);
       for (const line of lines) if (line.speakerKey !== active) drawLine(histories.get(line.speakerKey)!, colorOf(line.colorKey), false, width, height);
       const activeLine = lines.find((l) => l.speakerKey === active);
-      if (activeLine) {
-        const color = colorOf(activeLine.colorKey);
-        drawLine(histories.get(activeLine.speakerKey)!, color, true, width, height);
-        // Glowing head at the end of the sound.
-        const pulse = reducedMotion ? 0.5 : level;
-        const headX = width - 6;
-        const headY = height / 2;
-        const halo = ctx2d.createRadialGradient(headX, headY, 0, headX, headY, 10 + pulse * 12);
-        halo.addColorStop(0, withAlpha(color, 0.55));
-        halo.addColorStop(1, withAlpha(color, 0));
-        ctx2d.fillStyle = halo;
-        ctx2d.beginPath();
-        ctx2d.arc(headX, headY, 10 + pulse * 12, 0, Math.PI * 2);
-        ctx2d.fill();
-        ctx2d.fillStyle = '#ffffff';
-        ctx2d.shadowColor = color;
-        ctx2d.shadowBlur = 10 + pulse * 10;
-        ctx2d.beginPath();
-        ctx2d.arc(headX, headY, 2.6 + pulse * 1.6, 0, Math.PI * 2);
-        ctx2d.fill();
-        ctx2d.shadowBlur = 0;
-      }
+      if (activeLine) drawLine(histories.get(activeLine.speakerKey)!, colorOf(activeLine.colorKey), true, width, height);
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);

@@ -46,6 +46,7 @@
   "recording.keepAwake.notice": "Tắt tự động tắt màn hình/sleep trong lúc ghi — Hub chưa cấp quyền giữ màn hình sáng cho ứng dụng này.",
   "recording.capacity.notice": "Hệ thống đang ghi tối đa số cuộc họp cho phép, phụ đề trực tiếp tạm không khả dụng — bản ghi vẫn chạy và tên người nói sẽ có sau khi xử lý.",
   "recording.degradedLabels.notice": "Nhãn người nói sẽ có sau khi xử lý.",
+  "recording.editTitle": "Đổi tên cuộc họp",
   "recording.speakerBadge.numbered": "Người nói {n}",
   "recording.speakerBadge.speaking": "Đang nói",
   "recording.speakerBadge.speakingNow": "đang nói…",

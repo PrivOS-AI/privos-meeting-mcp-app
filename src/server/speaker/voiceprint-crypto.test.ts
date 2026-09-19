@@ -54,8 +54,17 @@ describe('voiceprint-crypto', () => {
     errorSpy.mockRestore();
   });
 
-  it('throws a clear error from sealEmbedding when the key is missing', () => {
+  it('still seals+opens with the built-in default key when none is configured', () => {
     setKey(undefined);
-    expect(() => sealEmbedding(new Float32Array([1]), { profileId: 'p', createdAt: 'now' })).toThrow(/VOICEPRINT_ENC_KEY/);
+    const vec = new Float32Array([0.4, -0.1, 0.9]);
+    const opened = openEmbedding(sealEmbedding(vec, { profileId: "p", createdAt: "now" }));
+    expect(opened && Array.from(opened)).toEqual(Array.from(vec));
+  });
+
+  it('accepts a key of any length (derives 32 bytes) — not only 32-byte base64', () => {
+    env.voiceprintEncKey = 'a short human passphrase';
+    const vec = new Float32Array([1, 2, 3]);
+    const opened = openEmbedding(sealEmbedding(vec, { profileId: "p", createdAt: "now" }));
+    expect(opened && Array.from(opened)).toEqual(Array.from(vec));
   });
 });

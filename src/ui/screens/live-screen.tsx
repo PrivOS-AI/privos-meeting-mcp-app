@@ -12,7 +12,6 @@ import { DegradedLabelsNotice } from '../components/degraded-labels-notice.js';
 import { EmptyState } from '../components/empty-state.js';
 import { Icon } from '../components/icon.js';
 import { KeepAwakeNotice } from '../components/keep-awake-notice.js';
-import { LiveSpeakerChips } from '../components/live-speaker-chips.js';
 import { VoiceWaveform } from '../components/voice-waveform.js';
 import { RecIndicator } from '../components/rec-indicator.js';
 import { RecordingFooter } from '../components/recording-footer.js';
@@ -35,6 +34,8 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
   const store = useRecordingStore();
   const state = useRecordingState();
   const [view, setView] = useState<ViewMode>('transcript');
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
 
   // Chat-style transcript: keep the newest caption in view so older lines are
   // pushed up as people talk — but never yank the view while the user has
@@ -63,25 +64,6 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
     await store.endAndSummarize();
     onEnded();
   }
-
-  // One chip per REALTIME speaker (from `speakerMap`, populated on the first
-  // token) so a user can name a speaker from second one — not the slower
-  // embedding-based `liveSpeakers`. Discovery order is the map's insertion order.
-  const realtimeChips = Object.entries(state.speakerMap).map(([speakerKey, badge]) => ({
-    speakerKey,
-    displayName: badge.displayName,
-    colorKey: badge.colorKey,
-    resolved: badge.resolved,
-  }));
-  const speakerChips =
-    state.meetingId && state.capabilities?.speakerLabels ? (
-      <LiveSpeakerChips
-        roomId={roomId}
-        speakers={realtimeChips}
-        degraded={state.liveSpeakersDegraded}
-        onAssign={(speakerKey, choice) => store.assignRealtimeSpeaker(speakerKey, choice)}
-      />
-    ) : null;
 
   const footer = (
     <RecordingFooter
@@ -119,7 +101,6 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
           </button>
         </div>
         {notices}
-        {speakerChips}
         <StageCaption lines={state.lines} speakerMap={state.speakerMap} size={state.stageCaptionSize} resolveSpeakerKey={(line) => resolveLineSpeakerKey(state, line)} />
         <div className="ma-stage__footer">{footer}</div>
       </div>
@@ -131,7 +112,30 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
       <div className="ma-live__main">
         <div className="ma-live__topbar">
           <div>
-            <h2 className="ma-live__title">{state.title}</h2>
+            {editingTitle ? (
+              <input
+                className="ma-live__title-input"
+                value={titleDraft}
+                autoFocus
+                maxLength={300}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={() => { store.setTitle(titleDraft); setEditingTitle(false); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { store.setTitle(titleDraft); setEditingTitle(false); }
+                  if (e.key === 'Escape') setEditingTitle(false);
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="ma-live__title"
+                onClick={() => { setTitleDraft(state.title); setEditingTitle(true); }}
+                aria-label={t('recording.editTitle')}
+              >
+                <span>{state.title}</span>
+                <Icon name="edit" size={15} />
+              </button>
+            )}
             <p className="ma-live__meta">
               <Icon name="person-multiple" size={14} />
               {speakerKeys.length > 0 ? t('recording.speakerCount', { n: speakerKeys.length }) : t('recording.speakerCount.unknown')}
@@ -146,7 +150,6 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
           </div>
         </div>
         {notices}
-        {speakerChips}
         <div
           className="ma-live__lines"
           ref={linesRef}

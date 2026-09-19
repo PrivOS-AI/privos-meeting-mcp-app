@@ -50,7 +50,7 @@ export function LineSpeakerPicker({ speakers, currentKey, onPick, onRename, onAd
         ))}
         <div className="ma-line-picker__divider" />
         <button type="button" role="menuitem" className="ma-line-picker__item" onClick={onRename}>
-          <Icon name="text-font-size" size={16} />
+          <Icon name="edit" size={16} />
           <span className="ma-line-picker__name">{t('speaker.linePicker.rename')}</span>
         </button>
         <button type="button" role="menuitem" className="ma-line-picker__item" onClick={() => onAddSpeaker(applyToVoice)}>

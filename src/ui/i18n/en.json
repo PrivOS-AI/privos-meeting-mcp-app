@@ -46,6 +46,7 @@
   "recording.keepAwake.notice": "Turn off screen auto-lock/sleep while recording — the Hub has not granted this app the screen-wake-lock permission yet.",
   "recording.capacity.notice": "The system is at its maximum concurrent recordings, live captions are temporarily unavailable — recording continues and speaker names will arrive after processing.",
   "recording.degradedLabels.notice": "Speaker labels will be available after processing.",
+  "recording.editTitle": "Rename meeting",
   "recording.speakerBadge.numbered": "Speaker {n}",
   "recording.speakerBadge.speaking": "Speaking",
   "recording.speakerBadge.speakingNow": "speaking…",

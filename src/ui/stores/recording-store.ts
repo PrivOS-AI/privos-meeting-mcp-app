@@ -586,6 +586,14 @@ export class RecordingStore {
     }
   }
 
+  /** Rename the meeting live (persists the new title on the meetings row). */
+  setTitle(title: string): void {
+    const next = title.trim();
+    if (!next || next === this.state.title) return;
+    this.setState({ title: next });
+    if (this.state.meetingId) void updateRecordingMeeting(this.app, this.state.meetingId, { title: next }).catch(() => undefined);
+  }
+
   setStageCaptionSize(size: StageCaptionSize): void {
     this.setState({ stageCaptionSize: size });
   }
