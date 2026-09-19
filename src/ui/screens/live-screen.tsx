@@ -47,14 +47,22 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
     onEnded();
   }
 
+  // One chip per REALTIME speaker (from `speakerMap`, populated on the first
+  // token) so a user can name a speaker from second one — not the slower
+  // embedding-based `liveSpeakers`. Discovery order is the map's insertion order.
+  const realtimeChips = Object.entries(state.speakerMap).map(([speakerKey, badge]) => ({
+    speakerKey,
+    displayName: badge.displayName,
+    colorKey: badge.colorKey,
+    resolved: badge.resolved,
+  }));
   const speakerChips =
     state.meetingId && state.capabilities?.speakerLabels ? (
       <LiveSpeakerChips
         roomId={roomId}
-        meetingId={state.meetingId}
-        speakers={state.liveSpeakers}
+        speakers={realtimeChips}
         degraded={state.liveSpeakersDegraded}
-        onResolved={(sessionSpeakerId, displayName) => store.applyQuickAssignResult(sessionSpeakerId, displayName)}
+        onAssign={(speakerKey, choice) => store.assignRealtimeSpeaker(speakerKey, choice)}
       />
     ) : null;
 

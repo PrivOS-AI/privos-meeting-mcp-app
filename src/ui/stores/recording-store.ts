@@ -22,6 +22,7 @@ import { listParts, notifyChunkReady, uploadPart } from '../data/meeting-part-up
 import { PartUploadQueue } from '../data/part-upload-queue.js';
 import { createRealtimeClient, type CaptionEvent, type CaptionStatus, type LiveTurn, type RealtimeConnection } from '../data/realtime-client.js';
 import { LiveSpeakerPoll, type LiveSpeaker } from '../data/live-speaker-poll.js';
+import { speakerResolve, type RealtimeAssignChoice } from '../data/speaker-api.js';
 import { ScreenWakeLock, type WakeLockState } from '../data/screen-wake-lock.js';
 import type { RealtimeCapabilities, RealtimeToken, SttVendor } from '../data/stt-types.js';
 import { TranslateBuffer } from '../data/translate-buffer.js';
@@ -167,6 +168,9 @@ export class RecordingStore {
   private timer: ReturnType<typeof setInterval> | null = null;
   private allTurns: LiveTurn[] = [];
   private nextPartSeq = 0;
+  /** Manual early assignments keyed by REALTIME speaker key, awaiting a session speaker to enrol against. */
+  private pendingAssignments = new Map<string, RealtimeAssignChoice>();
+  private reconciling = false;
 
   constructor(
     private readonly app: McpApp,
@@ -373,7 +377,10 @@ export class RecordingStore {
         roomId: this.ctx.roomId,
         meetingId,
         onUpdate: (map) => this.applySpeakerMap(map),
-        onSpeakersUpdate: (speakers, meta) => this.setState({ liveSpeakers: speakers, liveSpeakersDegraded: meta.degraded }),
+        onSpeakersUpdate: (speakers, meta) => {
+          this.setState({ liveSpeakers: speakers, liveSpeakersDegraded: meta.degraded });
+          void this.reconcilePendingAssignments(); // a new session speaker may now cover an early manual assignment
+        },
       });
     }
 
@@ -419,22 +426,61 @@ export class RecordingStore {
   }
 
   /**
-   * Optimistic update right after a quick-assign `speaker_resolve` call
-   * succeeds — patches the chip AND every already-rendered line's badge for
-   * that `sessionSpeakerId` immediately, instead of waiting up to
-   * `intervalMs` for the next poll to confirm the same thing.
+   * The user named a REALTIME speaker (from second one). Relabel every line of
+   * that speaker immediately and remember the choice; the enrolment is deferred
+   * to {@link reconcilePendingAssignments} once a session speaker exists for it.
+   * An empty/skip choice clears any pending assignment and the label.
    */
-  applyQuickAssignResult(sessionSpeakerId: string, displayName: string): void {
-    const liveSpeakers = this.state.liveSpeakers.map((s) => (s.sessionSpeakerId === sessionSpeakerId ? { ...s, displayName, resolved: true } : s));
-    const target = liveSpeakers.find((s) => s.sessionSpeakerId === sessionSpeakerId);
+  assignRealtimeSpeaker(speakerKey: string, choice: RealtimeAssignChoice): void {
+    const label = choice.displayName?.trim();
     const speakerMap = { ...this.state.speakerMap };
-    if (target) {
-      for (const label of target.sonioxLabels) {
-        const key = label.split('@')[0];
-        if (speakerMap[key]) speakerMap[key] = { ...speakerMap[key], displayName, resolved: true };
-      }
+    const prev = speakerMap[speakerKey] ?? { colorKey: this.nextColor(), resolved: false };
+    speakerMap[speakerKey] = { ...prev, displayName: label || prev.displayName, resolved: choice.mode !== 'skip' };
+    this.setState({ speakerMap });
+
+    if (choice.mode === 'skip') {
+      this.pendingAssignments.delete(speakerKey);
+      return;
     }
-    this.setState({ liveSpeakers, speakerMap });
+    this.pendingAssignments.set(speakerKey, choice);
+    void this.reconcilePendingAssignments();
+  }
+
+  /**
+   * For every pending manual assignment, find the session speaker whose
+   * `sonioxLabels` now include that realtime key and persist the identity via
+   * `speaker_resolve` (enrolling the voiceprint). Runs after each live-speaker
+   * poll and right after a manual assignment; single-flighted so overlapping
+   * polls do not double-resolve. A `not_found` (session speaker not written
+   * yet) leaves the assignment pending for a later poll.
+   */
+  private async reconcilePendingAssignments(): Promise<void> {
+    if (this.reconciling || this.pendingAssignments.size === 0 || !this.state.meetingId) return;
+    this.reconciling = true;
+    try {
+      for (const [speakerKey, choice] of [...this.pendingAssignments]) {
+        const session = this.state.liveSpeakers.find(
+          (s) => !s.mergedInto && s.sonioxLabels.some((lbl) => lbl.split('@')[0] === speakerKey),
+        );
+        if (!session) continue; // no session speaker yet — keep it pending
+        try {
+          const [result] = await speakerResolve(this.app, this.ctx.roomId, this.state.meetingId, [
+            { speakerId: session.sessionSpeakerId, mode: choice.mode, displayName: choice.displayName, privosUserId: choice.privosUserId, profileId: choice.profileId },
+          ]);
+          if (result?.reason === 'not_found') continue; // row not written yet; retry next poll
+          this.pendingAssignments.delete(speakerKey);
+          const displayName = result?.displayName ?? choice.displayName ?? this.state.speakerMap[speakerKey]?.displayName ?? '';
+          const liveSpeakers = this.state.liveSpeakers.map((s) =>
+            s.sessionSpeakerId === session.sessionSpeakerId ? { ...s, displayName, resolved: true } : s,
+          );
+          this.setState({ liveSpeakers });
+        } catch {
+          // Transient (relay blip): keep it pending for the next poll.
+        }
+      }
+    } finally {
+      this.reconciling = false;
+    }
   }
 
   // -------------------------------------------------------------- upload

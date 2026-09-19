@@ -8,6 +8,19 @@ import type { McpApp } from '@privos_ai/app-react';
 
 export type SpeakerResolveMode = 'user' | 'name' | 'merge' | 'skip';
 
+/**
+ * A manual assignment the user makes on a REALTIME speaker (from second one),
+ * before the embedding pipeline has a session speaker for it. The recording
+ * store applies the label at once and defers enrolment (voiceprint) until a
+ * matching session speaker appears.
+ */
+export interface RealtimeAssignChoice {
+  mode: SpeakerResolveMode;
+  displayName?: string;
+  privosUserId?: string;
+  profileId?: string;
+}
+
 export interface SpeakerResolveAssignment {
   speakerId: string;
   mode: SpeakerResolveMode;

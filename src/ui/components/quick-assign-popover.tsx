@@ -1,31 +1,28 @@
 /**
- * "Ai đang nói?" quick-assign popover (plan.md § UI): pick a room member,
- * type a name, or "cùng người với …" (merge into an existing profile) — all
- * three call `speaker_resolve` with `speakerId = sessionSpeakerId` (P4's tool
- * already accepts a session id as a fallback lookup key, see
- * `speaker-resolve-tool.ts`'s `findSpeakerRow`). A cluster that is not yet
- * coherent enough to enrol still gets NAMED immediately (`enrolled:false`,
- * `reason:'cluster_not_coherent'`/`'no_pending_embedding'`) — that is
- * success from this popover's point of view, not an error.
+ * "Ai đang nói?" quick-assign popover: pick a room member, type a name, or
+ * "cùng người với …" (merge into an existing profile). It only COLLECTS the
+ * choice and hands it back via `onAssign` — the recording store applies the
+ * label immediately and defers enrolment (`speaker_resolve`) until a session
+ * speaker exists for this realtime speaker, so a user can name someone from the
+ * first second without waiting on the embedding pipeline.
  */
 import { useEffect, useState } from 'react';
 import { usePrivosApp } from '@privos_ai/app-react';
 
-import { speakerProfileList, speakerResolve, type SpeakerProfileListItem, type SpeakerResolveMode } from '../data/speaker-api.js';
+import { speakerProfileList, type RealtimeAssignChoice, type SpeakerProfileListItem, type SpeakerResolveMode } from '../data/speaker-api.js';
 import type { RoomMember } from '../data/room-members.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 import { MemberPicker } from './member-picker.js';
 
 export interface QuickAssignPopoverProps {
   roomId: string;
-  meetingId: string;
-  sessionSpeakerId: string;
-  currentLabel: string;
+  /** The realtime speaker key this popover assigns (used only to scope the radio group ids). */
+  speakerId: string;
   onClose(): void;
-  onResolved(displayName: string): void;
+  onAssign(choice: RealtimeAssignChoice): void;
 }
 
-export function QuickAssignPopover({ roomId, meetingId, sessionSpeakerId, currentLabel, onClose, onResolved }: QuickAssignPopoverProps) {
+export function QuickAssignPopover({ speakerId, onClose, onAssign }: QuickAssignPopoverProps) {
   const app = usePrivosApp();
   const { t } = useI18n();
   const [mode, setMode] = useState<SpeakerResolveMode>('name');
@@ -33,8 +30,6 @@ export function QuickAssignPopover({ roomId, meetingId, sessionSpeakerId, curren
   const [member, setMember] = useState<RoomMember | undefined>();
   const [profileId, setProfileId] = useState('');
   const [profiles, setProfiles] = useState<SpeakerProfileListItem[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     speakerProfileList(app)
@@ -42,43 +37,31 @@ export function QuickAssignPopover({ roomId, meetingId, sessionSpeakerId, curren
       .catch(() => setProfiles([]));
   }, [app]);
 
-  async function submit(): Promise<void> {
-    setSubmitting(true);
-    setError(null);
-    try {
-      const assignment =
-        mode === 'user'
-          ? { speakerId: sessionSpeakerId, mode: 'user' as const, privosUserId: member?.id, displayName: member?.name }
-          : mode === 'merge'
-            ? { speakerId: sessionSpeakerId, mode: 'merge' as const, profileId }
-            : { speakerId: sessionSpeakerId, mode: 'name' as const, displayName };
-      const [result] = await speakerResolve(app, roomId, meetingId, [assignment]);
-      if (result.reason === 'not_found') {
-        // The chunk worker has not written this session speaker's row yet — too early to quick-assign.
-        setError(t('speaker.quickAssign.notFoundYet'));
-        return;
-      }
-      onResolved(result.displayName ?? displayName ?? member?.name ?? currentLabel);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSubmitting(false);
-    }
+  function submit(): void {
+    const choice: RealtimeAssignChoice =
+      mode === 'user'
+        ? { mode: 'user', privosUserId: member?.id, displayName: member?.name }
+        : mode === 'merge'
+          ? { mode: 'merge', profileId, displayName: profiles.find((p) => p.id === profileId)?.displayName }
+          : { mode: 'name', displayName: displayName.trim() };
+    onAssign(choice);
   }
+
+  const canSubmit = mode === 'user' ? Boolean(member) : mode === 'merge' ? Boolean(profileId) : displayName.trim().length > 0;
 
   return (
     <div className="ma-quick-assign" role="dialog" aria-label={t('speaker.quickAssign.title')}>
       <div className="ma-quick-assign__modes" role="radiogroup" aria-label={t('speaker.resolveModal.modeGroupLabel')}>
         <label>
-          <input type="radio" name={`qa-mode-${sessionSpeakerId}`} checked={mode === 'user'} onChange={() => setMode('user')} />
+          <input type="radio" name={`qa-mode-${speakerId}`} checked={mode === 'user'} onChange={() => setMode('user')} />
           {t('speaker.resolveModal.modeUser')}
         </label>
         <label>
-          <input type="radio" name={`qa-mode-${sessionSpeakerId}`} checked={mode === 'name'} onChange={() => setMode('name')} />
+          <input type="radio" name={`qa-mode-${speakerId}`} checked={mode === 'name'} onChange={() => setMode('name')} />
           {t('speaker.resolveModal.modeName')}
         </label>
         <label>
-          <input type="radio" name={`qa-mode-${sessionSpeakerId}`} checked={mode === 'merge'} onChange={() => setMode('merge')} />
+          <input type="radio" name={`qa-mode-${speakerId}`} checked={mode === 'merge'} onChange={() => setMode('merge')} />
           {t('speaker.quickAssign.samePersonAs')}
         </label>
       </div>
@@ -105,18 +88,12 @@ export function QuickAssignPopover({ roomId, meetingId, sessionSpeakerId, curren
         </select>
       ) : null}
 
-      {error ? (
-        <p className="ma-resolve-speakers__error" role="alert">
-          {error}
-        </p>
-      ) : null}
-
       <div className="ma-quick-assign__actions">
-        <button type="button" className="ma-resolve-speakers__later" onClick={onClose} disabled={submitting}>
+        <button type="button" className="ma-resolve-speakers__later" onClick={onClose}>
           {t('speaker.resolveModal.later')}
         </button>
-        <button type="button" className="ma-resolve-speakers__submit" onClick={() => void submit()} disabled={submitting}>
-          {submitting ? t('speaker.resolveModal.submitting') : t('speaker.resolveModal.submit')}
+        <button type="button" className="ma-resolve-speakers__submit" onClick={submit} disabled={!canSubmit}>
+          {t('speaker.resolveModal.submit')}
         </button>
       </div>
     </div>

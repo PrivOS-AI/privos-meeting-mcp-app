@@ -1,65 +1,60 @@
 /**
- * "Ai đang nói?" chip row on the live screen (plan.md § UI). One chip per
- * active session speaker (merged-away entries never render their own chip —
- * their labels already live on the winner). Clicking a chip opens
- * `QuickAssignPopover` for that `sessionSpeakerId`. A `degraded` badge in the
- * row explains that some segments could not be identified yet (a chunk was
- * dropped/failed) rather than silently looking broken.
+ * "Ai đang nói?" chip row on the live screen. One chip per REALTIME speaker
+ * (Soniox `speaker` label) — so a chip appears from the first token, letting the
+ * user name a speaker immediately. Clicking a chip opens `QuickAssignPopover`;
+ * the chosen name is applied to every line of that speaker at once and the
+ * recording store enrols the voiceprint once a session speaker forms for it. A
+ * `degraded` badge explains that some segments could not be identified yet.
  */
 import { useState } from 'react';
 
 import { useI18n } from '../i18n/i18n-provider.js';
-import type { LiveSpeaker } from '../data/live-speaker-poll.js';
+import type { RealtimeAssignChoice } from '../data/speaker-api.js';
 import { QuickAssignPopover } from './quick-assign-popover.js';
 import { SpeakerAvatar } from './speaker-avatar.js';
 
+export interface RealtimeSpeakerChip {
+  speakerKey: string;
+  displayName?: string;
+  colorKey: string;
+  resolved: boolean;
+}
+
 export interface LiveSpeakerChipsProps {
   roomId: string;
-  meetingId: string;
-  speakers: readonly LiveSpeaker[];
+  speakers: readonly RealtimeSpeakerChip[];
   degraded: boolean;
-  onResolved(sessionSpeakerId: string, displayName: string): void;
+  onAssign(speakerKey: string, choice: RealtimeAssignChoice): void;
 }
 
-function formatSeconds(sec: number): string {
-  const total = Math.max(0, Math.round(sec));
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`;
-}
-
-export function LiveSpeakerChips({ roomId, meetingId, speakers, degraded, onResolved }: LiveSpeakerChipsProps) {
+export function LiveSpeakerChips({ roomId, speakers, degraded, onAssign }: LiveSpeakerChipsProps) {
   const { t } = useI18n();
   const [openFor, setOpenFor] = useState<string | null>(null);
 
-  const active = speakers.filter((s) => !s.mergedInto);
-  if (active.length === 0 && !degraded) return null;
+  if (speakers.length === 0 && !degraded) return null;
 
   return (
     <div className="ma-speaker-chips" role="group" aria-label={t('recording.speakerChips.label')}>
-      {active.map((speaker, index) => {
+      {speakers.map((speaker, index) => {
         const label = speaker.displayName || t('speaker.numbered', { n: index + 1 });
         return (
-          <div key={speaker.sessionSpeakerId} className="ma-speaker-chip-wrap">
+          <div key={speaker.speakerKey} className="ma-speaker-chip-wrap">
             <button
               type="button"
               className={`ma-speaker-chip${speaker.resolved ? ' ma-speaker-chip--resolved' : ''}`}
-              onClick={() => setOpenFor(openFor === speaker.sessionSpeakerId ? null : speaker.sessionSpeakerId)}
+              onClick={() => setOpenFor(openFor === speaker.speakerKey ? null : speaker.speakerKey)}
             >
               <SpeakerAvatar name={label} colorKey={speaker.colorKey} size={22} />
-              <span className="ma-speaker-chip__name">{speaker.resolved ? label : t('recording.speakerChips.identifying')}</span>
-              <span className="ma-speaker-chip__seconds">{formatSeconds(speaker.liveSpeechSec)}</span>
+              <span className="ma-speaker-chip__name">{label}</span>
             </button>
-            {openFor === speaker.sessionSpeakerId ? (
+            {openFor === speaker.speakerKey ? (
               <QuickAssignPopover
                 roomId={roomId}
-                meetingId={meetingId}
-                sessionSpeakerId={speaker.sessionSpeakerId}
-                currentLabel={label}
+                speakerId={speaker.speakerKey}
                 onClose={() => setOpenFor(null)}
-                onResolved={(displayName) => {
+                onAssign={(choice) => {
                   setOpenFor(null);
-                  onResolved(speaker.sessionSpeakerId, displayName);
+                  onAssign(speaker.speakerKey, choice);
                 }}
               />
             ) : null}
