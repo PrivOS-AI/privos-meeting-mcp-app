@@ -36,7 +36,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   // Shared across every caption line so the whole column flips together.
-  const [timeMode, setTimeMode] = useState<'clock' | 'duration'>('clock');
+  const [timeMode, setTimeMode] = useState<'clock' | 'wall'>('clock');
   // Mobile only: the Summary/Bookmarks panel is a right-hand drawer.
   const [sideOpen, setSideOpen] = useState(false);
 
@@ -149,7 +149,6 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
                 </button>
               ) : null}
             </span>
-            <RecIndicator elapsedSec={state.elapsedSec} paused={state.status === 'paused'} />
             <button type="button" className="ma-live__toggle" onClick={() => setView('stage')}>
               <Icon name="volume" size={16} />
               {t('recording.view.stage')}
@@ -187,8 +186,10 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
                   onRename={(speakerKey, choice) => store.assignRealtimeSpeaker(speakerKey, choice)}
                   onMenuOpenChange={(open) => { menuOpenRef.current = open; }}
                   timeMode={timeMode}
-                  onToggleTimeMode={() => setTimeMode((m) => (m === 'clock' ? 'duration' : 'clock'))}
-                  onBookmark={() => void store.addBookmark()}
+                  onToggleTimeMode={() => setTimeMode((m) => (m === 'clock' ? 'wall' : 'clock'))}
+                  startedAtMs={state.startedAt}
+                  bookmarked={state.bookmarkedSecs.includes(Math.round(line.atSec))}
+                  onBookmark={() => void store.addBookmark(line.atSec, line.text)}
                 />
               );
             })

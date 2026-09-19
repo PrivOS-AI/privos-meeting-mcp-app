@@ -368,9 +368,9 @@
   gap: var(--space-2);
 }
 
-.ma-bookmarks-panel__row {
+".ma-bookmarks-panel__row {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2);
 }
 
@@ -386,10 +386,14 @@
   font-family: var(--ma-font-mono);
 }
 
-.ma-bookmarks-panel__quote {
+".ma-bookmarks-panel__quote {
   flex: 1;
+  min-width: 0;
   color: var(--ma-fg-3);
   font-size: var(--body-sm-size);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ma-bookmarks-panel__delete {

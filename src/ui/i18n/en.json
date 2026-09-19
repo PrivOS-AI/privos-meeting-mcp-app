@@ -66,6 +66,7 @@
   "speaker.linePicker.noMatch": "No matching speaker",
   "speaker.linePicker.applyToVoice": "Apply to every line of this voice",
   "recording.bookmark.add": "Bookmark here",
+  "recording.bookmark.saved": "Bookmarked",
   "recording.footer.mute": "Mute/unmute microphone",
   "recording.footer.textSize": "Caption text size",
   "recording.footer.pause": "Pause",

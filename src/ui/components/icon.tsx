@@ -36,6 +36,7 @@ export const ICON_NAMES = [
   'bell',
   'bookmark',
   'bookmark-add',
+  'bookmark-check',
   'bot',
   'calendar',
   'chat',

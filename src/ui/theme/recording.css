@@ -400,9 +400,15 @@
   border-radius: var(--ma-radius-sm);
 }
 
-.ma-caption-line__bookmark:hover {
+".ma-caption-line__bookmark:hover {
   color: var(--ma-brand-blue);
   background: var(--bg-hover);
+}
+
+.ma-caption-line__bookmark--on,
+.ma-caption-line__bookmark--on:disabled {
+  color: var(--ma-brand-blue);
+  opacity: 1;
 }
 
 /* ---------- Side panel ---------- */

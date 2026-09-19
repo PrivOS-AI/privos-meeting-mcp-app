@@ -78,6 +78,8 @@ export interface RecordingState {
   showTranslation: boolean;
   wakeLock: WakeLockState;
   bookmarkAtSec?: number;
+  /** Rounded atSec of every caption line the user has bookmarked this session — drives the filled/ticked bookmark icon per line. */
+  bookmarkedSecs: number[];
   error?: string;
 }
 
@@ -106,6 +108,7 @@ function initialState(): RecordingState {
     pendingParts: 0,
     clockSkewMs: 0,
     lines: [],
+    bookmarkedSecs: [],
     speakerMap: {},
     lineSpeaker: {},
     voiceAlias: {},
@@ -633,11 +636,18 @@ export class RecordingStore {
     this.translateBuffer?.setEnabled(showTranslation);
   }
 
-  async addBookmark(): Promise<void> {
+  /**
+   * Bookmark ONE caption segment. `atSec` is that line's start (rounded); `quote`
+   * is a short snippet of its text. Toggling the same segment removes it. Falls
+   * back to the current elapsed time when called with no line (legacy footer button).
+   */
+  async addBookmark(atSec?: number, quote?: string): Promise<void> {
     if (!this.state.meetingId) return;
-    const atSec = this.state.elapsedSec;
-    await addBookmark(this.app, { meetingId: this.state.meetingId, atSec, createdBy: this.ctx.userId });
-    this.setState({ bookmarkAtSec: atSec });
+    const at = Math.round(atSec ?? this.state.elapsedSec);
+    if (this.state.bookmarkedSecs.includes(at)) return; // already bookmarked this segment
+    const snippet = quote ? quote.trim().slice(0, 140) : undefined;
+    await addBookmark(this.app, { meetingId: this.state.meetingId, atSec: at, createdBy: this.ctx.userId, quote: snippet });
+    this.setState({ bookmarkAtSec: at, bookmarkedSecs: [...this.state.bookmarkedSecs, at] });
   }
 
   // ------------------------------------------------------------------ end

@@ -82,11 +82,16 @@ export function LiveSummaryPanel() {
     }
   }, [app, roomId, language, t]);
 
+  // Keep `run` in a ref so the 10-min interval is created ONCE per status change.
+  // (The panel re-renders every second as the elapsed clock ticks; depending on
+  // `run` here would clear+recreate the timer each render and it would never fire.)
+  const runRef = useRef(run);
+  runRef.current = run;
   useEffect(() => {
     if (state.status !== 'recording' && state.status !== 'paused') return;
-    const id = setInterval(() => void run(), REFRESH_INTERVAL_MS);
+    const id = setInterval(() => void runRef.current(), REFRESH_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [state.status, run]);
+  }, [state.status]);
 
   const busy = status === 'loading';
   const timeLabel = updatedAt

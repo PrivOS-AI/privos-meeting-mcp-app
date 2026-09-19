@@ -66,6 +66,7 @@
   "speaker.linePicker.noMatch": "Không có người nói phù hợp",
   "speaker.linePicker.applyToVoice": "Áp dụng cho mọi đoạn của giọng này",
   "recording.bookmark.add": "Đánh dấu tại đây",
+  "recording.bookmark.saved": "Đã đánh dấu",
   "recording.footer.mute": "Tắt/bật micro",
   "recording.footer.textSize": "Cỡ chữ phụ đề",
   "recording.footer.pause": "Tạm dừng",

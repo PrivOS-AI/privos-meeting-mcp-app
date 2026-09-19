@@ -118,11 +118,14 @@ export function VoiceWaveform({ stream, muted, speakers, activeKey }: VoiceWavef
         if (x === 0) ctx2d.moveTo(x, y);
         else ctx2d.lineTo(x, y);
       }
+      // Symmetric fade: both the head AND the tail taper out to nothing, so the
+      // wave closes to a point at each end instead of ending on a bright stub.
       const gradient = ctx2d.createLinearGradient(0, 0, width, 0);
       gradient.addColorStop(0, withAlpha(color, 0));
-      gradient.addColorStop(0.18, withAlpha(color, active ? 0.55 : 0.18));
-      gradient.addColorStop(0.85, withAlpha(color, active ? 1 : 0.3));
-      gradient.addColorStop(1, withAlpha(color, active ? 0.9 : 0.12));
+      gradient.addColorStop(0.15, withAlpha(color, active ? 0.5 : 0.24));
+      gradient.addColorStop(0.5, withAlpha(color, active ? 1 : 0.44));
+      gradient.addColorStop(0.85, withAlpha(color, active ? 0.5 : 0.24));
+      gradient.addColorStop(1, withAlpha(color, 0));
       ctx2d.strokeStyle = gradient;
       ctx2d.lineWidth = active ? 2.4 : 1.2;
       ctx2d.lineJoin = 'round';

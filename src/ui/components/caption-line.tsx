@@ -28,9 +28,13 @@ export interface CaptionLineProps {
   onRename?(speakerKey: string, choice: RealtimeAssignChoice): void;
   /** Fires when this line's speaker menu opens/closes, so the transcript can stop auto-scrolling while it is open. */
   onMenuOpenChange?(open: boolean): void;
-  /** 'clock' = timestamp since meeting start; 'duration' = how long this turn was spoken. */
-  timeMode?: 'clock' | 'duration';
+  /** 'clock' = elapsed since meeting start (mm:ss); 'wall' = real time of day (HH:MM:SS). */
+  timeMode?: 'clock' | 'wall';
   onToggleTimeMode?(): void;
+  /** Meeting start wall-clock in ms — turns a line's `atSec` into a real time of day. */
+  startedAtMs?: number;
+  /** This segment is already bookmarked — its bookmark icon shows as ticked/filled. */
+  bookmarked?: boolean;
   onBookmark?: () => void;
 }
 
@@ -40,14 +44,12 @@ function formatTimestamp(atSec: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-/** Spoken length of a turn: "8s" under a minute, else "1:05". */
-function formatDuration(sec: number): string {
-  const s = Math.max(0, Math.round(sec));
-  if (s < 60) return `${s}s`;
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+/** Real time of day this segment was spoken, e.g. "14:30:22". */
+function formatWallClock(atSec: number, startedAtMs: number): string {
+  return new Date(startedAtMs + atSec * 1000).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, speakers, onReassign, onAddSpeaker, onRename, onMenuOpenChange, timeMode = 'clock', onToggleTimeMode, onBookmark }: CaptionLineProps) {
+export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, speakers, onReassign, onAddSpeaker, onRename, onMenuOpenChange, timeMode = 'clock', onToggleTimeMode, startedAtMs = 0, bookmarked = false, onBookmark }: CaptionLineProps) {
   const { t } = useI18n();
   const [menu, setMenu] = useState<'closed' | 'picker' | 'rename'>('closed');
   useEffect(() => { onMenuOpenChange?.(menu !== 'closed'); }, [menu, onMenuOpenChange]);
@@ -87,7 +89,7 @@ export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, s
               aria-label={t('recording.time.toggle')}
               onClick={onToggleTimeMode}
             >
-              {timeMode === 'duration' ? formatDuration(line.endSec - line.atSec) : formatTimestamp(line.atSec)}
+              {timeMode === 'wall' ? formatWallClock(line.atSec, startedAtMs) : formatTimestamp(line.atSec)}
             </button>
           ) : (
             <span className="ma-caption-line__speaking">{t('recording.speakerBadge.speakingNow')}</span>
@@ -125,8 +127,15 @@ export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, s
         {line.translation ? <p className="ma-caption-line__translation">{line.translation}</p> : null}
       </div>
       {onBookmark ? (
-        <button type="button" className="ma-caption-line__bookmark" aria-label={t('recording.bookmark.add')} onClick={onBookmark}>
-          <Icon name="bookmark-add" size={16} />
+        <button
+          type="button"
+          className={`ma-caption-line__bookmark${bookmarked ? ' ma-caption-line__bookmark--on' : ''}`}
+          aria-label={t(bookmarked ? 'recording.bookmark.saved' : 'recording.bookmark.add')}
+          aria-pressed={bookmarked}
+          disabled={bookmarked}
+          onClick={onBookmark}
+        >
+          <Icon name={bookmarked ? 'bookmark-check' : 'bookmark-add'} size={16} />
         </button>
       ) : null}
     </div>
