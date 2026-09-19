@@ -19,8 +19,8 @@ interface MeBody {
 
 export const botCredentialCheckTool: AppTool = {
   name: 'meeting_agent_bot_credential_check',
-  title: 'Kiểm tra credential bot',
-  description: 'Kiểm tra thông tin xác thực của bot cài đặt với Hub.',
+  title: 'Check bot credential',
+  description: "Check the installation bot's credential against the Hub.",
   inputSchema: { type: 'object', properties: {} },
   async execute(_args, _context, runtime) {
     try {

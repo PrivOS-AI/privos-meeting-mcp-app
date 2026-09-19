@@ -20,8 +20,8 @@ import type { AppTool } from './registry.js';
 
 export const sttStatusTool: AppTool = {
   name: 'meeting_stt_status',
-  title: 'Trạng thái nhận dạng giọng nói',
-  description: 'Trạng thái của cả hai nhà cung cấp STT để quản trị viên so sánh.',
+  title: 'Speech-to-text status',
+  description: 'Status of both STT providers for admins to compare.',
   inputSchema: { type: 'object', properties: {} },
   async execute(_args, context) {
     const actor = requireVerifiedActor(context);

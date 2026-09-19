@@ -20,8 +20,8 @@ import type { AppTool } from './registry.js';
 
 export const bootstrapTool: AppTool = {
   name: 'meeting_bootstrap',
-  title: 'Khởi tạo dữ liệu phòng',
-  description: 'Đăng ký schema App DB, ghi nhận phòng và đảm bảo bot là thành viên phòng.',
+  title: 'Bootstrap room data',
+  description: 'Register the App DB schema, record the room, and ensure the bot is a room member.',
   inputSchema: { type: 'object', required: ['roomId'], properties: { roomId: { type: 'string' } } },
   async execute(args, _context, runtime) {
     const roomId = typeof args.roomId === 'string' ? args.roomId.trim() : '';

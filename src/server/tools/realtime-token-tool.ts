@@ -66,8 +66,8 @@ export async function countActiveRealtimeRecordings(): Promise<number> {
 
 export const realtimeTokenTool: AppTool = {
   name: 'meeting_realtime_token',
-  title: 'Lấy token phụ đề trực tiếp',
-  description: 'Mint token realtime ngắn hạn cho SDK phụ đề trực tiếp của nhà cung cấp STT đang chọn.',
+  title: 'Get live caption token',
+  description: "Mint a short-lived realtime token for the selected STT provider's live caption SDK.",
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId'],
