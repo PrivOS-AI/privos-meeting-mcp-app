@@ -1050,13 +1050,17 @@
 
 /* ---------- Mobile (<=720px): title bar, right drawer, compact wave ---------- */
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   /* Title bar sits at the top with the two fixed sidebar icons (left = rail /
      Meeting toggle, right = summary drawer) flanking it. */
   .ma-live__topbar {
     flex-wrap: wrap;
     padding: 0 44px; /* clear the fixed left + right icon buttons */
     min-height: 40px;
+  }
+
+  .ma-live__main {
+    padding: var(--space-2) var(--space-3) var(--space-3);
   }
 
   .ma-live__title-wrap {
@@ -1082,17 +1086,17 @@
     align-items: center;
     justify-content: center;
     position: fixed;
-    top: 10px;
-    right: 10px;
+    top: 52px;
+    right: 8px;
     z-index: 60;
     width: 40px;
     height: 40px;
     min-height: 40px;
     color: var(--ma-fg-1);
-    background: var(--ma-surface);
-    border: 1px solid var(--ma-border-1);
-    border-radius: var(--ma-radius-md);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    box-shadow: none;
   }
 
   .ma-live__side {

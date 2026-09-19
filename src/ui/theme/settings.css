@@ -190,7 +190,7 @@
 
 /* ---------- Responsive: stack the settings nav above the content ---------- */
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .ma-settings-screen {
     padding: var(--space-4);
   }
