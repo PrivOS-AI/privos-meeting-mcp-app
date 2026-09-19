@@ -81,7 +81,23 @@
 .ma-settings-panel__actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-3);
+}
+
+/* Themed secondary button — a bare <button> keeps the browser's light-grey
+   default and ignores dark mode. */
+.ma-settings-panel__actions button {
+  padding: 0 var(--space-4);
+  font-weight: var(--weight-medium);
+  color: var(--ma-fg-1);
+  background: var(--ma-surface);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-md);
+}
+
+.ma-settings-panel__actions button:hover:not(:disabled) {
+  background: var(--bg-hover);
 }
 
 .ma-settings-field {
@@ -218,5 +234,19 @@
 
   .ma-settings-content {
     max-width: none;
+    width: 100%;
+  }
+
+  .ma-settings-field {
+    max-width: none;
+  }
+
+  /* Wide status tables scroll inside their own box, never the whole page. */
+  .ma-settings-table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
   }
 }

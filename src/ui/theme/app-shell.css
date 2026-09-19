@@ -402,6 +402,7 @@
 
   .ma-body {
     padding: var(--space-2) var(--space-3) var(--space-3);
+    overflow-x: hidden;
   }
 
   /* The live screen's own title bar occupies that row, between the two icons. */

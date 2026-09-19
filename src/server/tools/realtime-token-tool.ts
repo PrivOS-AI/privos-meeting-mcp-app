@@ -34,14 +34,21 @@ async function countFreshRecordings(freshSinceIso: string): Promise<number> {
   let total = 0;
   for (const roomId of knownRooms) {
     const roomDb = new AppDbBotClient(roomId);
-    const result = await roomDb.query('meetings', 'room', {
-      where: [
-        { field: 'status', op: '==', value: 'recording' },
-        { field: 'lastPartAt', op: '>=', value: freshSinceIso },
-      ],
-      limit: 1000,
-    });
-    total += extractDbRecords(result).length;
+    try {
+      const result = await roomDb.query('meetings', 'room', {
+        where: [
+          { field: 'status', op: '==', value: 'recording' },
+          { field: 'lastPartAt', op: '>=', value: freshSinceIso },
+        ],
+        limit: 1000,
+      });
+      total += extractDbRecords(result).length;
+    } catch (error) {
+      // A known room the bot can no longer read (removed from the room, room
+      // deleted) must not block captions everywhere else — it simply has no
+      // countable recordings.
+      console.warn('[meeting_realtime_token] bỏ qua phòng không đọc được khi đếm phiên:', { roomId, error: error instanceof Error ? error.message : error });
+    }
   }
   return total;
 }

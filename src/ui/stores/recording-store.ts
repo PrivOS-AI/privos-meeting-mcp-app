@@ -378,8 +378,10 @@ export class RecordingStore {
       token = parseToolResult(raw) as unknown as RealtimeToken;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      // "Hệ thống đang ghi tối đa N cuộc họp" — recording keeps going, only captions are unavailable.
-      this.setState({ captionStatus: 'capacity', error: message });
+      // Only the server's concurrency-cap refusal ("Hệ thống đang ghi tối đa N cuộc họp") is a
+      // capacity problem; any other failure is plain "captions off" — never mislabel it as capacity.
+      // Either way the recording itself keeps going.
+      this.setState({ captionStatus: /tối đa \d+ cuộc họp/.test(message) ? 'capacity' : 'off', error: message });
       return;
     }
     this.setState({ provider: token.provider, capabilities: token.capabilities });

@@ -271,3 +271,30 @@
 .ma-history-row__actions-count {
   font-family: var(--ma-font-mono);
 }
+
+/* ---------- Responsive: no page-level horizontal scroll ---------- */
+
+@media (max-width: 900px) {
+  .ma-history-screen {
+    padding: 0;
+  }
+
+  .ma-history-screen__header,
+  .ma-history-screen__controls {
+    flex-wrap: wrap;
+  }
+
+  .ma-history-screen__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  /* A wide table scrolls inside its own box instead of stretching the page. */
+  .ma-history-screen__table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+}
