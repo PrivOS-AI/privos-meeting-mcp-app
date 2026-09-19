@@ -59,7 +59,10 @@ export async function getFileMetadata(hub: RoomBoundHubClient, fileId: string, s
   if (response.status === 404) return null;
   const body = await readJson(response);
   if (!response.ok || body?.success !== true) throw mapFileHttpError(response.status, body);
-  return asFileMeta(body.file);
+  // The Hub returns the file record FLAT (`{_id, name, channel_id, …, success}`), not
+  // wrapped in `file` — reading only `body.file` made every lookup a miss, so
+  // `assertFileInRoom` rejected every part. Accept both shapes.
+  return asFileMeta(body.file ?? body);
 }
 
 /** Every file directly inside `folderId` — used to rediscover a meeting's own uploaded parts server-side. */

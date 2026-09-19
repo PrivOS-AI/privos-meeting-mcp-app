@@ -122,6 +122,11 @@ function applyCaption(lines: CaptionLine[], event: CaptionEvent, speakerMap: Rec
     }
     return lines;
   }
+  // Register a newly seen speaker BEFORE any early return below — otherwise a
+  // line can render with a speaker the map does not know ("speaker 0").
+  if (event.speakerKey && !speakerMap[event.speakerKey]) {
+    speakerMap[event.speakerKey] = { colorKey: PALETTE[Object.keys(speakerMap).length % PALETTE.length], resolved: false };
+  }
   const asLine = (): CaptionLine => ({
     id: event.id,
     text: event.text,
@@ -136,17 +141,19 @@ function applyCaption(lines: CaptionLine[], event: CaptionEvent, speakerMap: Rec
     next[existingIndex] = { ...next[existingIndex], ...asLine(), id: lines[existingIndex].id };
     return next;
   }
-  if (event.kind === 'final') {
-    const draftIndex = [...lines].reverse().findIndex((l) => !l.isFinal);
+  // Providers WITHOUT stable line ids (ElevenLabs: a rolling `draft` id, then a
+  // fresh id per committed line) need the final to take over the open draft.
+  // Speaker-labelled providers (Soniox) carry a stable id per speaker turn and
+  // upsert above — letting a new turn's final replace "the latest draft" here
+  // overwrote the PREVIOUS speaker's line and erased the visible history.
+  if (event.kind === 'final' && !event.speakerKey) {
+    const draftIndex = [...lines].reverse().findIndex((l) => !l.isFinal && !l.speakerKey);
     if (draftIndex >= 0) {
       const realIndex = lines.length - 1 - draftIndex;
       const next = [...lines];
       next[realIndex] = asLine();
       return next;
     }
-  }
-  if (event.speakerKey && !speakerMap[event.speakerKey]) {
-    speakerMap[event.speakerKey] = { colorKey: PALETTE[Object.keys(speakerMap).length % PALETTE.length], resolved: false };
   }
   return [...lines, asLine()];
 }

@@ -98,7 +98,7 @@ export function ProcessingScreen({ onDone, onOpenMeeting }: ProcessingScreenProp
   }
 
   useEffect(() => {
-    if (!meetingId) return undefined;
+    if (!meetingId || !context.roomId) return undefined;
     let cancelled = false;
     async function poll(): Promise<void> {
       try {
