@@ -1,5 +1,5 @@
 {
-  "app.title": "Meeting Agent",
+  "app.title": "PrivOS Meeting App",
 
   "rail.new": "Nouvelle réunion",
   "rail.history": "Historique",
@@ -9,7 +9,7 @@
   "rail.open": "Ouvrir le menu",
   "rail.close": "Fermer le menu",
 
-  "topbar.title": "Meeting Agent",
+  "topbar.title": "PrivOS Meeting App",
   "topbar.theme.toggle": "Basculer le thème clair/sombre",
   "topbar.language.label": "Langue",
   "userMenu.title": "Compte et paramètres",

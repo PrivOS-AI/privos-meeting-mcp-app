@@ -1,5 +1,5 @@
 {
-  "app.title": "Meeting Agent",
+  "app.title": "PrivOS Meeting App",
 
   "rail.new": "新しい会議",
   "rail.history": "履歴",
@@ -9,7 +9,7 @@
   "rail.open": "メニューを開く",
   "rail.close": "メニューを閉じる",
 
-  "topbar.title": "Meeting Agent",
+  "topbar.title": "PrivOS Meeting App",
   "topbar.theme.toggle": "ライト/ダークテーマを切り替え",
   "topbar.language.label": "言語",
   "userMenu.title": "アカウントと設定",

@@ -1,5 +1,5 @@
 {
-  "app.title": "Meeting Agent",
+  "app.title": "PrivOS Meeting App",
 
   "rail.new": "新建会议",
   "rail.history": "历史记录",
@@ -9,7 +9,7 @@
   "rail.open": "打开菜单",
   "rail.close": "关闭菜单",
 
-  "topbar.title": "Meeting Agent",
+  "topbar.title": "PrivOS Meeting App",
   "topbar.theme.toggle": "切换浅色/深色主题",
   "topbar.language.label": "语言",
   "userMenu.title": "账户与设置",

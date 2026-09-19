@@ -1,5 +1,5 @@
 {
-  "app.title": "Meeting Agent",
+  "app.title": "PrivOS Meeting App",
 
   "rail.new": "Neue Besprechung",
   "rail.history": "Verlauf",
@@ -9,7 +9,7 @@
   "rail.open": "Menü öffnen",
   "rail.close": "Menü schließen",
 
-  "topbar.title": "Meeting Agent",
+  "topbar.title": "PrivOS Meeting App",
   "topbar.theme.toggle": "Hell-/Dunkelmodus umschalten",
   "topbar.language.label": "Sprache",
   "userMenu.title": "Konto & Einstellungen",

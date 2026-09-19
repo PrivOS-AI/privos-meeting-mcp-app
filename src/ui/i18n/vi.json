@@ -1,5 +1,5 @@
 {
-  "app.title": "Meeting Agent",
+  "app.title": "PrivOS Meeting App",
 
   "rail.new": "Cuộc họp mới",
   "rail.history": "Lịch sử",
@@ -9,7 +9,7 @@
   "rail.open": "Mở menu",
   "rail.close": "Đóng menu",
 
-  "topbar.title": "Meeting Agent",
+  "topbar.title": "PrivOS Meeting App",
   "topbar.theme.toggle": "Đổi giao diện sáng/tối",
   "topbar.language.label": "Ngôn ngữ",
   "userMenu.title": "Tài khoản & cài đặt",

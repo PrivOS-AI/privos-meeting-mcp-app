@@ -21,6 +21,7 @@ import { RecoveryBanner } from './screens/recovery-banner.js';
 import { SettingsScreen } from './screens/settings-screen.js';
 import { useI18n } from './i18n/i18n-provider.js';
 import { RecordingStoreProvider, useRecordingState } from './stores/recording-store.js';
+import { ensureSandboxBotKey } from './data/sandbox-bot-key.js';
 
 export type Route = 'new' | 'live' | 'processing' | 'detail' | 'history' | 'settings';
 
@@ -63,7 +64,10 @@ export function App() {
         // Bootstrap failure must not block the shell from rendering; later
         // phases that depend on it will surface their own errors.
         console.error('meeting_bootstrap failed', error);
-      });
+      })
+      // Proactively push the bot key so Hub AI's sandbox VM is established (else
+      // summarize/translate fail with "container unavailable"). Best-effort.
+      .then(() => ensureSandboxBotKey(app, context.roomId).catch(() => undefined));
   }, [app, context.roomId]);
 
   return (

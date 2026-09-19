@@ -1,5 +1,5 @@
 {
-  "app.title": "Meeting Agent",
+  "app.title": "PrivOS Meeting App",
 
   "rail.new": "새 회의",
   "rail.history": "기록",
@@ -9,7 +9,7 @@
   "rail.open": "메뉴 열기",
   "rail.close": "메뉴 닫기",
 
-  "topbar.title": "Meeting Agent",
+  "topbar.title": "PrivOS Meeting App",
   "topbar.theme.toggle": "밝은/어두운 테마 전환",
   "topbar.language.label": "언어",
   "userMenu.title": "계정 및 설정",
