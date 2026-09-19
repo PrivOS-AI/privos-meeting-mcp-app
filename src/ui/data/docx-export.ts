@@ -42,7 +42,7 @@ export interface BuildMeetingDocxInput {
   speakers: DocxSpeaker[];
   segments: DocxSegment[];
   summary?: DocxSummary;
-  language: 'vi' | 'en';
+  language: import('../../shared/languages.js').LanguageCode;
 }
 
 const LABELS = {
@@ -56,7 +56,9 @@ function displayNameFor(speakerId: string, speakers: readonly DocxSpeaker[]): st
 
 /** Builds the in-memory `docx` `Document` — pure and Node-testable via `Packer.toBuffer` (no browser APIs). */
 export function buildMeetingDocx(input: BuildMeetingDocxInput): Document {
-  const labels = LABELS[input.language] ?? LABELS.vi;
+  // DOCX section labels only ship vi/en; any other meeting language falls back to English.
+  // DOCX section labels only ship vi/en; any other meeting language uses English.
+  const labels = input.language === 'vi' ? LABELS.vi : LABELS.en;
   const children: Paragraph[] = [
     new Paragraph({ text: input.title, heading: HeadingLevel.HEADING_1 }),
     new Paragraph({

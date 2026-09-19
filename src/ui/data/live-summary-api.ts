@@ -29,7 +29,7 @@ export interface LiveSummaryResult {
 
 export async function fetchLiveSummary(
   app: McpApp,
-  input: { roomId: string; meetingId: string; title: string; language: 'vi' | 'en'; segments: LiveSummaryLine[] },
+  input: { roomId: string; meetingId: string; title: string; language: import('../../shared/languages.js').LanguageCode; segments: LiveSummaryLine[] },
 ): Promise<LiveSummaryResult> {
   const raw = await app.callServerTool({
     name: 'meeting_live_summary',

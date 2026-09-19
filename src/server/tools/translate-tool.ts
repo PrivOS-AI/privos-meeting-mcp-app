@@ -7,6 +7,7 @@
  * meeting and forwards a single Hub AI call for the whole batch.
  */
 import { AppError } from '../../shared/app-error.js';
+import { LANGUAGE_ENGLISH_NAMES, SUPPORTED_LANGUAGES, isLanguageCode, type LanguageCode } from '../../shared/languages.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { generateWithHubAi } from '../hub/hub-ai-client.js';
 import type { AppTool, ToolRuntime } from './registry.js';
@@ -15,7 +16,7 @@ import { checkRateLimit } from './rate-limiter.js';
 const MAX_SEGMENTS_PER_CALL = 40;
 /** Generous ceiling above the 3-5s batching cadence — guards against a runaway client, not normal use. */
 const TRANSLATE_LIMIT_PER_MINUTE = 30;
-const TARGETS = new Set(['vi', 'en']);
+const TARGETS = new Set<string>(SUPPORTED_LANGUAGES);
 
 interface InputSegment {
   id: string;
@@ -46,8 +47,8 @@ function asInputSegment(value: unknown): InputSegment | null {
  * Fence the untrusted transcript text as DATA, never as instructions (RT-12) —
  * a speaker could say anything, including something that reads like a prompt.
  */
-function buildTranslatePrompt(target: 'vi' | 'en', segments: InputSegment[]): string {
-  const targetName = target === 'vi' ? 'Vietnamese' : 'English';
+function buildTranslatePrompt(target: LanguageCode, segments: InputSegment[]): string {
+  const targetName = LANGUAGE_ENGLISH_NAMES[target];
   const payload = JSON.stringify(segments.map((s) => ({ id: s.id, text: s.text })));
   return [
     'You are translating live meeting captions for a transcription app.',
@@ -144,7 +145,7 @@ export const translateTool: AppTool = {
     }
     if (toTranslate.length === 0) return { translations: passthrough };
 
-    const targetLang = target === 'vi' ? 'vi' : 'en';
+    const targetLang = isLanguageCode(target) ? target : ('en' as LanguageCode);
     const { text } = await generateWithHubAi(runtime.agentBotHub, {
       roomId,
       prompt: buildTranslatePrompt(targetLang, toTranslate),

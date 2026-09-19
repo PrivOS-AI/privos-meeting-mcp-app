@@ -27,6 +27,7 @@ import { speakerResolve, type RealtimeAssignChoice } from '../data/speaker-api.j
 import { ScreenWakeLock, type WakeLockState } from '../data/screen-wake-lock.js';
 import type { RealtimeCapabilities, RealtimeToken, SttVendor } from '../data/stt-types.js';
 import { TranslateBuffer } from '../data/translate-buffer.js';
+import type { LanguageCode } from '../../shared/languages.js';
 
 export type RecordingStatus = 'idle' | 'recording' | 'paused' | 'ending' | 'uploading' | 'done' | 'error';
 export type StageCaptionSize = 'small' | 'medium' | 'large';
@@ -85,7 +86,9 @@ export interface RecordingState {
 
 export interface StartRecordingInput {
   title: string;
-  language: 'vi' | 'en';
+  language: LanguageCode;
+  /** Bilingual-translation target language (only used when `translationEnabled`). */
+  translationLang: LanguageCode;
   translationEnabled: boolean;
 }
 
@@ -183,6 +186,8 @@ export class RecordingStore {
   private state: RecordingState = initialState();
   private listeners = new Set<() => void>();
 
+  private meetingLanguage: LanguageCode = 'vi';
+  private translationTarget: LanguageCode = 'en';
   private stream: MediaStream | null = null;
   /** Releases the active capture (host-brokered stop, or getUserMedia track stop). */
   private micStop: (() => void) | null = null;
@@ -276,6 +281,8 @@ export class RecordingStore {
   // ---------------------------------------------------------------- start
 
   async startRecording(input: StartRecordingInput): Promise<void> {
+    this.meetingLanguage = input.language;
+    this.translationTarget = input.translationLang;
     try {
       // Guard the async host context: without a room every downstream call
       // (meeting row, Files folder, realtime token) is meaningless, and a
@@ -305,7 +312,7 @@ export class RecordingStore {
         slug: slugify(input.title),
         language: input.language,
         translationEnabled: input.translationEnabled,
-        translationLang: input.language === 'vi' ? 'en' : 'vi',
+        translationLang: input.translationLang,
         keepAudio: true,
         ownerUserId: this.ctx.userId,
         startedAt: startedAtIso,
@@ -390,7 +397,7 @@ export class RecordingStore {
       this.translateBuffer = new TranslateBuffer(this.app, {
         roomId: this.ctx.roomId,
         meetingId,
-        target: 'en',
+        target: this.translationTarget,
         onTranslated: (translations) => {
           const lines = [...this.state.lines];
           for (const t of translations) {
@@ -418,6 +425,8 @@ export class RecordingStore {
       stream: this.stream!,
       recorderEpochMs: this.state.recorderEpochMs,
       translate: token.capabilities.translation && translationEnabled,
+      translateFrom: this.meetingLanguage,
+      translateTo: this.translationTarget,
       mintToken: async () => {
         const raw = await this.app.callServerTool({ name: 'meeting_realtime_token', arguments: { roomId: this.ctx.roomId, meetingId } });
         return parseToolResult(raw) as unknown as RealtimeToken;

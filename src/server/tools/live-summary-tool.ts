@@ -20,6 +20,7 @@ import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { chunkTranscript } from '../summary/chunker.js';
 import { summarizeTranscript } from '../summary/summarizer.js';
 import type { SummaryLanguage } from '../summary/prompts.js';
+import { asLanguageCode } from '../../shared/languages.js';
 import type { Segment } from '../transcript/segment-builder.js';
 import type { AppTool, ToolRuntime } from './registry.js';
 import { checkRateLimit } from './rate-limiter.js';
@@ -41,7 +42,7 @@ function asString(value: unknown): string {
 }
 
 function asLanguage(value: unknown): SummaryLanguage {
-  return value === 'en' ? 'en' : 'vi';
+  return asLanguageCode(value);
 }
 
 /** One client caption line -> a summarizer input line, or null when it carries no usable text. */

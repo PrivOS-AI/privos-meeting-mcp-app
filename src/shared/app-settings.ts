@@ -10,10 +10,11 @@
  * never need a workspace-admin gate.
  */
 import { AppError } from './app-error.js';
+import { SUPPORTED_LANGUAGES, type LanguageCode } from './languages.js';
 
 export type SttVendor = 'soniox' | 'elevenlabs';
 export type SummaryLength = 'short' | 'normal' | 'detailed';
-export type SettingsLanguage = 'vi' | 'en';
+export type SettingsLanguage = LanguageCode;
 
 /** Every key `meeting_settings_set` accepts, exactly plan.md's `app_settings` row (minus `knownRooms`, which is bootstrap-internal, never admin-tunable). */
 export interface WorkspaceAppSettings {
@@ -88,7 +89,7 @@ export const WORKSPACE_SETTING_VALIDATORS: Record<keyof WorkspaceAppSettings, Va
   speakerSessionMatchThreshold: unitFractionValidator('speakerSessionMatchThreshold'),
   speakerSessionMergeThreshold: unitFractionValidator('speakerSessionMergeThreshold'),
   summaryLength: enumValidator('summaryLength', ['short', 'normal', 'detailed']),
-  summaryLanguage: enumValidator('summaryLanguage', ['vi', 'en']),
+  summaryLanguage: enumValidator('summaryLanguage', SUPPORTED_LANGUAGES),
   autoDeleteAudioDays: nonNegativeIntValidator('autoDeleteAudioDays'),
   interruptedPartsRetentionDays: nonNegativeIntValidator('interruptedPartsRetentionDays'),
   keepOriginalAudio: booleanValidator('keepOriginalAudio'),

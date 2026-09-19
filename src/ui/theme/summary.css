@@ -1,7 +1,7 @@
 /*
  * Phase 6 UI — summary card, action items card, save-to-files modal,
  * send-to-chat button. Split out to keep each theme file under ~200 lines
- * (repo convention, see speaker-identity.css's header).
+ * (repo convention, see speaker-identity.csss header).
  */
 
 .ma-summary-card,

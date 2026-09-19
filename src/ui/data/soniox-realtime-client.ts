@@ -219,7 +219,7 @@ export function createSonioxConnection(opts: RealtimeConnectionOptions): Realtim
               model: token.model ?? 'stt-rt-v5',
               enableSpeakerDiarization: true,
               stream: opts.stream,
-              ...(opts.translate ? { translation: { type: 'two_way' as const, language_a: 'vi', language_b: 'en' } } : {}),
+              ...(opts.translate ? { translation: { type: 'two_way' as const, language_a: opts.translateFrom ?? 'vi', language_b: opts.translateTo ?? 'en' } } : {}),
             })
             .catch((error: unknown) => resolve({ endedReason: `start-error:${String(error)}` }));
         })

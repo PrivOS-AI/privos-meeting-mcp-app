@@ -6,8 +6,9 @@
  * appears in a user-role prompt, fenced by `fenceUntrusted`.
  */
 import { escapeMarkdown, fenceUntrusted, sanitizeDisplayName } from './sanitize.js';
+import { LANGUAGE_ENGLISH_NAMES, type LanguageCode } from '../../shared/languages.js';
 
-export type SummaryLanguage = 'vi' | 'en';
+export type SummaryLanguage = LanguageCode;
 
 /** Fixed system context for both map and reduce calls — no user data, ever. */
 export const SUMMARY_SYSTEM_CONTEXT = [
@@ -54,7 +55,7 @@ export function buildReducePrompt(input: {
   language: SummaryLanguage;
   notesWithTimestamps: readonly { startLabel: string; endLabel: string; notes: string; decisions: string[]; actionItems: unknown[] }[];
 }): string {
-  const languageName = input.language === 'vi' ? 'tiếng Việt' : 'English';
+  const languageName = LANGUAGE_ENGLISH_NAMES[input.language];
   const safeTitle = sanitizeDisplayName(input.title) || (input.language === 'vi' ? 'Cuộc họp' : 'Meeting');
   const safeSpeakers = input.speakerNames.map((n) => sanitizeDisplayName(n));
   const notesBlock = input.notesWithTimestamps
@@ -121,6 +122,31 @@ export const SUMMARY_MARKDOWN_LABELS: Record<SummaryLanguage, { summary: string;
     due: 'Due',
     at: 'Timestamp',
     meta: { startedAt: 'Started', duration: 'Duration', speakers: 'Participants' },
+  },
+  fr: {
+    summary: 'Résumé', decisions: 'Décisions', actionItems: 'Actions à mener', keyTopics: 'Sujets clés',
+    task: 'Tâche', owner: 'Responsable', due: 'Échéance', at: 'Horodatage',
+    meta: { startedAt: 'Début', duration: 'Durée', speakers: 'Participants' },
+  },
+  zh: {
+    summary: '摘要', decisions: '决定', actionItems: '待办事项', keyTopics: '关键主题',
+    task: '任务', owner: '负责人', due: '截止', at: '时间点',
+    meta: { startedAt: '开始', duration: '时长', speakers: '参与者' },
+  },
+  ko: {
+    summary: '요약', decisions: '결정 사항', actionItems: '실행 항목', keyTopics: '주요 주제',
+    task: '작업', owner: '담당자', due: '기한', at: '시각',
+    meta: { startedAt: '시작', duration: '소요 시간', speakers: '참석자' },
+  },
+  ja: {
+    summary: '要約', decisions: '決定事項', actionItems: 'アクション項目', keyTopics: '主なトピック',
+    task: 'タスク', owner: '担当者', due: '期限', at: 'タイムスタンプ',
+    meta: { startedAt: '開始', duration: '長さ', speakers: '参加者' },
+  },
+  de: {
+    summary: 'Zusammenfassung', decisions: 'Entscheidungen', actionItems: 'Aufgaben', keyTopics: 'Hauptthemen',
+    task: 'Aufgabe', owner: 'Verantwortlich', due: 'Fällig', at: 'Zeitstempel',
+    meta: { startedAt: 'Beginn', duration: 'Dauer', speakers: 'Teilnehmer' },
   },
 };
 

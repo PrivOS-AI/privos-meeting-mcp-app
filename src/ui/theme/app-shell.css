@@ -405,7 +405,7 @@
     overflow-x: hidden;
   }
 
-  /* The live screen's own title bar occupies that row, between the two icons. */
+  /* The live-screen title bar occupies that row, between the two icons. */
   .ma-body.ma-body--live {
     margin-top: -48px;
     padding: 0;

@@ -53,6 +53,9 @@ export interface RealtimeConnectionOptions extends RealtimeConnectionCallbacks {
   stream: MediaStream;
   recorderEpochMs: number;
   translate: boolean;
+  /** Meeting (spoken) language + bilingual target — Soniox two_way pairs them; ElevenLabs uses the target only. */
+  translateFrom?: import('../../shared/languages.js').LanguageCode;
+  translateTo?: import('../../shared/languages.js').LanguageCode;
 }
 
 export interface RealtimeConnection {

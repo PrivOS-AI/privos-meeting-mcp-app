@@ -8,6 +8,7 @@
  * summarize pass) so it never looks dead to `sweepStale`. `finally` always
  * clears the job's scratch directory.
  */
+import { asLanguageCode, isLanguageCode } from '../../shared/languages.js';
 import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -161,7 +162,7 @@ export async function summarizeTranscript(input: {
   // Translate first so the map-reduce summarizer and the transcript writers both see `.translation` — a per-batch
   // translate failure is already swallowed inside `translateSegmentsBatch` (skip that batch), never here.
   let translatedSegments = segments;
-  const targetLang = input.translationLang === 'vi' || input.translationLang === 'en' ? input.translationLang : undefined;
+  const targetLang = isLanguageCode(input.translationLang) ? input.translationLang : undefined;
   if (input.translationEnabled && targetLang) {
     const translations = await translateSegmentsBatch(hub, { roomId, segments, target: targetLang, signal });
     if (translations.size > 0) {
@@ -169,7 +170,7 @@ export async function summarizeTranscript(input: {
     }
   }
 
-  const summaryLanguage: 'vi' | 'en' = input.language === 'en' ? 'en' : 'vi';
+  const summaryLanguage = asLanguageCode(input.language);
   const chunks = chunkTranscript(translatedSegments, displayNameBySpeaker);
   const payload = await runSummarizer(hub, { roomId, chunks, language: summaryLanguage, title, speakerNames }, signal);
 

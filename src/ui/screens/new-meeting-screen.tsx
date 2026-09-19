@@ -8,6 +8,9 @@ import { useEffect, useState } from 'react';
 import { parseToolResult, usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { useI18n } from '../i18n/i18n-provider.js';
+import { SUPPORTED_LANGUAGES, LANGUAGE_ENDONYMS, type Language } from '../i18n/languages.js';
+import { defaultTranslationTarget } from '../../shared/languages.js';
+import { loadLocalPreferences } from '../data/local-preferences.js';
 import { useRecordingStore } from '../stores/recording-store.js';
 import { Icon } from '../components/icon.js';
 
@@ -21,8 +24,10 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
   const context = usePrivosContext();
   const store = useRecordingStore();
 
+  const prefs = loadLocalPreferences();
   const [title, setTitle] = useState('');
-  const [language, setLanguage] = useState<'vi' | 'en'>('vi');
+  const [language, setLanguage] = useState<Language>(prefs.meetingLanguage);
+  const [translationLang, setTranslationLang] = useState<Language>(prefs.translationLang);
   // Bilingual captions add latency + Hub-AI cost, so start unchecked; the user opts in per meeting.
   const [translationEnabled, setTranslationEnabled] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
@@ -50,7 +55,7 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
     setMicError(null);
     setStarting(true);
     try {
-      await store.startRecording({ title: title.trim() || t('screen.new.untitled'), language, translationEnabled });
+      await store.startRecording({ title: title.trim() || t('screen.new.untitled'), language, translationLang: translationLang === language ? defaultTranslationTarget(language) : translationLang, translationEnabled });
       onStarted();
     } catch (error) {
       // Keep the raw cause for diagnosis; the on-screen text is classified below.
@@ -91,9 +96,10 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
 
       <label className="ma-field">
         <span className="ma-field__label">{t('screen.new.language')}</span>
-        <select className="ma-field__input" value={language} onChange={(e) => setLanguage(e.target.value as 'vi' | 'en')}>
-          <option value="vi">Tiếng Việt</option>
-          <option value="en">English</option>
+        <select className="ma-field__input" value={language} onChange={(e) => setLanguage(e.target.value as Language)}>
+          {SUPPORTED_LANGUAGES.map((code) => (
+            <option key={code} value={code}>{LANGUAGE_ENDONYMS[code]}</option>
+          ))}
         </select>
       </label>
 
@@ -101,6 +107,17 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
         <input type="checkbox" checked={translationEnabled} onChange={(e) => setTranslationEnabled(e.target.checked)} />
         <span>{t('screen.new.translation')}</span>
       </label>
+
+      {translationEnabled ? (
+        <label className="ma-field">
+          <span className="ma-field__label">{t('screen.new.translationTarget')}</span>
+          <select className="ma-field__input" value={translationLang} onChange={(e) => setTranslationLang(e.target.value as Language)}>
+            {SUPPORTED_LANGUAGES.filter((code) => code !== language).map((code) => (
+              <option key={code} value={code}>{LANGUAGE_ENDONYMS[code]}</option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       <div className="ma-new-meeting__readonly">
         <div>

@@ -43,6 +43,7 @@
   "screen.new.meetingTitle": "Meeting title",
   "screen.new.language": "Primary language",
   "screen.new.translation": "Enable bilingual captions",
+  "screen.new.translationTarget": "Translation target",
   "screen.new.provider": "Live caption provider: {provider}",
   "screen.new.start": "Start recording",
   "screen.new.starting": "Requesting microphone access…",

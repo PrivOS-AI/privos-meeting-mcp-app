@@ -10,6 +10,7 @@ import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { fetchLiveSummary, type LiveSummaryResult, type LiveSummaryLine } from '../data/live-summary-api.js';
 import { useI18n } from '../i18n/i18n-provider.js';
+import { asLanguageCode } from '../../shared/languages.js';
 import { resolveLineSpeakerKey, useRecordingState, type RecordingState } from '../stores/recording-store.js';
 
 /** Auto-refresh cadence — the first summary lands ~10 min in, then every 10 min. */
@@ -68,7 +69,7 @@ export function LiveSummaryPanel() {
         roomId,
         meetingId: current.meetingId,
         title: current.title,
-        language: language === 'en' ? 'en' : 'vi',
+        language: asLanguageCode(language),
         segments,
       });
       setResult(next);

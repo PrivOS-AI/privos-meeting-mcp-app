@@ -1,8 +1,7 @@
 /**
- * The set of languages the UI ships. Kept apart from the provider so the
- * language-resolution logic can be imported (and unit-tested) without pulling
- * in React or the translation bundles.
+ * UI-facing re-export of the canonical language set (`src/shared/languages.ts`),
+ * kept as its own module so `resolve-language.ts` can be imported and unit-tested
+ * without pulling in React or the translation bundles. `Language` is the UI's
+ * name for a language code.
  */
-export const SUPPORTED_LANGUAGES = ['vi', 'en'] as const;
-
-export type Language = (typeof SUPPORTED_LANGUAGES)[number];
+export { SUPPORTED_LANGUAGES, LANGUAGE_ENDONYMS, type LanguageCode as Language } from '../../shared/languages.js';

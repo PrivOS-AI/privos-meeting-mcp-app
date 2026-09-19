@@ -17,7 +17,7 @@ export interface TranslateBufferLine {
 export interface TranslateBufferOptions {
   roomId: string;
   meetingId: string;
-  target: 'vi' | 'en';
+  target: import('../../shared/languages.js').LanguageCode;
   /** 3-5s per spec; injectable for tests. */
   flushIntervalMs?: number;
   onTranslated(translations: Array<{ id: string; text: string }>): void;

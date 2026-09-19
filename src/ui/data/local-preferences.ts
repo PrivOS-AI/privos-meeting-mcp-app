@@ -6,8 +6,10 @@
  * persists `uiLanguage` (kept in that provider, not duplicated here). Never
  * written to `app_settings` — these do not affect any other workspace member.
  */
+import type { LanguageCode } from '../../shared/languages.js';
+
 export type StageCaptionSize = 'small' | 'medium' | 'large';
-export type PrefLanguage = 'vi' | 'en';
+export type PrefLanguage = LanguageCode;
 
 export interface LocalPreferences {
   /** Default main language for a NEW meeting (not the running meeting's own language, which is fixed once recording starts). */

@@ -13,6 +13,7 @@
 import type { McpApp } from '@privos_ai/app-react';
 
 import { listActionItems } from './action-item-read-model.js';
+import { asLanguageCode } from '../../shared/languages.js';
 import { buildMeetingDocx, meetingDocxToBlob, type DocxSummary } from './docx-export.js';
 import { resolveFileUrl } from './file-download.js';
 import type { MeetingReadModel } from './meeting-read-model.js';
@@ -57,7 +58,7 @@ export async function downloadMeetingDocx(app: McpApp, meeting: MeetingReadModel
     speakers: transcript.speakers.map((s) => ({ speakerId: s.speakerId, displayName: s.displayName ?? s.speakerId })),
     segments: transcript.segments.map((s) => ({ speakerId: s.speakerId, startSec: s.startSec, text: s.text, translation: s.translation })),
     summary,
-    language: meeting.language === 'en' ? 'en' : 'vi',
+    language: asLanguageCode(meeting.language),
   });
   triggerDownload(await meetingDocxToBlob(doc), `${meeting.title || 'meeting'}.docx`);
 }

@@ -17,10 +17,15 @@ import { readBrowserLanguages, resolveInitialLanguage } from './resolve-language
 
 import en from './en.json';
 import vi from './vi.json';
+import fr from './fr.json';
+import zh from './zh.json';
+import ko from './ko.json';
+import ja from './ja.json';
+import de from './de.json';
 
 export { SUPPORTED_LANGUAGES, type Language } from './languages.js';
 
-const bundles: Record<Language, Record<string, string>> = { vi, en };
+const bundles: Record<Language, Record<string, string>> = { vi, en, fr, zh, ko, ja, de };
 
 const STORAGE_KEY = 'meeting-agent.language';
 
@@ -66,7 +71,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     (key: string, vars?: Record<string, string | number>) => {
       // Fall back through Vietnamese to the key itself, so a missing English
       // string shows real content instead of a blank in the UI.
-      const template = bundles[language][key] ?? bundles.vi[key] ?? key;
+      const template = bundles[language][key] ?? bundles.en[key] ?? key;
       if (!vars) return template;
       return template.replace(/\{(\w+)\}/g, (match, name: string) =>
         name in vars ? String(vars[name]) : match,

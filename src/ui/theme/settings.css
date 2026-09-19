@@ -2,7 +2,7 @@
  * P8 — Settings shell (240px nav + 7 panels) and the shared panel/field/table
  * primitives every `screens/settings/*-panel.tsx` reuses. Split out of
  * speaker-identity.css to keep each theme file under ~200 lines (repo
- * convention) — `.ma-settings-screen`'s base rule stays in speaker-identity.css
+ * convention) — `.ma-settings-screen`s base rule stays in speaker-identity.css
  * (P4), this file only adds the nav layout + panel primitives P8 introduces.
  */
 
@@ -85,8 +85,8 @@
   gap: var(--space-3);
 }
 
-/* Themed secondary button — a bare <button> keeps the browser's light-grey
-   default and ignores dark mode. */
+/* Themed secondary button — a bare button keeps the browser default light-grey
+   and ignores dark mode. */
 .ma-settings-panel__actions button {
   padding: 0 var(--space-4);
   font-weight: var(--weight-medium);

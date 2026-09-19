@@ -4,7 +4,7 @@
  *
  * The Google Fonts @import is deliberately dropped: the app document runs in
  * an opaque origin (iframe `srcdoc`, no `allow-same-origin`), so a network
- * font request never resolves there. Type falls back to the platform's own
+ * font request never resolves there. Type falls back to the platforms own
  * sans/mono stack instead of trying to fetch Montserrat/JetBrains Mono.
  *
  * A `--ma-*` alias layer sits on top of the raw PrivOS tokens: screens and

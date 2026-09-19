@@ -43,6 +43,7 @@
   "screen.new.meetingTitle": "Tên cuộc họp",
   "screen.new.language": "Ngôn ngữ chính",
   "screen.new.translation": "Bật phụ đề song ngữ",
+  "screen.new.translationTarget": "Ngôn ngữ dịch",
   "screen.new.provider": "Nhà cung cấp phụ đề trực tiếp: {provider}",
   "screen.new.start": "Bắt đầu ghi",
   "screen.new.starting": "Đang xin quyền micro…",
