@@ -132,4 +132,27 @@ describe('createSonioxConnection', () => {
     expect(lastTurns.every((t) => !t.text.includes('hello'))).toBe(true);
     expect(stub.captions.some((c) => c.text === 'hello' && c.translationOf)).toBe(true);
   });
+  it('keeps one speaker\'s words on ONE line, and starts a new line after a long pause', async () => {
+    const stub = new RealtimeConnectionCallbacksStub();
+    createSonioxConnection({ ...stub.options(), mintToken: async () => token(), stream: {} as MediaStream, recorderEpochMs: 0, translate: false });
+    await vi.waitFor(() => expect(FakeSonioxClient.instances).toHaveLength(1));
+    const client = FakeSonioxClient.instances[0];
+    client.options.onStarted?.();
+
+    client.options.onPartialResult?.({
+      tokens: [
+        makeToken({ text: 'xin ', speaker: '1', is_final: true, start_ms: 0, end_ms: 300 }),
+        makeToken({ text: 'chào ', speaker: '1', is_final: true, start_ms: 320, end_ms: 600 }),
+        makeToken({ text: 'mọi người', speaker: '1', is_final: true, start_ms: 650, end_ms: 1100 }),
+        // same speaker resumes after a 3s silence -> new line
+        makeToken({ text: 'tiếp theo', speaker: '1', is_final: true, start_ms: 4100, end_ms: 4700 }),
+      ],
+      text: '',
+      final_audio_proc_ms: 4700,
+      total_audio_proc_ms: 4700,
+    });
+
+    const lines = new Map(stub.captions.map((c) => [c.id, c.text]));
+    expect([...lines.values()]).toEqual(['xin chào mọi người', 'tiếp theo']);
+  });
 });

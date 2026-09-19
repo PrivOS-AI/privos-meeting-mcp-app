@@ -158,7 +158,9 @@ export class JobRepository {
         title: input.title,
         keepAudio: input.keepAudio,
         status: 'queued',
-        step: null,
+        // The Hub's validator rejects `null` for a string field ("Document failed
+        // validation") — an empty string is the "no step yet" value; `fromRow` reads it back as null.
+        step: '',
         progress: 0,
         startedAt: now,
         heartbeatAt: now,
@@ -173,7 +175,7 @@ export class JobRepository {
       title: input.title,
       keepAudio: input.keepAudio,
       status: 'queued',
-      step: null,
+      step: '',
       progress: 0,
       error: '',
       resultJson: '',
@@ -198,7 +200,7 @@ export class JobRepository {
   ): Promise<void> {
     try {
       const data: Record<string, unknown> = { heartbeatAt: new Date().toISOString() };
-      if (patch.step !== undefined) data.step = patch.step;
+      if (patch.step !== undefined) data.step = patch.step ?? ''; // never write null: the Hub validator rejects it
       if (patch.progress !== undefined) data.progress = patch.progress;
       if (patch.audioFileId !== undefined) data.audioFileId = patch.audioFileId;
       if (patch.providerFileId !== undefined) data.providerFileId = patch.providerFileId;

@@ -42,6 +42,9 @@ interface BuildResult {
  * flips it draft->final in place. Re-emitting all turns each snapshot is cheap:
  * turn count is bounded by speaker switches, not token count.
  */
+/** A same-speaker pause longer than this starts a new caption line. */
+const LINE_BREAK_PAUSE_MS = 1500;
+
 function buildFromSnapshot(sessionIndex: number, tokens: Token[], offsetMs: number): BuildResult {
   const captions: CaptionEvent[] = [];
   const turns: LiveTurn[] = [];
@@ -83,7 +86,10 @@ function buildFromSnapshot(sessionIndex: number, tokens: Token[], offsetMs: numb
     }
 
     const speakerKey = token.speaker ? `s${sessionIndex}:${token.speaker}` : `s${sessionIndex}:unknown`;
-    if (current && current.speakerKey === speakerKey) {
+    // Same speaker continues the line — unless they paused: a long monologue
+    // would otherwise be one ever-growing paragraph with no visible history.
+    const pausedMs = current ? (token.start_ms ?? current.endMsRaw) - current.endMsRaw : 0;
+    if (current && current.speakerKey === speakerKey && pausedMs <= LINE_BREAK_PAUSE_MS) {
       current.text += token.text;
       current.endMsRaw = token.end_ms ?? current.endMsRaw;
       current.final = token.is_final;

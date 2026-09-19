@@ -2,7 +2,7 @@
  * The live recording screen: toggles between 1a (light Transcript) and 1b
  * (dark Stage). Both share the same `RecordingStore` state and footer.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { BookmarksPanel } from '../components/bookmarks-panel.js';
@@ -35,6 +35,18 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
   const store = useRecordingStore();
   const state = useRecordingState();
   const [view, setView] = useState<ViewMode>('transcript');
+
+  // Chat-style transcript: keep the newest caption in view so older lines are
+  // pushed up as people talk — but never yank the view while the user has
+  // scrolled up to read history (only follow when already near the bottom).
+  const linesRef = useRef<HTMLDivElement | null>(null);
+  const followRef = useRef(true);
+  const lastLine = state.lines[state.lines.length - 1];
+  useEffect(() => {
+    const el = linesRef.current;
+    if (el && followRef.current) el.scrollTop = el.scrollHeight;
+  }, [state.lines.length, lastLine?.text, lastLine?.translation]);
+  // (hooks above must stay before the idle early-return below — Rules of Hooks)
 
   if (state.status === 'idle') {
     return <EmptyState icon="microphone" title={t('screen.live.title')} subtitle={t('screen.live.subtitle')} />;
@@ -130,7 +142,14 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
         </div>
         {notices}
         {speakerChips}
-        <div className="ma-live__lines">
+        <div
+          className="ma-live__lines"
+          ref={linesRef}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            followRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          }}
+        >
           {state.lines.length === 0 ? (
             <p className="ma-live__waiting">{t('recording.waitingForCaptions')}</p>
           ) : (
