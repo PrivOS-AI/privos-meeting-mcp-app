@@ -26,7 +26,7 @@ export interface LocalPreferences {
 }
 
 export const DEFAULT_LOCAL_PREFERENCES: LocalPreferences = {
-  meetingLanguage: 'vi',
+  meetingLanguage: 'en',
   translationLang: 'en',
   showTranslation: false,
   stageCaptionSize: 'medium',

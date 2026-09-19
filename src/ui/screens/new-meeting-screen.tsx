@@ -10,7 +10,7 @@ import { parseToolResult, usePrivosApp, usePrivosContext } from '@privos_ai/app-
 import { useI18n } from '../i18n/i18n-provider.js';
 import { SUPPORTED_LANGUAGES, LANGUAGE_ENDONYMS, type Language } from '../i18n/languages.js';
 import { defaultTranslationTarget } from '../../shared/languages.js';
-import { loadLocalPreferences } from '../data/local-preferences.js';
+import { loadLocalPreferences, saveLocalPreference } from '../data/local-preferences.js';
 import { useRecordingStore } from '../stores/recording-store.js';
 import { Icon } from '../components/icon.js';
 
@@ -54,6 +54,8 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
   async function handleStart(): Promise<void> {
     setMicError(null);
     setStarting(true);
+    // Remember the picked main language as the default for the next new meeting.
+    saveLocalPreference('meetingLanguage', language);
     try {
       await store.startRecording({ title: title.trim() || t('screen.new.untitled'), language, translationLang: translationLang === language ? defaultTranslationTarget(language) : translationLang, translationEnabled });
       onStarted();
