@@ -15,6 +15,7 @@
   "userMenu.title": "Tài khoản & cài đặt",
   "userMenu.close": "Đóng menu",
   "userMenu.theme": "Giao diện",
+  "userMenu.theme.auto": "Tự động",
   "userMenu.theme.dark": "Tối",
   "userMenu.theme.light": "Sáng",
 

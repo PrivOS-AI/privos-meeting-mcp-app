@@ -16,8 +16,11 @@ export interface UserMenuProps {
 
 export function UserMenu({ username, onClose }: UserMenuProps) {
   const { language, setLanguage, t } = useI18n();
-  const { theme, setMode } = useTheme();
+  const { mode, setMode } = useTheme();
   const otherLanguage = SUPPORTED_LANGUAGES.find((code) => code !== language) ?? language;
+  // Cycle Auto (follow the Hub) -> Light -> Dark -> Auto, so the initial
+  // Hub-following state is always reachable again, not a one-way override.
+  const nextMode = mode === 'auto' ? 'light' : mode === 'light' ? 'dark' : 'auto';
 
   return (
     <>
@@ -28,12 +31,11 @@ export function UserMenu({ username, onClose }: UserMenuProps) {
           type="button"
           role="menuitem"
           className="ma-user-menu__item"
-          aria-pressed={theme === 'dark'}
-          onClick={() => setMode(theme === 'dark' ? 'light' : 'dark')}
+          onClick={() => setMode(nextMode)}
         >
           <Icon name="lightbulb" size={16} />
           <span className="ma-user-menu__label">{t('userMenu.theme')}</span>
-          <span className="ma-user-menu__value">{t(theme === 'dark' ? 'userMenu.theme.dark' : 'userMenu.theme.light')}</span>
+          <span className="ma-user-menu__value">{t(`userMenu.theme.${mode}`)}</span>
         </button>
         <button type="button" role="menuitem" className="ma-user-menu__item" onClick={() => setLanguage(otherLanguage)}>
           <Icon name="globe" size={16} />

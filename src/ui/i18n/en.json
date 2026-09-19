@@ -15,6 +15,7 @@
   "userMenu.title": "Account & settings",
   "userMenu.close": "Close menu",
   "userMenu.theme": "Appearance",
+  "userMenu.theme.auto": "Auto",
   "userMenu.theme.dark": "Dark",
   "userMenu.theme.light": "Light",
 
