@@ -29,76 +29,72 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function tokensEqual(a: Token | undefined, b: Token): boolean {
-  return Boolean(a) && a!.text === b.text && a!.is_final === b.is_final && a!.speaker === b.speaker;
-}
-
 interface BuildResult {
   captions: CaptionEvent[];
   turns: LiveTurn[];
 }
 
-/** Diff `tokens` against `previous`, emit captions only for changed/new slots, and rebuild the turn grouping. */
-function buildFromSnapshot(sessionIndex: number, tokens: Token[], previous: Token[], offsetMs: number): BuildResult {
+/**
+ * Group the FULL cumulative token snapshot into one caption LINE per speaker
+ * run (a "turn"), not one per token — otherwise every word starts a new line.
+ * Line ids are stable across snapshots (`turn{n}` in appearance order), so
+ * `applyCaption` keeps updating the same growing line as more tokens stream and
+ * flips it draft->final in place. Re-emitting all turns each snapshot is cheap:
+ * turn count is bounded by speaker switches, not token count.
+ */
+function buildFromSnapshot(sessionIndex: number, tokens: Token[], offsetMs: number): BuildResult {
   const captions: CaptionEvent[] = [];
   const turns: LiveTurn[] = [];
-  let current: { speakerKey: string; startMsRaw: number; endMsRaw: number; text: string; final: boolean } | null = null;
-  let turnIndex = 0;
-  let lastOriginalId: string | undefined;
-
   const toMeetingSec = (rawMs: number | undefined) => (offsetMs + (rawMs ?? 0)) / 1000;
+
+  // Current original (non-translation) speaker run.
+  let current: { id: string; speakerKey: string; startMsRaw: number; endMsRaw: number; text: string; final: boolean; lang?: string } | null = null;
+  let turnIndex = 0;
+  // Current translation run, linked to the original turn open when it started.
+  let translation: { id: string; text: string; final: boolean; translationOf?: string; lang?: string } | null = null;
+  let translationIndex = 0;
 
   const flushTurn = () => {
     if (!current) return;
-    turns.push({
-      id: `s${sessionIndex}:turn${turnIndex++}`,
-      speakerKey: current.speakerKey,
-      startMs: offsetMs + current.startMsRaw,
-      endMs: offsetMs + current.endMsRaw,
-      text: current.text,
-      final: current.final,
-    });
+    turns.push({ id: current.id, speakerKey: current.speakerKey, startMs: offsetMs + current.startMsRaw, endMs: offsetMs + current.endMsRaw, text: current.text, final: current.final });
+    captions.push({ kind: current.final ? 'final' : 'draft', id: current.id, text: current.text, atSec: toMeetingSec(current.startMsRaw), endSec: toMeetingSec(current.endMsRaw), speakerKey: current.speakerKey, lang: current.lang });
     current = null;
   };
+  const flushTranslation = () => {
+    if (!translation) return;
+    captions.push({ kind: translation.final ? 'final' : 'draft', id: translation.id, text: translation.text, atSec: 0, endSec: 0, translationOf: translation.translationOf, lang: translation.lang });
+    translation = null;
+  };
 
-  tokens.forEach((token, index) => {
-    const id = `s${sessionIndex}:${index}`;
-    const isTranslation = token.translation_status === 'translation';
-
-    if (!tokensEqual(previous[index], token)) {
-      captions.push({
-        kind: token.is_final ? 'final' : 'draft',
-        id,
-        text: token.text,
-        atSec: toMeetingSec(token.start_ms),
-        endSec: toMeetingSec(token.end_ms ?? token.start_ms),
-        speakerKey: !isTranslation && token.speaker ? `s${sessionIndex}:${token.speaker}` : undefined,
-        lang: token.language,
-        translationOf: isTranslation ? lastOriginalId : undefined,
-      });
+  tokens.forEach((token) => {
+    if (token.translation_status === 'translation') {
+      // Translation tokens carry no timestamp and never join a LiveTurn (QĐ-12);
+      // group them into their own line linked to the original turn now open.
+      const translationOf = current?.id;
+      if (translation && translation.translationOf === translationOf) {
+        translation.text += token.text;
+        translation.final = token.is_final;
+        translation.lang = token.language ?? translation.lang;
+      } else {
+        flushTranslation();
+        translation = { id: `s${sessionIndex}:trans${translationIndex++}`, text: token.text, final: token.is_final, translationOf, lang: token.language };
+      }
+      return;
     }
-    if (!isTranslation) lastOriginalId = id;
-
-    // Translation tokens carry no timestamp and are excluded from every turn/alignment (QĐ-12).
-    if (isTranslation) return;
 
     const speakerKey = token.speaker ? `s${sessionIndex}:${token.speaker}` : `s${sessionIndex}:unknown`;
     if (current && current.speakerKey === speakerKey) {
       current.text += token.text;
       current.endMsRaw = token.end_ms ?? current.endMsRaw;
       current.final = token.is_final;
+      current.lang = token.language ?? current.lang;
     } else {
       flushTurn();
-      current = {
-        speakerKey,
-        startMsRaw: token.start_ms ?? 0,
-        endMsRaw: token.end_ms ?? token.start_ms ?? 0,
-        text: token.text,
-        final: token.is_final,
-      };
+      current = { id: `s${sessionIndex}:turn${turnIndex++}`, speakerKey, startMsRaw: token.start_ms ?? 0, endMsRaw: token.end_ms ?? token.start_ms ?? 0, text: token.text, final: token.is_final, lang: token.language };
     }
   });
   flushTurn();
+  flushTranslation();
 
   return { captions, turns };
 }
@@ -113,7 +109,6 @@ export function createSonioxConnection(opts: RealtimeConnectionOptions): Realtim
   let rollTimer: ReturnType<typeof setTimeout> | null = null;
   const offsetBySession = new Map<number, number>();
   const turnsBySession = new Map<number, LiveTurn[]>();
-  const previousTokensBySession = new Map<number, Token[]>();
 
   function clearRollTimer(): void {
     if (rollTimer) clearTimeout(rollTimer);
@@ -122,9 +117,7 @@ export function createSonioxConnection(opts: RealtimeConnectionOptions): Realtim
 
   function handlePartialResult(index: number, result: SpeechToTextAPIResponse): void {
     const offsetMs = offsetBySession.get(index) ?? 0;
-    const previous = previousTokensBySession.get(index) ?? [];
-    const { captions, turns } = buildFromSnapshot(index, result.tokens, previous, offsetMs);
-    previousTokensBySession.set(index, result.tokens);
+    const { captions, turns } = buildFromSnapshot(index, result.tokens, offsetMs);
     turnsBySession.set(index, turns);
     for (const caption of captions) opts.onCaption(caption);
     opts.onTurns([...turnsBySession.values()].flat());
