@@ -15,15 +15,14 @@
  * translate-batch payloads: POST `generate-async` → `{ attemptId }`, then poll
  * `attempt-status` until terminal.
  *
- * OPEN QUESTION (plan.md risk table + `auth-and-rest-integration.md:59-74,
- * 99-147`, not present in this repo — external Hub dev-doc): the exact
- * `generate-async`/`attempt-status` response shape has never been observed
- * against a live Hub (spike-05 is unresolved offline). The field names below
- * (`attemptId`, `status`, `text`/`result`/`output`, terminal state strings)
- * are this phase's best-guess DEFAULT, written tolerantly (accepts several
- * plausible shapes) and isolated to `parseAttemptStatus`/the two `asRecord`
- * extractions below so a future correction is a one-function fix once the
- * spike runs live.
+ * Contract (Hub route `agents.sandbox.generate-async`/`attempt-status`):
+ * `generate-async` POSTs `{ roomId, prompt, ... }` and returns `{ attemptId }`.
+ * `attempt-status` is a GET that REQUIRES BOTH `roomId` and `attemptId` query
+ * params — omitting `roomId` makes the Hub reject the poll with the Meteor
+ * "Match error: Expected string, got undefined". It returns
+ * `{ status, text?, source }` where `status` is one of running/completed/
+ * failed/cancelled/unknown. The text extraction stays tolerant (accepts a few
+ * shapes) so a Hub response tweak is a one-function fix.
  */
 import type { RoomBoundHubClient } from '@privos_ai/app-server';
 
@@ -218,12 +217,15 @@ export async function generateAsyncWithHubAi(
 
     let pollResponse: Response;
     try {
-      pollResponse = await hub.authorizedFetch(`${ATTEMPT_STATUS_PATH}?attemptId=${encodeURIComponent(attemptId)}`, {
-        method: 'GET',
-        requiredScope: 'sandbox:generate',
-        retryMode: 'never',
-        signal,
-      });
+      pollResponse = await hub.authorizedFetch(
+        `${ATTEMPT_STATUS_PATH}?roomId=${encodeURIComponent(input.roomId)}&attemptId=${encodeURIComponent(attemptId)}`,
+        {
+          method: 'GET',
+          requiredScope: 'sandbox:generate',
+          retryMode: 'never',
+          signal,
+        },
+      );
     } catch {
       throw new AppError('Không kiểm tra được trạng thái Hub AI — vui lòng thử lại sau.');
     }

@@ -48,6 +48,24 @@ describe('generateAsyncWithHubAi', () => {
     expect(pollCount).toBe(3);
   });
 
+  it('sends roomId (Hub-required) alongside attemptId on the attempt-status poll', async () => {
+    vi.useFakeTimers();
+    let polledPath = '';
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path === '/api/v1/agents.sandbox.generate-async') return jsonResponse(200, { attemptId: 'attempt-9' });
+      polledPath = path;
+      return jsonResponse(200, { status: 'completed', text: 'ok', source: 'room' });
+    });
+    const hub = { authorizedFetch } as unknown as RoomBoundHubClient;
+
+    const resultPromise = generateAsyncWithHubAi(hub, { roomId: 'r1', prompt: 'summarize this' });
+    await vi.advanceTimersByTimeAsync(1_000);
+    await resultPromise;
+
+    expect(polledPath).toContain('roomId=r1');
+    expect(polledPath).toContain('attemptId=attempt-9');
+  });
+
   it('throws with the Hub-reported reason on a failed attempt', async () => {
     vi.useFakeTimers();
     const authorizedFetch = vi.fn(async (path: string) => {
