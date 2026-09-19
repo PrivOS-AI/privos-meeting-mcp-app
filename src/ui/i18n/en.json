@@ -137,7 +137,7 @@
   "speaker.memberPicker.placeholder": "Type a member's name…",
   "speaker.memberPicker.searching": "Searching…",
   "speaker.memberPicker.degradedPlaceholder": "Type a name (member search unavailable)",
-  "speaker.memberPicker.degradedHint": "Member search is unavailable in this room — type a name instead.",
+  "speaker.memberPicker.degradedHint": "Member search needs the \"rooms:read\" permission, which isn't granted yet. Ask an admin to approve it (or re-pair the app); for now just type the name.",
   "speaker.memberPicker.useTyped": "Use this",
 
   "speaker.labelEditor.pickExisting": "Existing profile",

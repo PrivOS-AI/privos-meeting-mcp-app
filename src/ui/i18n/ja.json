@@ -137,7 +137,7 @@
   "speaker.memberPicker.placeholder": "メンバーの名前を入力…",
   "speaker.memberPicker.searching": "検索中…",
   "speaker.memberPicker.degradedPlaceholder": "名前を入力（メンバー検索は利用できません）",
-  "speaker.memberPicker.degradedHint": "このルームではメンバー検索を利用できません — 代わりに名前を入力してください。",
+  "speaker.memberPicker.degradedHint": "メンバー検索には \"rooms:read\" 権限が必要ですが、アプリにまだ付与されていません。管理者に承認を依頼してください（またはアプリを再ペアリング）。当面は名前を直接入力してください。",
   "speaker.memberPicker.useTyped": "これを使用",
 
   "speaker.labelEditor.pickExisting": "既存のプロフィール",

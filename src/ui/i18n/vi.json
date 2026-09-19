@@ -137,7 +137,7 @@
   "speaker.memberPicker.placeholder": "Gõ tên thành viên…",
   "speaker.memberPicker.searching": "Đang tìm…",
   "speaker.memberPicker.degradedPlaceholder": "Nhập tên (không tìm được danh sách thành viên)",
-  "speaker.memberPicker.degradedHint": "Không tìm được danh sách thành viên phòng này — hãy nhập tên trực tiếp.",
+  "speaker.memberPicker.degradedHint": "Tìm thành viên cần quyền \"rooms:read\" nhưng app chưa được cấp. Nhờ quản trị viên duyệt quyền này (hoặc pair lại app); tạm thời cứ nhập tên trực tiếp.",
   "speaker.memberPicker.useTyped": "Dùng tên này",
 
   "speaker.labelEditor.pickExisting": "Hồ sơ có sẵn",

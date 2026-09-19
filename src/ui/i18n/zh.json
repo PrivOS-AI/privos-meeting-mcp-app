@@ -137,7 +137,7 @@
   "speaker.memberPicker.placeholder": "输入成员姓名…",
   "speaker.memberPicker.searching": "正在搜索…",
   "speaker.memberPicker.degradedPlaceholder": "输入姓名（成员搜索不可用）",
-  "speaker.memberPicker.degradedHint": "此房间中成员搜索不可用 — 请改为输入姓名。",
+  "speaker.memberPicker.degradedHint": "成员搜索需要 \"rooms:read\" 权限，但应用尚未获授权。请管理员批准该权限（或重新配对应用）；暂时可直接输入姓名。",
   "speaker.memberPicker.useTyped": "使用该姓名",
 
   "speaker.labelEditor.pickExisting": "现有档案",

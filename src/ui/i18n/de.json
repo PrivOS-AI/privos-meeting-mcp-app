@@ -137,7 +137,7 @@
   "speaker.memberPicker.placeholder": "Namen eines Mitglieds eingeben…",
   "speaker.memberPicker.searching": "Suche läuft…",
   "speaker.memberPicker.degradedPlaceholder": "Namen eingeben (Mitgliedersuche nicht verfügbar)",
-  "speaker.memberPicker.degradedHint": "Die Mitgliedersuche ist in diesem Raum nicht verfügbar — geben Sie stattdessen einen Namen ein.",
+  "speaker.memberPicker.degradedHint": "Die Mitgliedersuche benötigt die Berechtigung \"rooms:read\", die noch nicht erteilt ist. Bitten Sie einen Administrator um Freigabe (oder koppeln Sie die App neu); geben Sie vorerst den Namen direkt ein.",
   "speaker.memberPicker.useTyped": "Diesen verwenden",
 
   "speaker.labelEditor.pickExisting": "Vorhandenes Profil",

@@ -137,7 +137,7 @@
   "speaker.memberPicker.placeholder": "Saisissez le nom d'un membre…",
   "speaker.memberPicker.searching": "Recherche…",
   "speaker.memberPicker.degradedPlaceholder": "Saisissez un nom (recherche de membres indisponible)",
-  "speaker.memberPicker.degradedHint": "La recherche de membres est indisponible dans ce salon — saisissez un nom à la place.",
+  "speaker.memberPicker.degradedHint": "La recherche de membres nécessite l'autorisation \"rooms:read\", pas encore accordée. Demandez à un administrateur de l'approuver (ou réappairez l'app) ; en attendant, saisissez le nom directement.",
   "speaker.memberPicker.useTyped": "Utiliser celui-ci",
 
   "speaker.labelEditor.pickExisting": "Profil existant",

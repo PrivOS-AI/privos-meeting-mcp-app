@@ -137,7 +137,7 @@
   "speaker.memberPicker.placeholder": "구성원 이름 입력…",
   "speaker.memberPicker.searching": "검색 중…",
   "speaker.memberPicker.degradedPlaceholder": "이름 입력 (구성원 검색 불가)",
-  "speaker.memberPicker.degradedHint": "이 방에서는 구성원 검색을 사용할 수 없습니다 — 대신 이름을 입력하세요.",
+  "speaker.memberPicker.degradedHint": "구성원 검색에는 \"rooms:read\" 권한이 필요하지만 앱에 아직 부여되지 않았습니다. 관리자에게 승인을 요청하세요(또는 앱을 다시 페어링). 지금은 이름을 직접 입력하세요.",
   "speaker.memberPicker.useTyped": "이 이름 사용",
 
   "speaker.labelEditor.pickExisting": "기존 프로필",
