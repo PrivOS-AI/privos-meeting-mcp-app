@@ -11,6 +11,7 @@ import { parseToolResult, usePrivosApp, usePrivosContext } from '@privos_ai/app-
 
 import { AppRail } from './components/app-rail.js';
 import { BotCredentialBanner } from './components/bot-credential-banner.js';
+import { Icon } from './components/icon.js';
 import { HistoryScreen } from './screens/history-screen.js';
 import { LiveScreen } from './screens/live-screen.js';
 import { MeetingDetailScreen } from './screens/meeting-detail-screen.js';
@@ -18,6 +19,7 @@ import { NewMeetingScreen } from './screens/new-meeting-screen.js';
 import { ProcessingScreen } from './screens/processing-screen.js';
 import { RecoveryBanner } from './screens/recovery-banner.js';
 import { SettingsScreen } from './screens/settings-screen.js';
+import { useI18n } from './i18n/i18n-provider.js';
 import { RecordingStoreProvider, useRecordingState } from './stores/recording-store.js';
 
 export type Route = 'new' | 'live' | 'processing' | 'detail' | 'history' | 'settings';
@@ -25,7 +27,10 @@ export type Route = 'new' | 'live' | 'processing' | 'detail' | 'history' | 'sett
 export function App() {
   const app = usePrivosApp();
   const context = usePrivosContext();
+  const { t } = useI18n();
   const [route, setRoute] = useState<Route>('new');
+  // Mobile-only: the rail is an off-canvas drawer toggled by the hamburger below.
+  const [railOpen, setRailOpen] = useState(false);
   // History → detail navigation carries the picked meeting id; owned here (not in RecordingStore) since it has
   // nothing to do with the in-progress recording state machine (phase-07 § Related Code Files: `app.tsx` route `detail/:meetingId`).
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
@@ -65,7 +70,16 @@ export function App() {
   return (
     <RecordingStoreProvider>
       <div className="ma-app">
-        <AppRail current={route} onNavigate={setRoute} />
+        <button
+          type="button"
+          className="ma-rail-toggle"
+          aria-label={t(railOpen ? 'rail.close' : 'rail.open')}
+          aria-expanded={railOpen}
+          onClick={() => setRailOpen((v) => !v)}
+        >
+          <Icon name={railOpen ? 'close' : 'menu'} size={22} />
+        </button>
+        <AppRail current={route} onNavigate={setRoute} open={railOpen} onClose={() => setRailOpen(false)} />
         <div className="ma-app__column">
           <BotCredentialBanner />
           <RecoveryBanner />

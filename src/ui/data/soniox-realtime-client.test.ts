@@ -155,6 +155,27 @@ describe('createSonioxConnection', () => {
     const lines = new Map(stub.captions.map((c) => [c.id, c.text]));
     expect([...lines.values()]).toEqual(['xin chào mọi người', 'tiếp theo']);
   });
+  it('splits one speaker\'s uninterrupted monologue into multiple lines past the length cap', async () => {
+    const stub = new RealtimeConnectionCallbacksStub();
+    createSonioxConnection({ ...stub.options(), mintToken: async () => token(), stream: {} as MediaStream, recorderEpochMs: 0, translate: false });
+    await vi.waitFor(() => expect(FakeSonioxClient.instances).toHaveLength(1));
+    const client = FakeSonioxClient.instances[0];
+    client.options.onStarted?.();
+
+    // ~40 tokens of 30 chars each = ~1200 chars, ONE speaker, NO pause between
+    // tokens -> must break into more than one line (cap ~750 chars).
+    const tokens: Token[] = [];
+    for (let i = 0; i < 40; i++) {
+      tokens.push(makeToken({ text: 'x'.repeat(29) + ' ', speaker: '1', is_final: true, start_ms: i * 300, end_ms: i * 300 + 280 }));
+    }
+    client.options.onPartialResult?.({ tokens, text: '', final_audio_proc_ms: 12_000, total_audio_proc_ms: 12_000 });
+
+    const originalLines = stub.captions.filter((c) => !c.translationOf);
+    const uniqueIds = new Set(originalLines.map((c) => c.id));
+    expect(uniqueIds.size).toBeGreaterThan(1);
+    // Every emitted line stays within a sane bound (cap + one token's worth).
+    for (const c of originalLines) expect(c.text.length).toBeLessThanOrEqual(790);
+  });
   it('builds up history when each response carries only NEW final tokens (Soniox sends a final once)', async () => {
     const stub = new RealtimeConnectionCallbacksStub();
     createSonioxConnection({ ...stub.options(), mintToken: async () => token(), stream: {} as MediaStream, recorderEpochMs: 0, translate: true });

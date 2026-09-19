@@ -6,6 +6,8 @@
   "rail.bookmarks": "Bookmarks",
   "rail.search": "Search",
   "rail.settings": "Settings",
+  "rail.open": "Open menu",
+  "rail.close": "Close menu",
 
   "topbar.title": "Meeting Agent",
   "topbar.theme.toggle": "Toggle light/dark theme",

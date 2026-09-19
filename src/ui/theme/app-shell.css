@@ -14,7 +14,9 @@
 
 .ma-app__column {
   display: grid;
-  grid-template-rows: 60px auto 1fr;
+  /* Header removed (its controls moved to the rail avatar menu): the first two
+     rows are the credential + recovery banners, which collapse to 0 when null. */
+  grid-template-rows: auto auto 1fr;
   min-width: 0;
   min-height: 0;
 }
@@ -40,6 +42,7 @@
 }
 
 .ma-rail__item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -51,6 +54,31 @@
   background: transparent;
   border: none;
   border-radius: var(--ma-radius-md);
+}
+
+/* Active meeting: the record icon ripples gently instead of sitting static. */
+.ma-rail__item--recording {
+  color: var(--status-danger);
+}
+
+.ma-rail__item--recording::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: var(--ma-radius-md);
+  border: 2px solid var(--status-danger);
+  opacity: 0;
+  pointer-events: none;
+  animation: ma-rail-ripple 2.4s ease-out infinite;
+}
+
+@keyframes ma-rail-ripple {
+  0% { transform: scale(0.85); opacity: 0.55; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ma-rail__item--recording::after { animation: none; opacity: 0.5; }
 }
 
 .ma-rail__item:hover {
@@ -323,4 +351,77 @@
 .ma-user-menu__value {
   font-weight: var(--weight-semibold);
   color: var(--ma-fg-1);
+}
+
+/* ---------- Mobile drawer: hamburger toggle + scrim + off-canvas rail ---------- */
+
+.ma-rail-toggle {
+  display: none; /* desktop: the rail is always visible, no toggle needed */
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 60;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  color: var(--ma-fg-1);
+  background: var(--ma-surface);
+  border: 1px solid var(--ma-border-1);
+  border-radius: var(--ma-radius-md);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+}
+
+.ma-rail__scrim {
+  display: none; /* only meaningful once the rail is a drawer (mobile) */
+}
+
+@media (max-width: 720px) {
+  .ma-app {
+    grid-template-columns: 1fr;
+  }
+
+  /* Clear the fixed hamburger so it never overlaps content or the live title. */
+  .ma-app__column {
+    padding-top: 52px;
+  }
+
+  .ma-rail {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 55;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+
+  .ma-rail--open {
+    transform: none;
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.28);
+  }
+
+  .ma-rail-toggle {
+    display: flex;
+  }
+
+  .ma-rail__scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    padding: 0;
+    background: rgba(0, 0, 0, 0.4);
+    border: none;
+  }
+
+  /* Live screen: stack the summary/bookmarks panel under the transcript. */
+  .ma-live {
+    grid-template-columns: 1fr;
+  }
+
+  .ma-live__side {
+    border-left: none;
+    border-top: 1px solid var(--ma-border-1);
+  }
 }

@@ -187,3 +187,36 @@
   flex-basis: 100%;
   margin: 0;
 }
+
+/* ---------- Responsive: stack the settings nav above the content ---------- */
+
+@media (max-width: 720px) {
+  .ma-settings-screen {
+    padding: var(--space-4);
+  }
+
+  .ma-settings-screen--with-nav {
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .ma-settings-nav {
+    position: static;
+    flex: none;
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: var(--space-1);
+    padding-bottom: var(--space-1);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ma-settings-nav__item {
+    white-space: nowrap;
+  }
+
+  .ma-settings-content {
+    max-width: none;
+  }
+}

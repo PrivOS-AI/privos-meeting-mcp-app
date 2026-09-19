@@ -44,6 +44,16 @@ interface BuildResult {
  */
 /** A same-speaker pause longer than this starts a new caption line. */
 const LINE_BREAK_PAUSE_MS = 1500;
+/**
+ * Even with no pause, a long monologue is cut into ~100-150-word lines: a
+ * single ever-growing paragraph is hard to read AND makes speaker correction
+ * coarse (one huge line = one label over minutes), and it feeds the live
+ * embedder one long, drift-prone span. ~750 chars ≈ 120-140 English words /
+ * ~150 Vietnamese words. The cut is deterministic on finalized text, so line
+ * ids stay stable across snapshot rebuilds. At normal speech ~750 chars is
+ * ~45-70s — well above `speakerMinSegmentSec`, so no span is dropped.
+ */
+const MAX_LINE_CHARS = 750;
 
 function buildFromSnapshot(sessionIndex: number, tokens: Token[], offsetMs: number): BuildResult {
   const captions: CaptionEvent[] = [];
@@ -83,7 +93,7 @@ function buildFromSnapshot(sessionIndex: number, tokens: Token[], offsetMs: numb
     // Same speaker continues the line — unless they paused: a long monologue
     // would otherwise be one ever-growing paragraph with no visible history.
     const pausedMs = current ? (token.start_ms ?? current.endMsRaw) - current.endMsRaw : 0;
-    if (current && current.speakerKey === speakerKey && pausedMs <= LINE_BREAK_PAUSE_MS) {
+    if (current && current.speakerKey === speakerKey && pausedMs <= LINE_BREAK_PAUSE_MS && current.text.length < MAX_LINE_CHARS) {
       current.text += token.text;
       current.endMsRaw = token.end_ms ?? current.endMsRaw;
       current.final = token.is_final;
