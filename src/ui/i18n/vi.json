@@ -102,6 +102,7 @@
 
   "processing.title": "Đang xử lý cuộc họp",
   "processing.provider": "Nhà cung cấp: {provider}",
+  "processing.backgroundNotice": "Việc xử lý chạy ngầm trên máy chủ. Bạn có thể đóng tab này hoặc bắt đầu cuộc họp mới — kết quả sẽ có trong Lịch sử.",
   "processing.step.download": "Tải & ghép phần ghi âm",
   "processing.step.decode": "Giải mã âm thanh",
   "processing.step.transcribe": "Nhận dạng giọng nói",

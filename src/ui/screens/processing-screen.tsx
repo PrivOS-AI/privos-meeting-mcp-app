@@ -160,6 +160,9 @@ export function ProcessingScreen({ onDone, onOpenMeeting }: ProcessingScreenProp
     <div className="ma-processing">
       <h2 className="ma-processing__title">{t('processing.title')}</h2>
       <p className="ma-processing__provider">{t('processing.provider', { provider: status?.provider ?? '…' })}</p>
+      {status?.status === 'queued' || status?.status === 'processing' ? (
+        <p className="ma-notice ma-notice--info ma-processing__background">{t('processing.backgroundNotice')}</p>
+      ) : null}
 
       <ol className="ma-processing__steps">
         {STEPS.map((step, index) => {

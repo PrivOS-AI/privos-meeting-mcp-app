@@ -102,6 +102,7 @@
 
   "processing.title": "Processing meeting",
   "processing.provider": "Provider: {provider}",
+  "processing.backgroundNotice": "Processing runs on the server. You can close this tab or start a new meeting — the result will appear in History.",
   "processing.step.download": "Download & concat parts",
   "processing.step.decode": "Decode audio",
   "processing.step.transcribe": "Speech recognition",
