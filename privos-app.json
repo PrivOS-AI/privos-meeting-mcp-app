@@ -98,6 +98,15 @@
       "reason": "Tóm tắt và dịch theo lô bằng Hub AI, không gửi transcript ra bên thứ ba."
     },
     {
+      "scope": "sandbox:botkey:push",
+      "requirement": "optional",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.ai.botkey",
+      "reason": "Đẩy khoá bot lên PrivOS Sandbox lúc khởi tạo để dựng sẵn VM Hub AI (nếu thiếu, tóm tắt/dịch báo 'container unavailable').",
+      "degradedBehavior": "Nhờ quản trị viên đẩy khoá bot thủ công; tóm tắt/dịch bằng Hub AI tạm không chạy tới khi VM được dựng."
+    },
+    {
       "scope": "rooms:read",
       "requirement": "optional",
       "context": "room",
