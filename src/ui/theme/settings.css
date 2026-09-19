@@ -192,7 +192,7 @@
 
 @media (max-width: 900px) {
   .ma-settings-screen {
-    padding: var(--space-4);
+    padding: 0;
   }
 
   .ma-settings-screen--with-nav {

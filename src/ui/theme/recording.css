@@ -1062,11 +1062,11 @@
   .ma-live__topbar {
     flex-wrap: wrap;
     padding: 0 44px; /* clear the fixed left + right icon buttons */
-    min-height: 40px;
+    min-height: 44px;
   }
 
   .ma-live__main {
-    padding: var(--space-2) var(--space-3) var(--space-3);
+    padding: 2px var(--space-3) var(--space-3);
   }
 
   .ma-live__title-wrap {
@@ -1092,8 +1092,8 @@
     align-items: center;
     justify-content: center;
     position: fixed;
-    top: 52px;
-    right: 8px;
+    top: 4px;
+    right: 6px;
     z-index: 60;
     width: 40px;
     height: 40px;

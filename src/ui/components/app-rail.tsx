@@ -53,6 +53,10 @@ export function AppRail({ current, onNavigate, open, onClose }: AppRailProps) {
       {open ? <button type="button" className="ma-rail__scrim" aria-label={t('rail.close')} onClick={onClose} /> : null}
       <nav className={`ma-rail${open ? ' ma-rail--open' : ''}`} aria-label={t('app.title')}>
         <div className="ma-rail__items">
+          {/* Mobile drawer only: Menu sits first, the (rippling) Meeting icon right below it. */}
+          <button type="button" className="ma-rail__item ma-rail__menu" aria-label={t('rail.close')} title={t('rail.close')} onClick={onClose}>
+            <Icon name="menu" size={22} />
+          </button>
           {RAIL_ITEMS.map((item) => {
             const label = t(item.labelKey);
             const active = item.route !== null && item.route === current;

@@ -74,9 +74,7 @@ export function App() {
         <div className="ma-app__column">
           <BotCredentialBanner />
           <RecoveryBanner />
-          <main className={route === 'live' ? 'ma-body ma-body--live' : 'ma-body'}>
-            <RoutedScreens route={route} setRoute={setRoute} selectedMeetingId={selectedMeetingId} openMeeting={openMeeting} />
-          </main>
+          <RoutedScreens route={route} setRoute={setRoute} selectedMeetingId={selectedMeetingId} openMeeting={openMeeting} />
         </div>
       </div>
     </RecordingStoreProvider>
@@ -84,23 +82,16 @@ export function App() {
 }
 
 /**
- * The mobile-only sidebar toggle. It IS the Meeting icon: while a meeting is
- * live it ripples (round), and tapping it opens the left rail. (Hidden on
- * desktop, where the rail is always visible.)
+ * The mobile-only "open sidebar" button — a plain menu icon shown while the rail
+ * is collapsed. Once open, the rail's own Menu button (its first item, above the
+ * Meeting icon) takes over, so this one steps aside. Hidden on desktop.
  */
 function RailToggle({ open, onToggle }: { open: boolean; onToggle(): void }) {
   const { t } = useI18n();
-  const recording = useRecordingState();
-  const meetingActive = recording.status === 'recording' || recording.status === 'paused' || recording.status === 'ending';
+  if (open) return null;
   return (
-    <button
-      type="button"
-      className={`ma-rail-toggle${meetingActive ? ' ma-rail-toggle--recording' : ''}`}
-      aria-label={t(open ? 'rail.close' : 'rail.open')}
-      aria-expanded={open}
-      onClick={onToggle}
-    >
-      <Icon name={open ? 'close' : 'record'} size={22} />
+    <button type="button" className="ma-rail-toggle" aria-label={t('rail.open')} aria-expanded={false} onClick={onToggle}>
+      <Icon name="menu" size={22} />
     </button>
   );
 }
@@ -119,14 +110,16 @@ function RoutedScreens({ route, setRoute, selectedMeetingId, openMeeting }: Rout
   // Keep a running meeting alive in the background: navigating away and back to
   // "New meeting" returns to the live session instead of a fresh start form.
   const showLive = route === 'live' || (route === 'new' && recordingActive);
+  // The live layout (full-bleed, no body padding) follows what is SHOWN, not the
+  // route — a background session reopened from "New meeting" is live too.
   return (
-    <>
+    <main className={showLive ? 'ma-body ma-body--live' : 'ma-body'}>
       {route === 'new' && !recordingActive ? <NewMeetingScreen onStarted={() => setRoute('live')} /> : null}
       {showLive ? <LiveScreen onEnded={() => setRoute('processing')} /> : null}
       {route === 'processing' ? <ProcessingScreen onDone={() => setRoute('history')} onOpenMeeting={openMeeting} /> : null}
       {route === 'detail' && selectedMeetingId ? <MeetingDetailScreen meetingId={selectedMeetingId} onBack={() => setRoute('history')} /> : null}
       {route === 'history' ? <HistoryScreen onStartRecording={() => setRoute('new')} onOpenMeeting={openMeeting} /> : null}
       {route === 'settings' ? <SettingsScreen /> : null}
-    </>
+    </main>
   );
 }
