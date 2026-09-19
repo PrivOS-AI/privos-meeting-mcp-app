@@ -53,35 +53,29 @@ function buildFromSnapshot(sessionIndex: number, tokens: Token[], offsetMs: numb
   // Current original (non-translation) speaker run.
   let current: { id: string; speakerKey: string; startMsRaw: number; endMsRaw: number; text: string; final: boolean; lang?: string } | null = null;
   let turnIndex = 0;
-  // Current translation run, linked to the original turn open when it started.
-  let translation: { id: string; text: string; final: boolean; translationOf?: string; lang?: string } | null = null;
-  let translationIndex = 0;
+  // Translation text accumulated PER ORIGINAL TURN, so the whole translation of
+  // a segment renders directly under that segment's caption.
+  const translations = new Map<string, { text: string; final: boolean; lang?: string }>();
+  let lastTurnId: string | undefined;
 
   const flushTurn = () => {
     if (!current) return;
     turns.push({ id: current.id, speakerKey: current.speakerKey, startMs: offsetMs + current.startMsRaw, endMs: offsetMs + current.endMsRaw, text: current.text, final: current.final });
     captions.push({ kind: current.final ? 'final' : 'draft', id: current.id, text: current.text, atSec: toMeetingSec(current.startMsRaw), endSec: toMeetingSec(current.endMsRaw), speakerKey: current.speakerKey, lang: current.lang });
+    lastTurnId = current.id;
     current = null;
-  };
-  const flushTranslation = () => {
-    if (!translation) return;
-    captions.push({ kind: translation.final ? 'final' : 'draft', id: translation.id, text: translation.text, atSec: 0, endSec: 0, translationOf: translation.translationOf, lang: translation.lang });
-    translation = null;
   };
 
   tokens.forEach((token) => {
     if (token.translation_status === 'translation') {
       // Translation tokens carry no timestamp and never join a LiveTurn (QĐ-12);
-      // group them into their own line linked to the original turn now open.
-      const translationOf = current?.id;
-      if (translation && translation.translationOf === translationOf) {
-        translation.text += token.text;
-        translation.final = token.is_final;
-        translation.lang = token.language ?? translation.lang;
-      } else {
-        flushTranslation();
-        translation = { id: `s${sessionIndex}:trans${translationIndex++}`, text: token.text, final: token.is_final, translationOf, lang: token.language };
-      }
+      // they belong to the original turn that is open (or was just closed).
+      const turnId = current?.id ?? lastTurnId;
+      if (!turnId) return;
+      const entry = translations.get(turnId) ?? { text: '', final: true, lang: token.language };
+      entry.text += token.text;
+      entry.final = entry.final && token.is_final;
+      translations.set(turnId, entry);
       return;
     }
 
@@ -100,7 +94,10 @@ function buildFromSnapshot(sessionIndex: number, tokens: Token[], offsetMs: numb
     }
   });
   flushTurn();
-  flushTranslation();
+  // After every turn line exists, so `translationOf` always finds its target.
+  for (const [turnId, entry] of translations) {
+    captions.push({ kind: entry.final ? 'final' : 'draft', id: `${turnId}:tr`, text: entry.text.trim(), atSec: 0, endSec: 0, translationOf: turnId, lang: entry.lang });
+  }
 
   return { captions, turns };
 }
@@ -116,6 +113,26 @@ export function createSonioxConnection(opts: RealtimeConnectionOptions): Realtim
   const offsetBySession = new Map<number, number>();
   const turnsBySession = new Map<number, LiveTurn[]>();
 
+  /**
+   * Soniox sends each FINAL token once and re-sends only the still-changing
+   * non-final tail, so a response is NOT the whole transcript — treating it as
+   * one rewrote the same few lines forever and the conversation history never
+   * built up. Keep every final token per session and append the current tail.
+   * If an SDK build does send cumulative finals (first final identical to ours),
+   * adopt its list instead of double-appending.
+   */
+  const finalTokensBySession = new Map<number, Token[]>();
+  function accumulate(index: number, tokens: Token[]): Token[] {
+    const kept = finalTokensBySession.get(index) ?? [];
+    const incomingFinals = tokens.filter((t) => t.is_final);
+    const tail = tokens.filter((t) => !t.is_final);
+    const first = incomingFinals[0];
+    const cumulative = Boolean(first && kept[0] && kept.length > 0 && first.text === kept[0].text && first.start_ms === kept[0].start_ms && incomingFinals.length >= kept.length);
+    const finals = cumulative ? incomingFinals : [...kept, ...incomingFinals];
+    finalTokensBySession.set(index, finals);
+    return [...finals, ...tail];
+  }
+
   function clearRollTimer(): void {
     if (rollTimer) clearTimeout(rollTimer);
     rollTimer = null;
@@ -123,9 +140,10 @@ export function createSonioxConnection(opts: RealtimeConnectionOptions): Realtim
 
   function handlePartialResult(index: number, result: SpeechToTextAPIResponse): void {
     const offsetMs = offsetBySession.get(index) ?? 0;
-    const { captions, turns } = buildFromSnapshot(index, result.tokens, offsetMs);
+    const { captions, turns } = buildFromSnapshot(index, accumulate(index, result.tokens), offsetMs);
     turnsBySession.set(index, turns);
     for (const caption of captions) opts.onCaption(caption);
+    opts.onLinesSnapshot?.(index, turns.map((t) => t.id));
     opts.onTurns([...turnsBySession.values()].flat());
   }
 

@@ -155,4 +155,32 @@ describe('createSonioxConnection', () => {
     const lines = new Map(stub.captions.map((c) => [c.id, c.text]));
     expect([...lines.values()]).toEqual(['xin chào mọi người', 'tiếp theo']);
   });
+  it('builds up history when each response carries only NEW final tokens (Soniox sends a final once)', async () => {
+    const stub = new RealtimeConnectionCallbacksStub();
+    createSonioxConnection({ ...stub.options(), mintToken: async () => token(), stream: {} as MediaStream, recorderEpochMs: 0, translate: true });
+    await vi.waitFor(() => expect(FakeSonioxClient.instances).toHaveLength(1));
+    const client = FakeSonioxClient.instances[0];
+    client.options.onStarted?.();
+
+    client.options.onPartialResult?.({
+      tokens: [makeToken({ text: 'chào anh', speaker: '1', is_final: true, start_ms: 0, end_ms: 800 })],
+      text: '', final_audio_proc_ms: 800, total_audio_proc_ms: 800,
+    });
+    // second response: the first final is NOT repeated; a second speaker + a translation + a draft tail
+    client.options.onPartialResult?.({
+      tokens: [
+        makeToken({ text: 'hello', is_final: true, translation_status: 'translation', language: 'en' }),
+        makeToken({ text: 'chào em', speaker: '2', is_final: true, start_ms: 1000, end_ms: 1700 }),
+        makeToken({ text: ' khoẻ', speaker: '2', is_final: false, start_ms: 1750, end_ms: 2000 }),
+      ],
+      text: '', final_audio_proc_ms: 1700, total_audio_proc_ms: 2000,
+    });
+
+    const latest = new Map(stub.captions.map((c) => [c.id, c]));
+    const lines = [...latest.values()].filter((c) => !c.translationOf);
+    expect(lines.map((c) => c.text)).toEqual(['chào anh', 'chào em khoẻ']);
+    expect(lines.map((c) => c.speakerKey)).toEqual(['s0:1', 's0:2']);
+    const translation = [...latest.values()].find((c) => c.translationOf);
+    expect(translation).toMatchObject({ text: 'hello', translationOf: lines[0].id });
+  });
 });

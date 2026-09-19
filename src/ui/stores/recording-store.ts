@@ -65,6 +65,10 @@ export interface RecordingState {
   clockSkewMs: number;
   lines: CaptionLine[];
   speakerMap: Record<string, LiveSpeakerBadge>;
+  /** Manual per-line correction: caption line id -> the speaker key the user says really spoke it. */
+  lineSpeaker: Record<string, string>;
+  /** "Apply to every line of this voice": a diarized voice key remapped wholesale to another speaker key. */
+  voiceAlias: Record<string, string>;
   /** Raw list from the last `meeting_live_speakers` poll — drives the "Ai đang nói?" chip row. */
   liveSpeakers: LiveSpeaker[];
   /** True once any chunk for this meeting was dropped/failed (S2-08) — "một số đoạn chưa nhận diện được". */
@@ -102,12 +106,25 @@ function initialState(): RecordingState {
     clockSkewMs: 0,
     lines: [],
     speakerMap: {},
+    lineSpeaker: {},
+    voiceAlias: {},
     liveSpeakers: [],
     liveSpeakersDegraded: false,
     stageCaptionSize: 'medium',
     showTranslation: false,
     wakeLock: { supported: false, active: false },
   };
+}
+
+/**
+ * Who a caption line belongs to after manual corrections: a per-line override
+ * wins, then a whole-voice alias, then what the diarizer said. The diarizer
+ * mixes voices up, so the user can fix one segment or a whole voice.
+ */
+export function resolveLineSpeakerKey(state: Pick<RecordingState, 'lineSpeaker' | 'voiceAlias'>, line: Pick<CaptionLine, 'id' | 'speakerKey'>): string | undefined {
+  const override = state.lineSpeaker[line.id];
+  if (override) return override;
+  return line.speakerKey ? (state.voiceAlias[line.speakerKey] ?? line.speakerKey) : undefined;
 }
 
 /** Merge one caption event into the line list: upsert by id, else promote the most recent still-draft line to final. */
@@ -411,6 +428,13 @@ export class RecordingStore {
           this.translateBuffer.push({ id: event.id, text: event.text, lang: event.lang });
         }
       },
+      onLinesSnapshot: (sessionIndex, ids) => {
+        // Drop this session's lines the provider no longer has (its draft tail regrouped).
+        const prefix = `s${sessionIndex}:turn`;
+        const alive = new Set(ids);
+        const lines = this.state.lines.filter((l) => !l.id.startsWith(prefix) || alive.has(l.id));
+        if (lines.length !== this.state.lines.length) this.setState({ lines });
+      },
       onTurns: (turns) => {
         this.allTurns = turns;
       },
@@ -430,6 +454,39 @@ export class RecordingStore {
     }
     // Relabel every rendered line's badge only — never touch `text`.
     this.setState({ speakerMap });
+  }
+
+  /** Create an empty speaker the user can move lines onto ("Add new speaker"). Returns its key. */
+  addManualSpeaker(): string {
+    const speakerMap = { ...this.state.speakerMap };
+    let n = 1;
+    while (speakerMap[`manual:${n}`]) n += 1;
+    const key = `manual:${n}`;
+    speakerMap[key] = { colorKey: this.nextColor(), resolved: false };
+    this.setState({ speakerMap });
+    return key;
+  }
+
+  /**
+   * Correct who spoke a segment. `applyToVoice` moves EVERY line the diarizer
+   * gave that voice (now and later) instead of just this one.
+   */
+  reassignLine(lineId: string, toSpeakerKey: string, applyToVoice: boolean): void {
+    const line = this.state.lines.find((l) => l.id === lineId);
+    if (!line) return;
+    if (applyToVoice && line.speakerKey) {
+      const voice = line.speakerKey;
+      const voiceAlias = { ...this.state.voiceAlias };
+      if (toSpeakerKey === voice) delete voiceAlias[voice];
+      else voiceAlias[voice] = toSpeakerKey;
+      // Per-line fixes of that voice are superseded by the wholesale move.
+      const lineSpeaker = Object.fromEntries(
+        Object.entries(this.state.lineSpeaker).filter(([id]) => this.state.lines.find((l) => l.id === id)?.speakerKey !== voice),
+      );
+      this.setState({ voiceAlias, lineSpeaker });
+      return;
+    }
+    this.setState({ lineSpeaker: { ...this.state.lineSpeaker, [lineId]: toSpeakerKey } });
   }
 
   /**

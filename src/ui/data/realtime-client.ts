@@ -35,6 +35,12 @@ export type CaptionStatus = 'connecting' | 'live' | 'reconnecting' | 'off';
 
 export interface RealtimeConnectionCallbacks {
   onCaption(event: CaptionEvent): void;
+  /**
+   * Optional: the COMPLETE set of live line ids for one session after a provider
+   * update. A provider that regroups its still-changing tail (Soniox) can shrink
+   * the turn list; lines of that session missing from `ids` are stale and must go.
+   */
+  onLinesSnapshot?(sessionIndex: number, ids: readonly string[]): void;
   /** Fires with the FULL current set of live turns whenever it changes (grouping is recomputed, not diffed). */
   onTurns(turns: LiveTurn[]): void;
   onStarted(sessionIndex: number, offsetMs: number): void;

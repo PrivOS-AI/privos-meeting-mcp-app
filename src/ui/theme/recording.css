@@ -411,19 +411,140 @@
 
 /* ---------- Mic level meter ---------- */
 
-.ma-mic-meter {
-  height: 4px;
-  background: var(--ma-border-1);
-  border-radius: var(--ma-radius-pill);
-  overflow: hidden;
+/* ---------- Voice waveform (one flowing line per speaker) ---------- */
+
+.ma-voice-wave {
+  display: block;
+  width: 100%;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: var(--ma-radius-lg);
+  background:
+    radial-gradient(120% 140% at 100% 50%, rgba(60, 130, 230, 0.1), transparent 60%),
+    var(--ma-surface);
+  border: 1px solid var(--ma-border-1);
+  transition: opacity 200ms ease;
 }
 
-.ma-mic-meter__fill {
-  height: 100%;
-  width: 100%;
-  transform-origin: left;
-  background: var(--status-success);
-  transition: transform 80ms linear;
+.ma-voice-wave--muted {
+  opacity: 0.45;
+}
+
+/* ---------- Per-segment speaker picker ---------- */
+
+.ma-caption-line__meta {
+  position: relative;
+}
+
+.ma-caption-line__speaker--button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: auto;
+  margin-left: -6px;
+  padding: 2px 6px;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: var(--ma-radius-sm);
+}
+
+.ma-caption-line__speaker--button:hover {
+  background: var(--bg-hover);
+}
+
+.ma-caption-line__speaker--open {
+  background: var(--bg-active);
+  box-shadow: 0 0 0 2px rgba(60, 130, 230, 0.35);
+}
+
+.ma-caption-line__speaking {
+  font-size: var(--caption-size);
+  font-weight: var(--weight-semibold);
+  color: var(--ma-link);
+}
+
+.ma-line-picker__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: default;
+}
+
+.ma-line-picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: -6px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(300px, 80vw);
+  padding: var(--space-2);
+  background: var(--ma-surface-raised);
+  border: 1px solid var(--ma-border-1);
+  border-radius: 12px;
+  box-shadow: var(--ma-shadow-lg);
+}
+
+.ma-line-picker__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: var(--body-sm-size);
+  font-weight: var(--weight-semibold);
+  color: var(--ma-fg-2);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+}
+
+.ma-line-picker__item:hover {
+  background: var(--bg-hover);
+}
+
+.ma-line-picker__item--current {
+  color: var(--ma-fg-1);
+  background: var(--bg-active);
+}
+
+.ma-line-picker__name {
+  flex: 1;
+}
+
+.ma-line-picker__divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--ma-border-1);
+}
+
+.ma-line-picker__apply {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 4px;
+  font-size: var(--caption-size);
+  color: var(--ma-fg-3);
+}
+
+.ma-line-picker__apply span {
+  flex: 1;
+  line-height: 1.4;
+}
+
+/* The rename popover opens from the same anchor as the picker. */
+.ma-caption-line__meta > .ma-quick-assign {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: -6px;
+  z-index: 5;
 }
 
 /* ---------- Stage (1b, dark, full-bleed) ---------- */

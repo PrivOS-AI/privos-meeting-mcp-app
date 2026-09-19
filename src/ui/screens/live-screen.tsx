@@ -13,13 +13,13 @@ import { EmptyState } from '../components/empty-state.js';
 import { Icon } from '../components/icon.js';
 import { KeepAwakeNotice } from '../components/keep-awake-notice.js';
 import { LiveSpeakerChips } from '../components/live-speaker-chips.js';
-import { MicLevelMeter } from '../components/mic-level-meter.js';
+import { VoiceWaveform } from '../components/voice-waveform.js';
 import { RecIndicator } from '../components/rec-indicator.js';
 import { RecordingFooter } from '../components/recording-footer.js';
 import { StageCaption } from '../components/stage-caption.js';
 import { deleteBookmark, listBookmarks, type BookmarkRecord } from '../data/bookmark-read-model.js';
 import { useI18n } from '../i18n/i18n-provider.js';
-import { useRecordingState, useRecordingStore, type StageCaptionSize } from '../stores/recording-store.js';
+import { resolveLineSpeakerKey, useRecordingState, useRecordingStore, type StageCaptionSize } from '../stores/recording-store.js';
 
 export interface LiveScreenProps {
   onEnded(): void;
@@ -53,6 +53,11 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
   }
 
   const speakerKeys = Object.keys(state.speakerMap);
+  const speakerLabel = (key: string): string => state.speakerMap[key]?.displayName ?? t('recording.speakerBadge.numbered', { n: speakerKeys.indexOf(key) + 1 });
+  // Every known speaker (diarized + manually added) — feeds the per-line picker and the waveform.
+  const pickerSpeakers = speakerKeys.map((key) => ({ speakerKey: key, label: speakerLabel(key), colorKey: state.speakerMap[key].colorKey }));
+  const newestLine = state.lines[state.lines.length - 1];
+  const activeSpeakerKey = newestLine ? resolveLineSpeakerKey(state, newestLine) : undefined;
 
   async function handleEnd(): Promise<void> {
     await store.endAndSummarize();
@@ -115,7 +120,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
         </div>
         {notices}
         {speakerChips}
-        <StageCaption lines={state.lines} speakerMap={state.speakerMap} size={state.stageCaptionSize} />
+        <StageCaption lines={state.lines} speakerMap={state.speakerMap} size={state.stageCaptionSize} resolveSpeakerKey={(line) => resolveLineSpeakerKey(state, line)} />
         <div className="ma-stage__footer">{footer}</div>
       </div>
     );
@@ -153,18 +158,27 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
           {state.lines.length === 0 ? (
             <p className="ma-live__waiting">{t('recording.waitingForCaptions')}</p>
           ) : (
-            state.lines.map((line) => (
-              <CaptionLine
-                key={line.id}
-                line={line}
-                speaker={line.speakerKey ? state.speakerMap[line.speakerKey] : undefined}
-                speakerIndex={line.speakerKey ? speakerKeys.indexOf(line.speakerKey) + 1 : 0}
-                onBookmark={() => void store.addBookmark()}
-              />
-            ))
+            state.lines.map((line) => {
+              const effectiveKey = resolveLineSpeakerKey(state, line);
+              return (
+                <CaptionLine
+                  key={line.id}
+                  line={line}
+                  speakerKey={effectiveKey}
+                  speaker={effectiveKey ? state.speakerMap[effectiveKey] : undefined}
+                  speakerIndex={effectiveKey ? speakerKeys.indexOf(effectiveKey) + 1 : 0}
+                  roomId={roomId}
+                  speakers={state.capabilities?.speakerLabels ? pickerSpeakers : []}
+                  onReassign={(toKey, applyToVoice) => store.reassignLine(line.id, toKey, applyToVoice)}
+                  onAddSpeaker={(applyToVoice) => store.reassignLine(line.id, store.addManualSpeaker(), applyToVoice)}
+                  onRename={(speakerKey, choice) => store.assignRealtimeSpeaker(speakerKey, choice)}
+                  onBookmark={() => void store.addBookmark()}
+                />
+              );
+            })
           )}
         </div>
-        <MicLevelMeter stream={store.getStream()} muted={state.muted} />
+        <VoiceWaveform stream={store.getStream()} muted={state.muted} speakers={pickerSpeakers} activeKey={activeSpeakerKey} />
         {footer}
       </div>
       <aside className="ma-live__side">
