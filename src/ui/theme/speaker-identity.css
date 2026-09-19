@@ -173,6 +173,7 @@
   border: 1px solid var(--ma-border-1);
   border-radius: var(--ma-radius-sm);
   background: var(--ma-surface-raised);
+  color: var(--ma-fg-1);
   max-height: 200px;
   overflow-y: auto;
 }
@@ -196,6 +197,23 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+/* Free-text fallback confirm button. Without explicit theme tokens the browser
+   default (light grey / black text) ignores dark mode. */
+.ma-member-picker__confirm {
+  align-self: flex-start;
+  background: var(--ma-brand-blue);
+  color: var(--ma-fg-inverse);
+  border: none;
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-2) var(--space-4);
+  font-weight: var(--weight-semibold);
+}
+
+.ma-member-picker__confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ---------- speaker-label-editor ---------- */

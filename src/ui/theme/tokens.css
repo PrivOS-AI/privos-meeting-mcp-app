@@ -17,9 +17,19 @@
   --privos-gold: #ffc814;
   --privos-gold-soft: #ffd957;
   --privos-gold-deep: #e5a800;
-  --privos-blue: #3c82e6;
-  --privos-blue-soft: #6ba3f0;
-  --privos-blue-deep: #2563c9;
+  /*
+   * Accent auto-detects the host workspace theme colour. The PrivOS SDK applies
+   * the resolved workspace token `--base-primary` onto :root on every host
+   * context change (see @privos_ai/app-react applyThemeTokens); we consume it
+   * here so every accent surface downstream (--ma-brand-blue, --fg-link ->
+   * --ma-link, --border-focus, --status-info, focus rings) follows the host's
+   * colour automatically. The literal is the fallback when running outside the
+   * Hub or when the host sends no theme tokens. Soft/deep + hover/active tints
+   * derive from the resolved accent so the whole ramp stays coherent.
+   */
+  --privos-blue: var(--base-primary, #3c82e6);
+  --privos-blue-soft: color-mix(in srgb, var(--privos-blue) 68%, #ffffff);
+  --privos-blue-deep: color-mix(in srgb, var(--privos-blue) 82%, #000000);
   --privos-navy: #001930;
   --privos-silver: #dcdcdc;
   --privos-ink: #080d0f;
@@ -48,8 +58,8 @@
   --bg-surface: #ffffff;
   --bg-raised: #ffffff;
   --bg-sunken: var(--navy-50);
-  --bg-hover: rgba(60, 130, 230, 0.06);
-  --bg-active: rgba(60, 130, 230, 0.12);
+  --bg-hover: color-mix(in srgb, var(--privos-blue) 6%, transparent);
+  --bg-active: color-mix(in srgb, var(--privos-blue) 12%, transparent);
 
   --fg-1: var(--navy-500);
   --fg-2: var(--navy-400);
@@ -70,7 +80,7 @@
   --status-danger: #db4b4b;
   --status-danger-bg: #fbe7e7;
   --status-info: var(--privos-blue);
-  --status-info-bg: #e7f0fd;
+  --status-info-bg: color-mix(in srgb, var(--privos-blue) 10%, #ffffff);
 
   /* ---------- ELEVATION ---------- */
   --shadow-xs: 0 1px 2px rgba(0, 25, 48, 0.06);
@@ -196,7 +206,7 @@
   --status-success-bg: rgba(31, 158, 111, 0.18);
   --status-warning-bg: rgba(229, 168, 0, 0.18);
   --status-danger-bg: rgba(219, 75, 75, 0.18);
-  --status-info-bg: rgba(60, 130, 230, 0.18);
+  --status-info-bg: color-mix(in srgb, var(--privos-blue) 18%, transparent);
 }
 
 * {
