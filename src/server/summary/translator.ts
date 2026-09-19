@@ -90,7 +90,7 @@ export async function translateSegmentsBatch(hub: RoomBoundHubClient, input: Tra
   for (const batch of batches) {
     try {
       const prompt = buildBatchTranslatePrompt(input.target, batch);
-      const { text } = await generateAsyncWithHubAi(hub, { roomId: input.roomId, prompt }, input.signal);
+      const { text } = await generateAsyncWithHubAi(hub, { roomId: input.roomId, prompt, purpose: 'translate' }, input.signal);
       const requestedIds = new Set(batch.map((b) => b.id));
       for (const [id, translation] of parseTranslationResponse(text, requestedIds)) {
         result.set(id, translation);

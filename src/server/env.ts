@@ -51,6 +51,11 @@ export interface AppEnv {
   liveChunkOverlapSec: number;
   voiceprintEncKey?: string;
   summaryModel?: string;
+  /** Hub AI provider id paired with `summaryModel` (Hub default when unset). */
+  summaryProvider?: string;
+  /** Translation can run on a cheaper/faster model than the summary; falls back to the summary pair. */
+  translateModel?: string;
+  translateProvider?: string;
   privosFilesOrigin?: string;
   meetingJobConcurrency: number;
   meetingJobTimeoutMs: number;
@@ -82,6 +87,9 @@ export function loadEnv(): AppEnv {
     liveChunkOverlapSec: num('LIVE_CHUNK_OVERLAP_SEC', 8),
     voiceprintEncKey: str('VOICEPRINT_ENC_KEY'),
     summaryModel: str('SUMMARY_MODEL'),
+    summaryProvider: str('SUMMARY_PROVIDER'),
+    translateModel: str('TRANSLATE_MODEL'),
+    translateProvider: str('TRANSLATE_PROVIDER'),
     privosFilesOrigin: str('PRIVOS_FILES_ORIGIN'),
     meetingJobConcurrency: num('MEETING_JOB_CONCURRENCY', 1),
     meetingJobTimeoutMs: num('MEETING_JOB_TIMEOUT_MS', 3_600_000),

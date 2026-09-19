@@ -49,6 +49,17 @@ export interface HubAiGenerateInput {
   prompt: string;
   systemContext?: string;
   model?: string;
+  /** Which configured provider/model pair to use — translation may run on a cheaper, faster model. Default 'summary'. */
+  purpose?: 'summary' | 'translate';
+}
+
+/** Provider/model for this call: explicit `model` wins, then the purpose's env pair, then the summary pair, then the Hub default (nothing sent). */
+function resolveModelChoice(input: HubAiGenerateInput): { provider?: string; model?: string } {
+  if (input.model) return { model: input.model };
+  if (input.purpose === 'translate' && env.translateModel) {
+    return { provider: env.translateProvider, model: env.translateModel };
+  }
+  return { provider: env.summaryProvider, model: env.summaryModel };
 }
 
 export interface HubAiGenerateResult {
@@ -81,7 +92,7 @@ async function readJsonBody(response: Response): Promise<Record<string, unknown>
 /** One-shot, blocking Hub AI generation as the installation bot. Never logs the prompt/response. */
 export async function generateWithHubAi(hub: RoomBoundHubClient, input: HubAiGenerateInput): Promise<HubAiGenerateResult> {
   validateGenerateInput(input);
-  const model = input.model ?? env.summaryModel;
+  const { provider, model } = resolveModelChoice(input);
   let response: Response;
   try {
     response = await hub.authorizedFetch(GENERATE_PATH, {
@@ -93,6 +104,7 @@ export async function generateWithHubAi(hub: RoomBoundHubClient, input: HubAiGen
         roomId: input.roomId,
         prompt: input.prompt,
         ...(input.systemContext ? { systemContext: input.systemContext } : {}),
+        ...(provider ? { provider } : {}),
         ...(model ? { model } : {}),
       }),
     });
@@ -167,7 +179,7 @@ export async function generateAsyncWithHubAi(
   signal?: AbortSignal,
 ): Promise<HubAiGenerateResult> {
   validateGenerateInput(input);
-  const model = input.model ?? env.summaryModel;
+  const { provider, model } = resolveModelChoice(input);
 
   let startResponse: Response;
   try {
@@ -181,6 +193,7 @@ export async function generateAsyncWithHubAi(
         roomId: input.roomId,
         prompt: input.prompt,
         ...(input.systemContext ? { systemContext: input.systemContext } : {}),
+        ...(provider ? { provider } : {}),
         ...(model ? { model } : {}),
       }),
     });

@@ -148,6 +148,7 @@ export const translateTool: AppTool = {
     const { text } = await generateWithHubAi(runtime.agentBotHub, {
       roomId,
       prompt: buildTranslatePrompt(targetLang, toTranslate),
+      purpose: 'translate',
     });
     const translated = parseTranslationResponse(text, toTranslate);
 
