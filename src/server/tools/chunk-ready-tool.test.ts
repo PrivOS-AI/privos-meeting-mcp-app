@@ -107,7 +107,7 @@ describe('meeting_chunk_ready', () => {
   });
 
   it('returns labels_not_supported (not an error) when the workspace realtime provider has no speaker labels', async () => {
-    store.app_settings.push({ _id: 'row-settings-1', key: 'sttRealtimeProvider', valueJson: JSON.stringify('elevenlabs') });
+    store.app_settings.push({ _id: 'row-settings-1', key: 'room:room-1:sttRealtimeProvider', valueJson: JSON.stringify('elevenlabs') });
     const result = await chunkReadyTool.execute({ ...baseArgs, segments: [] }, context('user-1'), runtime);
     expect(result).toEqual({ accepted: false, reason: 'labels_not_supported' });
     expect(enqueueChunk).not.toHaveBeenCalled();

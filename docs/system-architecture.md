@@ -125,13 +125,17 @@ xoá (`deleteUnmappedLiveSpeakers`).
 ## Settings, hardening & retention (P8)
 
 - `src/shared/app-settings.ts`: nguồn sự thật duy nhất cho 10 khoá `app_settings`
-  admin-gated (allowlist + `DEFAULT_WORKSPACE_SETTINGS` + validator) — `settings-set-tool.ts`
-  (backend, chỉ workspace admin) và `ui/data/settings-store.ts` (iframe đọc DEFAULTS +
+  (allowlist + `DEFAULT_WORKSPACE_SETTINGS` + validator), lưu **theo từng phòng** bằng key
+  `room:<roomId>:<key>` (`roomSettingKey`; collection vẫn `scope:'global'` nên phòng nằm trong
+  key) — `settings-set-tool.ts` (backend, gate `tools/can-manage-room-settings.ts`: tạm thời
+  MỌI thành viên phòng đã xác minh, vì token user của Hub chỉ có `sub`/`preferred_username`/`rid`,
+  không có role workspace hay role phòng → chưa enforce được owner-only) và `ui/data/settings-store.ts` (iframe đọc DEFAULTS +
   merge với `app_settings`, ghi qua tool) dùng chung, không còn hai bản trôi dạt. Cài đặt
   riêng người dùng (ngôn ngữ cuộc họp mặc định, cỡ chữ Stage, mic ưu tiên, độ trễ caption)
   ở `ui/data/local-preferences.ts` (localStorage, không admin gate, không vào `app_settings`).
 - `tools/is-workspace-admin.ts`: heuristic đọc `actor.claims` (`isAdmin`/`admin`/`role`/`roles`)
-  — `authz.ts` re-export để mọi tool cũ giữ nguyên import path.
+  — đã xác minh live (2026-09-19) là Hub KHÔNG gửi claim nào trong số đó nên luôn `false`;
+  chỉ còn dùng để nới quyền cho `speaker_profile_update/_delete` (người tạo vẫn luôn có quyền).
 - `meeting_stt_status` (P8 hoàn thiện): admin thấy `{ok, activeRealtimeProvider,
   activeAsyncProvider, providers[4], liveConcurrency:{active,max}, checkedAt}`; người khác
   chỉ `{ok}` (tính từ provider realtime đang active). `stt/provider-health-probe.ts` chạy

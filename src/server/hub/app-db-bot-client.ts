@@ -58,6 +58,11 @@ export function extractDbTotal(result: unknown): number {
 export class AppDbBotClient {
   constructor(private readonly roomId?: string) {}
 
+  /** The room this client is bound to (undefined for a room-less client). */
+  get boundRoomId(): string | undefined {
+    return this.roomId;
+  }
+
   /** The bound roomId for BOTH scopes: room scope needs it for storage, global scope needs it only for the permission context. */
   private roomArg(_scope: 'global' | 'room'): string | undefined {
     return this.roomId;

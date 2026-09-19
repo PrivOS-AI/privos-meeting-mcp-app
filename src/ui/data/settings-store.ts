@@ -13,18 +13,20 @@ import type { McpApp } from '@privos_ai/app-react';
 import {
   DEFAULT_WORKSPACE_SETTINGS,
   isWorkspaceSettingKey,
+  parseRoomSettingKey,
   WORKSPACE_SETTING_KEYS,
   type WorkspaceAppSettings,
 } from '../../shared/app-settings.js';
 import { AppDbClient } from './app-db-client.js';
 
 /** DEFAULTS merged with whatever rows exist in `app_settings` — an unset key silently keeps its default. */
-export async function loadWorkspaceSettings(app: McpApp): Promise<WorkspaceAppSettings> {
+export async function loadWorkspaceSettings(app: McpApp, roomId: string): Promise<WorkspaceAppSettings> {
   const db = new AppDbClient(app);
   const { records } = await db.query({ collection: 'app_settings', limit: 200 });
   const settings: WorkspaceAppSettings = { ...DEFAULT_WORKSPACE_SETTINGS };
   for (const row of records) {
-    const key = typeof row.key === 'string' ? row.key : '';
+    // Settings are per room: only rows keyed `room:<this room>:<key>` apply here.
+    const key = parseRoomSettingKey(roomId, typeof row.key === 'string' ? row.key : '') ?? '';
     if (!isWorkspaceSettingKey(key)) continue;
     try {
       (settings as unknown as Record<string, unknown>)[key] = JSON.parse(String(row.valueJson));

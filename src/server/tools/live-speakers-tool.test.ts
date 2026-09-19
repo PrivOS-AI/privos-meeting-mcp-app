@@ -68,7 +68,7 @@ describe('meeting_live_speakers', () => {
   });
 
   it('returns labelsSupported:false and an empty list for a degraded (ElevenLabs) meeting', async () => {
-    store.app_settings.push({ _id: 'row-1', key: 'sttRealtimeProvider', valueJson: JSON.stringify('elevenlabs') });
+    store.app_settings.push({ _id: 'row-1', key: 'room:room-1:sttRealtimeProvider', valueJson: JSON.stringify('elevenlabs') });
     const raw = (await liveSpeakersTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('user-2'), {} as never)) as {
       sessionSpeakers: unknown[];
       labelsSupported: boolean;

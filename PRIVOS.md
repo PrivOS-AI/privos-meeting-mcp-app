@@ -38,7 +38,11 @@ Notes:
 - Verify: `pm2 logs meeting-agent` should show `relay.connected`; also check
   `curl localhost:3012/health` and `/ready` (both 200) — the deploy script prints these.
 - STT provider (Soniox/ElevenLabs, realtime + async) is switched from Settings
-  in the app (workspace admin only) — never requires a redeploy or manifest
-  republish; CSP already declares both vendor WS origins.
+  in the app, PER ROOM (keys `room:<roomId>:<key>` in `app_settings`). Interim
+  policy: any verified room member may change it — the Hub's user token carries
+  no workspace/room role, so owner-only cannot be enforced yet (tighten in
+  `tools/can-manage-room-settings.ts` once the Hub exposes room roles). Never
+  requires a redeploy or manifest republish; CSP already declares both vendor
+  WS origins.
 - Full runbook (backup/rotate `VOICEPRINT_ENC_KEY`, rollback, pm2 ecosystem
   entry, first-deploy steps): `docs/deployment-guide.md`.

@@ -97,3 +97,19 @@ export const WORKSPACE_SETTING_VALIDATORS: Record<keyof WorkspaceAppSettings, Va
 export function isWorkspaceSettingKey(key: string): key is keyof WorkspaceAppSettings {
   return (WORKSPACE_SETTING_KEYS as readonly string[]).includes(key);
 }
+
+/**
+ * Settings are PER ROOM. `app_settings` is a `scope:'global'` collection (the
+ * Hub shares its rows across every room), so the room is carried in the row key
+ * itself: `room:<roomId>:<settingKey>`. One room changing its STT provider or
+ * retention window never affects another room.
+ */
+export function roomSettingKey(roomId: string, key: string): string {
+  return `room:${roomId}:${key}`;
+}
+
+/** Inverse of {@link roomSettingKey}: the bare setting key when `rowKey` belongs to `roomId`, else `null`. */
+export function parseRoomSettingKey(roomId: string, rowKey: string): string | null {
+  const prefix = `room:${roomId}:`;
+  return rowKey.startsWith(prefix) ? rowKey.slice(prefix.length) : null;
+}

@@ -10,7 +10,8 @@
  * is currently ACTIVE so a non-admin still sees "is live captioning up" without
  * seeing which vendor or its usage.
  */
-import { requireVerifiedActor, isWorkspaceAdmin } from './authz.js';
+import { requireVerifiedActor } from './authz.js';
+import { canManageRoomSettings } from './can-manage-room-settings.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { env } from '../env.js';
 import { allProviderStatuses, realtimeProviderFor, resolveAsyncVendor, resolveRealtimeVendor } from '../stt/stt-provider-registry.js';
@@ -24,15 +25,12 @@ export const sttStatusTool: AppTool = {
   inputSchema: { type: 'object', properties: {} },
   async execute(_args, context) {
     const actor = requireVerifiedActor(context);
-    // TEMP: dump the exact verified-actor shape the Hub delivers, to confirm
-    // whether any workspace-admin signal is present. Remove after diagnosis.
-    console.error('[stt_status] actor=', JSON.stringify(actor), 'identityState=', context.identityState, 'isWorkspaceAdmin=', isWorkspaceAdmin(actor));
     // Bind to the caller's room so the global `app_settings` reads resolve to the granted `room` permission context.
     const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     const realtimeVendor = await resolveRealtimeVendor(db).catch(() => undefined);
 
-    if (!isWorkspaceAdmin(actor)) {
-      // Non-admin: only "is the currently active realtime provider usable" —
+    if (!canManageRoomSettings(actor)) {
+      // Not a room member: only "is the currently active realtime provider usable" —
       // never the vendor name, model, or usage.
       const ok = realtimeVendor ? (await realtimeProviderFor(realtimeVendor).status()).ok : false;
       return { ok };

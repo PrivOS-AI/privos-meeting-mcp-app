@@ -1,10 +1,18 @@
 /**
- * Typed read/write over the global `app_settings` collection (one row per key,
- * value stored as a JSON string in `valueJson`). Runs as the installation bot.
- * Writes to settings are backend-only (workspace-admin tools); reads are used by
- * the provider registry and status tools.
+ * Typed read/write over the `app_settings` collection (one row per key, value
+ * stored as a JSON string in `valueJson`). Runs as the installation bot.
+ *
+ * Settings are PER ROOM: the collection itself is `scope:'global'` (shared rows),
+ * so every key is namespaced with the room the client is bound to
+ * (`roomSettingKey`). A room-less client falls back to the bare key, which no
+ * room ever reads — callers bind a room.
  */
+import { roomSettingKey } from '../../shared/app-settings.js';
 import { extractDbRecords, type AppDbBotClient, type DbRow } from './app-db-bot-client.js';
+
+function storageKey(db: AppDbBotClient, key: string): string {
+  return db.boundRoomId ? roomSettingKey(db.boundRoomId, key) : key;
+}
 
 interface SettingRecord extends DbRow {
   key: string;
@@ -18,7 +26,7 @@ function extractRecords(result: unknown): SettingRecord[] {
 /** Read one setting, parsed from JSON, or `undefined` when unset. */
 export async function getSetting<T>(db: AppDbBotClient, key: string): Promise<T | undefined> {
   const result = await db.query('app_settings', 'global', {
-    where: [{ field: 'key', op: '==', value: key }],
+    where: [{ field: 'key', op: '==', value: storageKey(db, key) }],
     limit: 1,
   });
   const record = extractRecords(result)[0];
@@ -32,7 +40,7 @@ export async function getSetting<T>(db: AppDbBotClient, key: string): Promise<T 
 
 async function findSetting(db: AppDbBotClient, key: string): Promise<SettingRecord | undefined> {
   const result = await db.query('app_settings', 'global', {
-    where: [{ field: 'key', op: '==', value: key }],
+    where: [{ field: 'key', op: '==', value: storageKey(db, key) }],
     limit: 1,
   });
   return extractRecords(result)[0];
@@ -51,7 +59,7 @@ export async function setSetting(db: AppDbBotClient, key: string, value: unknown
     return;
   }
   try {
-    await db.create('app_settings', 'global', { key, valueJson });
+    await db.create('app_settings', 'global', { key: storageKey(db, key), valueJson });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!/duplicate|unique|already\s+exists/i.test(message)) throw error;

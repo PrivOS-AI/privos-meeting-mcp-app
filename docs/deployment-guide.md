@@ -179,8 +179,9 @@ log `hmac_mismatch`, không crash app). Quy trình:
 
 Bốn cài đặt sau interface chung: `soniox-realtime` | `elevenlabs-realtime` |
 `soniox-async` | `elevenlabs-batch`. Chọn bằng **Settings › Speech recognition**
-trong app (chỉ workspace admin, `meeting_settings_set` ghi `app_settings.sttRealtimeProvider`/
-`sttAsyncProvider`) — đổi provider là đổi một ô Settings, **không cần** deploy
+trong app (**theo từng phòng**; tạm thời mọi thành viên phòng đổi được — xem
+`tools/can-manage-room-settings.ts`; `meeting_settings_set` ghi `app_settings` key
+`room:<roomId>:sttRealtimeProvider`/`sttAsyncProvider`, chưa đặt thì dùng env/default) — đổi provider là đổi một ô Settings, **không cần** deploy
 lại hay republish manifest (CSP đã khai sẵn cả hai origin WS).
 
 | | Realtime | Async |

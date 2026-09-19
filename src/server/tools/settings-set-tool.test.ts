@@ -25,8 +25,15 @@ describe('meeting_settings_set', () => {
     fakeHub = installFakeHub({ store });
   });
 
-  it('rejects a non-admin caller', async () => {
-    await expect(settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 0.5 }, context(), {} as never)).rejects.toThrow(/quản trị viên/);
+  it('lets any verified room member change the room settings (interim policy: the Hub exposes no role signal)', async () => {
+    await settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 0.5 }, context(), {} as never);
+    expect(store.app_settings.map((r) => r.key)).toEqual(['room:room-1:speakerMatchThreshold']);
+  });
+
+  it('rejects a caller that is not bound to a room', async () => {
+    const roomless = context();
+    (roomless.actor as { roomId?: string }).roomId = undefined;
+    await expect(settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 0.5 }, roomless, {} as never)).rejects.toThrow(/thành viên của phòng/);
   });
 
   it('rejects an unsupported key even for an admin', async () => {

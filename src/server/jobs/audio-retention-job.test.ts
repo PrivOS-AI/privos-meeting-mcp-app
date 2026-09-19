@@ -46,7 +46,7 @@ describe('purgeExpiredAudio', () => {
   });
 
   it('deletes kept audio past autoDeleteAudioDays and stamps audioDeletedAt', async () => {
-    store.app_settings = [{ _id: 's1', key: 'autoDeleteAudioDays', valueJson: JSON.stringify(1) }];
+    store.app_settings = [{ _id: 's1', key: 'room:room-1:autoDeleteAudioDays', valueJson: JSON.stringify(1) }];
     store.meetings = [
       { _id: 'm1', roomId: 'room-1', status: 'summarized', keepAudio: true, endedAt: oldIso(10), audioFileId: 'audio-1' },
     ];
@@ -58,7 +58,7 @@ describe('purgeExpiredAudio', () => {
   });
 
   it('does not touch audio when autoDeleteAudioDays is 0 (disabled)', async () => {
-    store.app_settings = [{ _id: 's1', key: 'autoDeleteAudioDays', valueJson: JSON.stringify(0) }];
+    store.app_settings = [{ _id: 's1', key: 'room:room-1:autoDeleteAudioDays', valueJson: JSON.stringify(0) }];
     store.meetings = [
       { _id: 'm1', roomId: 'room-1', status: 'summarized', keepAudio: true, endedAt: oldIso(500), audioFileId: 'audio-1' },
     ];
@@ -69,7 +69,7 @@ describe('purgeExpiredAudio', () => {
   });
 
   it('skips a meeting whose audio was already deleted', async () => {
-    store.app_settings = [{ _id: 's1', key: 'autoDeleteAudioDays', valueJson: JSON.stringify(1) }];
+    store.app_settings = [{ _id: 's1', key: 'room:room-1:autoDeleteAudioDays', valueJson: JSON.stringify(1) }];
     store.meetings = [
       { _id: 'm1', roomId: 'room-1', status: 'summarized', keepAudio: true, endedAt: oldIso(10), audioFileId: 'audio-1', audioDeletedAt: oldIso(1) },
     ];
@@ -80,8 +80,8 @@ describe('purgeExpiredAudio', () => {
 
   it('deletes orphaned parts of a meeting interrupted past interruptedPartsRetentionDays', async () => {
     store.app_settings = [
-      { _id: 's1', key: 'autoDeleteAudioDays', valueJson: JSON.stringify(0) },
-      { _id: 's2', key: 'interruptedPartsRetentionDays', valueJson: JSON.stringify(1) },
+      { _id: 's1', key: 'room:room-1:autoDeleteAudioDays', valueJson: JSON.stringify(0) },
+      { _id: 's2', key: 'room:room-1:interruptedPartsRetentionDays', valueJson: JSON.stringify(1) },
     ];
     store.meetings = [{ _id: 'm2', roomId: 'room-1', status: 'interrupted', lastPartAt: oldIso(10), folderId: 'folder-1' }];
     folderFiles['folder-1'] = [
@@ -95,7 +95,7 @@ describe('purgeExpiredAudio', () => {
   });
 
   it('clears pendingEmbedding on meeting_speakers rows whose meeting ended 30+ days ago', async () => {
-    store.app_settings = [{ _id: 's1', key: 'autoDeleteAudioDays', valueJson: JSON.stringify(0) }];
+    store.app_settings = [{ _id: 's1', key: 'room:room-1:autoDeleteAudioDays', valueJson: JSON.stringify(0) }];
     store.meetings = [{ _id: 'm3', roomId: 'room-1', status: 'summarized', endedAt: oldIso(31) }];
     store.meeting_speakers = [
       { _id: 'ms1', meeting: 'm3', pendingEmbedding: 'sealed-ciphertext', displayName: 'Người nói 1' },
@@ -109,7 +109,7 @@ describe('purgeExpiredAudio', () => {
   });
 
   it('does not clear pendingEmbedding for a meeting that ended less than 30 days ago', async () => {
-    store.app_settings = [{ _id: 's1', key: 'autoDeleteAudioDays', valueJson: JSON.stringify(0) }];
+    store.app_settings = [{ _id: 's1', key: 'room:room-1:autoDeleteAudioDays', valueJson: JSON.stringify(0) }];
     store.meetings = [{ _id: 'm4', roomId: 'room-1', status: 'summarized', endedAt: oldIso(2) }];
     store.meeting_speakers = [{ _id: 'ms3', meeting: 'm4', pendingEmbedding: 'sealed-ciphertext' }];
     const hub = buildHub();

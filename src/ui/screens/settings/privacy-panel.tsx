@@ -14,7 +14,7 @@
  * irreversible-action gate), documented inline rather than left ambiguous.
  */
 import { useEffect, useState } from 'react';
-import { usePrivosApp } from '@privos_ai/app-react';
+import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { useI18n } from '../../i18n/i18n-provider.js';
 import { loadWorkspaceSettings, saveWorkspaceSetting } from '../../data/settings-store.js';
@@ -28,6 +28,7 @@ const CONFIRM_PHRASE = 'XOA VOICEPRINT';
 
 export function PrivacyPanel() {
   const app = usePrivosApp();
+  const { roomId } = usePrivosContext();
   const { t } = useI18n();
   const { isAdmin } = useWorkspaceAdmin();
   const [settings, setSettings] = useState<WorkspaceAppSettings | null>(null);
@@ -37,10 +38,11 @@ export function PrivacyPanel() {
   const [deleteResult, setDeleteResult] = useState<string | null>(null);
 
   useEffect(() => {
-    loadWorkspaceSettings(app)
+    if (!roomId) return;
+    loadWorkspaceSettings(app, roomId)
       .then(setSettings)
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
-  }, [app]);
+  }, [app, roomId]);
 
   async function change<K extends 'keepOriginalAudio' | 'autoDeleteAudioDays' | 'interruptedPartsRetentionDays'>(
     key: K,

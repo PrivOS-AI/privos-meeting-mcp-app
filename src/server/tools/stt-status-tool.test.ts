@@ -37,8 +37,10 @@ describe('meeting_stt_status', () => {
     vi.unstubAllGlobals();
   });
 
-  it('a non-admin verified caller only ever gets {ok} — no provider names, models or usage', async () => {
-    const result = (await sttStatusTool.execute({}, context(), {} as never)) as Record<string, unknown>;
+  it('a caller not bound to a room only ever gets {ok} — no provider names, models or usage', async () => {
+    const roomless = context();
+    (roomless.actor as { roomId?: string }).roomId = undefined;
+    const result = (await sttStatusTool.execute({}, roomless, {} as never)) as Record<string, unknown>;
     expect(Object.keys(result)).toEqual(['ok']);
   });
 

@@ -10,7 +10,8 @@ import { AppError } from '../../shared/app-error.js';
 import { isWorkspaceSettingKey, WORKSPACE_SETTING_VALIDATORS } from '../../shared/app-settings.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { setSetting } from '../hub/app-settings.js';
-import { isWorkspaceAdmin, requireVerifiedActor } from './authz.js';
+import { requireVerifiedActor } from './authz.js';
+import { canManageRoomSettings } from './can-manage-room-settings.js';
 import type { AppTool } from './registry.js';
 
 export const settingsSetTool: AppTool = {
@@ -27,8 +28,8 @@ export const settingsSetTool: AppTool = {
   },
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
-    if (!isWorkspaceAdmin(actor)) {
-      throw new AppError('Chỉ quản trị viên workspace mới thay đổi được cấu hình này.');
+    if (!canManageRoomSettings(actor)) {
+      throw new AppError('Chỉ thành viên của phòng mới thay đổi được cấu hình của phòng này.');
     }
 
     const key = typeof args.key === 'string' ? args.key.trim() : '';
@@ -37,8 +38,8 @@ export const settingsSetTool: AppTool = {
     }
     const value = WORKSPACE_SETTING_VALIDATORS[key](args.value);
 
-    // Bind to the admin's room so the global `app_settings` write resolves to the granted `room` permission context.
-    const db = new AppDbBotClient(actor.roomId ?? context.roomId);
+    // Settings are per room: bind to the caller's verified room (also the granted `room` permission context).
+    const db = new AppDbBotClient(actor.roomId);
     await setSetting(db, key, value);
     return { settings: { [key]: value } };
   },
