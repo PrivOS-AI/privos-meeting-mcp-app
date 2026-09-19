@@ -175,7 +175,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
                   roomId={roomId}
                   speakers={state.capabilities?.speakerLabels ? pickerSpeakers : []}
                   onReassign={(toKey, applyToVoice) => store.reassignLine(line.id, toKey, applyToVoice)}
-                  onAddSpeaker={(applyToVoice) => store.reassignLine(line.id, store.addManualSpeaker(), applyToVoice)}
+                  onAddSpeaker={(name, applyToVoice) => store.reassignLine(line.id, store.addManualSpeaker(name), applyToVoice)}
                   onRename={(speakerKey, choice) => store.assignRealtimeSpeaker(speakerKey, choice)}
                   onMenuOpenChange={(open) => { menuOpenRef.current = open; }}
                   onBookmark={() => void store.addBookmark()}

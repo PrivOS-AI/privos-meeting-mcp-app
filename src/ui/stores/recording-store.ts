@@ -456,13 +456,18 @@ export class RecordingStore {
     this.setState({ speakerMap });
   }
 
-  /** Create an empty speaker the user can move lines onto ("Add new speaker"). Returns its key. */
-  addManualSpeaker(): string {
+  /**
+   * Create a speaker the user can move lines onto ("Add new speaker"). When a
+   * name is typed in the picker's search box, it becomes the speaker's label;
+   * otherwise it stays an unnamed "Speaker N". Returns its key.
+   */
+  addManualSpeaker(displayName?: string): string {
     const speakerMap = { ...this.state.speakerMap };
     let n = 1;
     while (speakerMap[`manual:${n}`]) n += 1;
     const key = `manual:${n}`;
-    speakerMap[key] = { colorKey: this.nextColor(), resolved: false };
+    const name = displayName?.trim();
+    speakerMap[key] = { colorKey: this.nextColor(), resolved: Boolean(name), ...(name ? { displayName: name } : {}) };
     this.setState({ speakerMap });
     return key;
   }

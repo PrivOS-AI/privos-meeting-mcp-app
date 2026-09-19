@@ -24,7 +24,7 @@ export interface CaptionLineProps {
   /** Every known speaker, for the picker. Empty → the name is not interactive (provider without labels). */
   speakers: readonly PickerSpeaker[];
   onReassign?(toSpeakerKey: string, applyToVoice: boolean): void;
-  onAddSpeaker?(applyToVoice: boolean): void;
+  onAddSpeaker?(name: string, applyToVoice: boolean): void;
   onRename?(speakerKey: string, choice: RealtimeAssignChoice): void;
   /** Fires when this line's speaker menu opens/closes, so the transcript can stop auto-scrolling while it is open. */
   onMenuOpenChange?(open: boolean): void;
@@ -81,9 +81,9 @@ export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, s
                 onReassign?.(toKey, applyToVoice);
               }}
               onRename={() => setMenu('rename')}
-              onAddSpeaker={(applyToVoice) => {
+              onAddSpeaker={(name, applyToVoice) => {
                 setMenu('closed');
-                onAddSpeaker?.(applyToVoice);
+                onAddSpeaker?.(name, applyToVoice);
               }}
             />
           ) : null}
