@@ -81,8 +81,16 @@ export function createMcpHandler(ctx: ServeAppHandlerContext): AppMcpHandler {
           throw Object.assign(new Error(`Unknown tool: ${params.name ?? '<missing>'}`), { code: -32601 });
         }
         assertVerifiedActor(context);
-        const result = await tool.execute(params.arguments ?? {}, context, runtime);
-        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+        try {
+          const result = await tool.execute(params.arguments ?? {}, context, runtime);
+          return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+        } catch (error) {
+          // The SDK collapses a thrown error to "-32603 Internal error" with no
+          // message, so every tool failure is otherwise opaque in the logs. Log
+          // the tool + full cause here before rethrowing (AppError preserved).
+          console.error(`[tool:${params.name}] failed`, error);
+          throw error;
+        }
       }
 
       default:
