@@ -7,6 +7,7 @@
  */
 import { parseToolResult } from '@privos_ai/app-react';
 import type { McpApp } from '@privos_ai/app-react';
+import { unwrapRestBody } from './rest-body.js';
 
 import { partFileName } from '../../shared/meeting-slug.js';
 
@@ -100,7 +101,7 @@ export async function listParts(app: McpApp, roomId: string, folderId: string): 
     path: `file-management.files.channel/${roomId}`,
     query: { folderId, count: 100 },
   });
-  return asFiles(response.body)
+  return asFiles(unwrapRestBody(response))
     .filter((file) => file.name.startsWith('audio.part-'))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
