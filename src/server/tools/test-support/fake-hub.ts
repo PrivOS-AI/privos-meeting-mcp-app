@@ -57,6 +57,12 @@ export function installFakeHub(options: FakeHubOptions): RoomBoundHubClient & { 
       const page = typeof limit === 'number' ? rows.slice(0, limit) : rows;
       return { records: page, total: rows.length };
     }
+    if (toolName === 'mcpapp.db.get') {
+      const { collection, id } = args as { collection: string; id: string };
+      const row = (store[collection] ?? []).find((r) => r._id === id);
+      if (!row) throw new Error(`Record "${id}" not found`); // mirrors the Hub miss that getById turns into null
+      return row;
+    }
     if (toolName === 'mcpapp.db.create') {
       const { collection, data } = args as { collection: string; data: Record<string, unknown> };
       const row: Row = { _id: `row-${++seq}`, ...data };

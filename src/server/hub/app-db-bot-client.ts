@@ -107,16 +107,22 @@ export class AppDbBotClient {
   }
 
   /**
-   * Fetch one row by id via `query` (there is no dedicated `mcpapp.db.get` on
-   * the bot-credential surface). Returns `null` when absent instead of
-   * throwing, so authz checks can turn a miss into a clear `AppError`.
+   * Fetch one row by id via the dedicated `mcpapp.db.get`. A `where` filter on
+   * `_id` matches nothing on the Hub (only `mcpapp.db.get` resolves a row by id;
+   * ordinary fields filter fine), so a query-based lookup always returned null
+   * and made every authz check report "meeting not found". Returns `null` when
+   * absent — the Hub reports a miss as a `not found` / `Invalid record ID`
+   * error, which callers want as a clean miss; any other failure propagates.
    */
   async getById(collection: string, scope: 'global' | 'room', id: string): Promise<DbRow | null> {
-    const result = await this.query(collection, scope, {
-      where: [{ field: '_id', op: '==', value: id }],
-      limit: 1,
-    });
-    return extractDbRecords(result)[0] ?? null;
+    try {
+      const result = await callAppPlatformTool('mcpapp.db.get', { collection, id }, 'db:read', this.roomArg(scope));
+      return result && typeof result === 'object' && typeof (result as DbRow)._id === 'string' ? (result as DbRow) : null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (/not found|Invalid record ID/i.test(message)) return null;
+      throw error;
+    }
   }
 }
 
