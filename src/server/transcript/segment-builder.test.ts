@@ -65,6 +65,20 @@ describe('buildSegments', () => {
     expect(segments.some((s) => s.text.includes('blip'))).toBe(true);
   });
 
+  it('concatenates soniox subword tokens when tokensCarrySpacing is set (no space shredding)', () => {
+    // Soniox returns Vietnamese "lĩnh" as separate subword tokens with no
+    // spaces; space-joining them yields "l ĩ nh" — the bug this option fixes.
+    const tokens: SttToken[] = [
+      token({ text: 'l', startMs: 0, endMs: 100, speaker: 'a', language: 'vi' }),
+      token({ text: 'ĩ', startMs: 100, endMs: 200, speaker: 'a', language: 'vi' }),
+      token({ text: 'nh', startMs: 200, endMs: 300, speaker: 'a', language: 'vi' }),
+      token({ text: ' vực', startMs: 300, endMs: 500, speaker: 'a', language: 'vi' }),
+    ];
+    expect(buildSegments(tokens, { tokensCarrySpacing: true })[0].text).toBe('lĩnh vực');
+    // Default (elevenlabs bare-word) behavior is unchanged: space-joined.
+    expect(buildSegments(tokens)[0].text).toBe('l ĩ nh vực');
+  });
+
   it('produces the same Segment shape for a soniox-style and an elevenlabs-style fixture', () => {
     const sonioxTokens: SttToken[] = [
       token({ text: ' Hello', startMs: 0, endMs: 400, speaker: 'speaker_1', language: 'en', confidence: 0.9 }),

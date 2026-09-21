@@ -144,7 +144,7 @@ export const summarizeTool: AppTool = {
       segments: finalSegments,
       displayNameBySpeaker,
     });
-    const srt = buildSrt(finalSegments, transcriptDoc.tokens);
+    const srt = buildSrt(finalSegments, transcriptDoc.tokens, transcriptDoc.provider === 'soniox-async');
 
     const [jsonUpload, mdUpload, srtUpload] = await Promise.all([
       uploadBotFile({

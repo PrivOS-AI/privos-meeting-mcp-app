@@ -28,17 +28,17 @@ function srtTimestamp(totalSec: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
 }
 
-function joinCueText(tokens: readonly SttToken[]): string {
-  return tokens
-    .map((t) => t.text)
-    .join(' ')
+/** `carrySpacing`: tokens already carry their own spacing (soniox-async) → concatenate; else bare words → space-join. Mirrors `segment-builder.ts`. */
+function joinCueText(tokens: readonly SttToken[], carrySpacing: boolean): string {
+  const parts = tokens.map((t) => t.text);
+  return (carrySpacing ? parts.join('') : parts.join(' '))
     .replace(/\s+([,.!?;:])/g, '$1')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
 /** Split one long segment into `MAX_CUE_SEC`-ish chunks at the nearest token boundary. */
-function splitSegment(segment: Segment, tokens: readonly SttToken[]): Cue[] {
+function splitSegment(segment: Segment, tokens: readonly SttToken[], carrySpacing: boolean): Cue[] {
   const durationSec = segment.endSec - segment.startSec;
   if (durationSec <= MAX_CUE_SEC) {
     const text = segment.translation ? `${segment.text}\n${segment.translation}` : segment.text;
@@ -61,19 +61,19 @@ function splitSegment(segment: Segment, tokens: readonly SttToken[]): Cue[] {
   for (const token of segmentTokens) {
     bucket.push(token);
     if (token.endMs / 1000 >= nextBoundarySec && cues.length < chunkCount - 1) {
-      cues.push({ startSec: bucket[0].startMs / 1000, endSec: token.endMs / 1000, text: joinCueText(bucket) });
+      cues.push({ startSec: bucket[0].startMs / 1000, endSec: token.endMs / 1000, text: joinCueText(bucket, carrySpacing) });
       bucket = [];
       nextBoundarySec += targetSec;
     }
   }
   if (bucket.length > 0) {
-    cues.push({ startSec: bucket[0].startMs / 1000, endSec: segment.endSec, text: joinCueText(bucket) });
+    cues.push({ startSec: bucket[0].startMs / 1000, endSec: segment.endSec, text: joinCueText(bucket, carrySpacing) });
   }
   return cues.length > 0 ? cues : [{ startSec: segment.startSec, endSec: segment.endSec, text: segment.text }];
 }
 
-export function buildSrt(segments: readonly Segment[], tokens: readonly SttToken[] = []): string {
+export function buildSrt(segments: readonly Segment[], tokens: readonly SttToken[] = [], tokensCarrySpacing = false): string {
   const cues: Cue[] = [];
-  for (const segment of segments) cues.push(...splitSegment(segment, tokens));
+  for (const segment of segments) cues.push(...splitSegment(segment, tokens, tokensCarrySpacing));
   return cues.map((cue, index) => `${index + 1}\n${srtTimestamp(cue.startSec)} --> ${srtTimestamp(cue.endSec)}\n${cue.text}\n`).join('\n');
 }

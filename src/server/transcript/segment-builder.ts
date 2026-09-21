@@ -27,6 +27,17 @@ export interface BuildSegmentsOptions {
   minSegmentSec?: number;
   /** Language used when a token has none and there is no prior segment to inherit from. */
   defaultLang?: string;
+  /**
+   * How each token's `text` already spaces itself. The two async providers use
+   * OPPOSITE conventions, so joining must respect the source:
+   *  - `false` (default): tokens are bare words (elevenlabs-batch drops its
+   *    `spacing` tokens) → join with a single space.
+   *  - `true`: tokens already carry their own inter-word spacing (soniox-async
+   *    returns leading spaces / space tokens; subword tokens have none) →
+   *    concatenate. Joining these with a space instead shreds every word into
+   *    syllables, e.g. Vietnamese "lĩnh" → "l ĩ nh".
+   */
+  tokensCarrySpacing?: boolean;
 }
 
 const DEFAULT_PAUSE_SPLIT_SEC = 1.5;
@@ -58,9 +69,8 @@ function majorityLang(counts: Map<string, number>, fallback: string): string {
   return best;
 }
 
-function joinTokenText(parts: readonly string[]): string {
-  return parts
-    .join(' ')
+function joinTokenText(parts: readonly string[], carrySpacing: boolean): string {
+  return (carrySpacing ? parts.join('') : parts.join(' '))
     .replace(/\s+([,.!?;:])/g, '$1')
     .replace(/\s{2,}/g, ' ')
     .trim();
@@ -70,6 +80,7 @@ export function buildSegments(tokens: readonly SttToken[], options: BuildSegment
   const pauseSplitSec = options.pauseSplitSec ?? DEFAULT_PAUSE_SPLIT_SEC;
   const minSegmentSec = options.minSegmentSec ?? DEFAULT_MIN_SEGMENT_SEC;
   const defaultLang = options.defaultLang ?? DEFAULT_LANG;
+  const tokensCarrySpacing = options.tokensCarrySpacing ?? false;
   if (tokens.length === 0) return [];
 
   let lastSpeaker: string | undefined;
@@ -132,7 +143,7 @@ export function buildSegments(tokens: readonly SttToken[], options: BuildSegment
     speakerId: seg.speakerId,
     startSec: seg.startMs / 1000,
     endSec: seg.endMs / 1000,
-    text: joinTokenText(seg.parts),
+    text: joinTokenText(seg.parts, tokensCarrySpacing),
     lang: majorityLang(seg.langCounts, seg.lang),
     tokenCount: seg.tokenCount,
     avgConfidence: seg.confCount > 0 ? seg.confSum / seg.confCount : undefined,
