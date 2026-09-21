@@ -45,11 +45,10 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
   // scrolled up to read history (only follow when already near the bottom).
   const linesRef = useRef<HTMLDivElement | null>(null);
   const followRef = useRef(true);
-  const menuOpenRef = useRef(false);
   const lastLine = state.lines[state.lines.length - 1];
   useEffect(() => {
     const el = linesRef.current;
-    if (el && followRef.current && !menuOpenRef.current) el.scrollTop = el.scrollHeight;
+    if (el && followRef.current) el.scrollTop = el.scrollHeight;
   }, [state.lines.length, lastLine?.text, lastLine?.translation]);
   // (hooks above must stay before the idle early-return below — Rules of Hooks)
 
@@ -184,7 +183,6 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
                   onReassign={(toKey, applyToVoice) => store.reassignLine(line.id, toKey, applyToVoice)}
                   onAddSpeaker={(name, applyToVoice) => store.reassignLine(line.id, store.addManualSpeaker(name), applyToVoice)}
                   onRename={(speakerKey, choice) => store.assignRealtimeSpeaker(speakerKey, choice)}
-                  onMenuOpenChange={(open) => { menuOpenRef.current = open; }}
                   timeMode={timeMode}
                   onToggleTimeMode={() => setTimeMode((m) => (m === 'clock' ? 'wall' : 'clock'))}
                   startedAtMs={state.startedAt}

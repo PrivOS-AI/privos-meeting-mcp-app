@@ -252,6 +252,8 @@
   "detail.autoScroll": "Auto-scroll",
   "detail.editSpeaker": "Edit label",
   "detail.speakers": "speakers",
+  "detail.speakersTab": "Speakers",
+  "detail.backToHistory": "Back to history",
   "detail.savedOnPrivos": "Transcript stored on PrivOS",
   "detail.audioDeleted": "The original audio was deleted per the storage setting",
   "detail.saveToFiles": "Save to Files",

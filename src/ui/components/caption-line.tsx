@@ -4,7 +4,7 @@
  * mixes voices up — every segment can be corrected), mm:ss, the caption text
  * with its translation directly underneath, and a bookmark button.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import type { CaptionLine as CaptionLineData, LiveSpeakerBadge } from '../stores/recording-store.js';
 import type { RealtimeAssignChoice } from '../data/speaker-api.js';
@@ -26,8 +26,6 @@ export interface CaptionLineProps {
   onReassign?(toSpeakerKey: string, applyToVoice: boolean): void;
   onAddSpeaker?(name: string, applyToVoice: boolean): void;
   onRename?(speakerKey: string, choice: RealtimeAssignChoice): void;
-  /** Fires when this line's speaker menu opens/closes, so the transcript can stop auto-scrolling while it is open. */
-  onMenuOpenChange?(open: boolean): void;
   /** 'clock' = elapsed since meeting start (mm:ss); 'wall' = real time of day (HH:MM:SS). */
   timeMode?: 'clock' | 'wall';
   onToggleTimeMode?(): void;
@@ -49,10 +47,9 @@ function formatWallClock(atSec: number, startedAtMs: number): string {
   return new Date(startedAtMs + atSec * 1000).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, speakers, onReassign, onAddSpeaker, onRename, onMenuOpenChange, timeMode = 'clock', onToggleTimeMode, startedAtMs = 0, bookmarked = false, onBookmark }: CaptionLineProps) {
+export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, speakers, onReassign, onAddSpeaker, onRename, timeMode = 'clock', onToggleTimeMode, startedAtMs = 0, bookmarked = false, onBookmark }: CaptionLineProps) {
   const { t } = useI18n();
   const [menu, setMenu] = useState<'closed' | 'picker' | 'rename'>('closed');
-  useEffect(() => { onMenuOpenChange?.(menu !== 'closed'); }, [menu, onMenuOpenChange]);
   const badgeLabel = speaker?.displayName ?? (speakerKey ? t('recording.speakerBadge.numbered', { n: speakerIndex }) : t('recording.speakerBadge.speaking'));
   const interactive = Boolean(speakerKey) && speakers.length > 0;
 
@@ -112,15 +109,23 @@ export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, s
             />
           ) : null}
           {menu === 'rename' && speakerKey ? (
-            <QuickAssignPopover
-              roomId={roomId}
-              speakerId={speakerKey}
-              onClose={() => setMenu('closed')}
-              onAssign={(choice) => {
-                setMenu('closed');
-                onRename?.(speakerKey, choice);
-              }}
-            />
+            <>
+              <button
+                type="button"
+                className="ma-caption-line__modal-scrim"
+                aria-label={t('speaker.linePicker.close')}
+                onClick={() => setMenu('closed')}
+              />
+              <QuickAssignPopover
+                roomId={roomId}
+                speakerId={speakerKey}
+                onClose={() => setMenu('closed')}
+                onAssign={(choice) => {
+                  setMenu('closed');
+                  onRename?.(speakerKey, choice);
+                }}
+              />
+            </>
           ) : null}
         </div>
         <p className="ma-caption-line__text">{line.text}</p>

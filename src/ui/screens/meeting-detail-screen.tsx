@@ -1,9 +1,11 @@
 /**
- * Screen 1c — Meeting detail (phase-07 § Requirements): player + scrubber
- * with bookmark ticks, colored/searchable transcript, speaker relabel, the
- * P6 summary/action-items panel, bookmarks, and SRT/DOCX export + Send to
- * Chat + Share. `transcript.json`/audio load once per meetingId (cached by
- * `transcript-loader.ts`).
+ * Screen 1c — Meeting detail, read-only (phase-07 § Requirements). Reuses the
+ * live "meeting tab" shell (`.ma-live*` / `.ma-side-panel*`) so a history item
+ * reads like the recording view — chat-style transcript column + a right drawer
+ * — but WITHOUT any record controls. Playback (audio + scrubber), regenerate
+ * summary, speaker relabel, bookmarks and SRT/DOCX/Share/Send-to-Chat stay; a
+ * Back button returns to the history list. `transcript.json`/audio load once per
+ * meetingId (cached by `transcript-loader.ts`).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
@@ -14,6 +16,7 @@ import { BookmarksPanel } from '../components/bookmarks-panel.js';
 import { EmptyState } from '../components/empty-state.js';
 import { Icon } from '../components/icon.js';
 import { MeetingDetailActions } from '../components/meeting-detail-actions.js';
+import { MeetingDetailSidePanel, type DetailSideTab } from '../components/meeting-detail-side-panel.js';
 import { MeetingSpeakersPanel } from '../components/meeting-speakers-panel.js';
 import { SaveToFilesModal } from '../components/save-to-files-modal.js';
 import { StatusBadge } from '../components/status-badge.js';
@@ -67,6 +70,8 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
   const [searchQuery, setSearchQuery] = useState('');
   const [hitIndex, setHitIndex] = useState(0);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  // Mobile only: the Summary/Speakers/Bookmarks panel is a right-hand drawer.
+  const [sideOpen, setSideOpen] = useState(false);
 
   const reload = useCallback(async () => {
     if (!roomId) return;
@@ -170,58 +175,97 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
     }
   }
 
-  if (loading && !meeting) return <EmptyState icon="file-text" title={t('screen.detail.title')} subtitle={t('screen.detail.subtitle')} />;
   if (!meeting) return <EmptyState icon="file-text" title={t('screen.detail.title')} subtitle={t('screen.detail.subtitle')} />;
 
+  const sideTabs: DetailSideTab[] = [
+    {
+      id: 'summary',
+      icon: 'sparkle',
+      label: t('recording.side.summary'),
+      node: (
+        <SummaryCard
+          roomId={roomId}
+          meetingId={meetingId}
+          summaryText={meeting.summaryText}
+          keyTopics={meeting.keyTopics}
+          summaryError={meeting.summaryError}
+          onRegenerated={() => void reload()}
+        />
+      ),
+    },
+    {
+      id: 'speakers',
+      icon: 'person-multiple',
+      label: t('detail.speakersTab'),
+      node: (
+        <MeetingSpeakersPanel
+          roomId={roomId}
+          meetingId={meetingId}
+          speakers={speakers}
+          onRelabeled={(speakerId, displayName) => setSpeakers((prev) => prev.map((s) => (s.speakerId === speakerId ? { ...s, displayName } : s)))}
+        />
+      ),
+    },
+    {
+      id: 'actions',
+      icon: 'checkmark-circle',
+      label: t('recording.side.actions'),
+      node: <ActionItemsCard roomId={roomId} meetingTitle={meeting.title ?? ''} items={actionItems} onSeek={seek} onChanged={() => void reload()} />,
+    },
+    {
+      id: 'bookmarks',
+      icon: 'bookmark',
+      label: t('recording.side.bookmarks'),
+      node: <BookmarksPanel bookmarks={bookmarks} onSeek={seek} onDelete={(id) => void removeBookmark(id)} />,
+    },
+  ];
+
   return (
-    <div className="ma-meeting-detail">
-      <div className="ma-meeting-detail__main">
-        <nav className="ma-meeting-detail__breadcrumb">
-          <button type="button" onClick={onBack}>
-            <Icon name="arrow-left" size={14} /> {t('rail.history')}
+    <div className="ma-live ma-detail">
+      <div className="ma-live__main">
+        <div className="ma-live__topbar">
+          <button type="button" className="ma-detail__back" onClick={onBack}>
+            <Icon name="arrow-left" size={16} /> {t('detail.backToHistory')}
           </button>
-        </nav>
+          <div className="ma-live__title-wrap">
+            {titleDraft != null ? (
+              <input
+                className="ma-live__title-input"
+                value={titleDraft}
+                autoFocus
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={() => void saveTitle()}
+                onKeyDown={(e) => e.key === 'Enter' && void saveTitle()}
+              />
+            ) : (
+              <button type="button" className="ma-live__title" onClick={() => setTitleDraft(meeting.title ?? '')} aria-label={t('recording.editTitle')}>
+                <span className="ma-live__title-text">{meeting.title || t('screen.new.untitled')}</span>
+                <Icon name="edit" size={15} />
+              </button>
+            )}
+          </div>
+          <div className="ma-live__topbar-actions">
+            <span className="ma-live__meta">
+              <Icon name="person-multiple" size={14} /> {speakers.length} {t('detail.speakers')}
+            </span>
+            <button type="button" className="ma-live__side-toggle" onClick={() => setSideOpen(true)} aria-label={t('recording.side.open')}>
+              <Icon name="sparkle" size={18} />
+            </button>
+          </div>
+        </div>
 
-        {titleDraft != null ? (
-          <input
-            className="ma-meeting-detail__title-input"
-            value={titleDraft}
-            autoFocus
-            onChange={(e) => setTitleDraft(e.target.value)}
-            onBlur={() => void saveTitle()}
-            onKeyDown={(e) => e.key === 'Enter' && void saveTitle()}
-          />
-        ) : (
-          <h2 className="ma-meeting-detail__title" onClick={() => setTitleDraft(meeting.title ?? '')}>
-            {meeting.title || t('screen.new.untitled')} <Icon name="edit" size={14} />
-          </h2>
-        )}
-
-        <div className="ma-meeting-detail__meta">
+        <div className="ma-detail__meta">
           <span>{meeting.startedAt ? new Date(meeting.startedAt).toLocaleString() : '—'}</span>
           <span>{formatClock(meeting.durationSec ?? 0)}</span>
-          <span>{speakers.length} {t('detail.speakers')}</span>
           <StatusBadge status={meeting.status} />
-          {meeting.transcriptJsonFileId ? <span className="ma-meeting-detail__badge">{t('detail.savedOnPrivos')}</span> : null}
+          {meeting.transcriptJsonFileId ? <span className="ma-detail__badge">{t('detail.savedOnPrivos')}</span> : null}
         </div>
 
         {error ? (
-          <p className="ma-meeting-detail__error" role="alert">
+          <p className="ma-detail__error" role="alert">
             {error}
           </p>
         ) : null}
-
-        {audioUrl ? (
-          <AudioPlayer
-            ref={playerRef}
-            src={audioUrl}
-            bookmarks={bookmarks.map((b) => ({ id: b.id, atSec: b.atSec }))}
-            onTimeUpdate={setCurrentSec}
-            onError={() => void retryAudioUrl()}
-          />
-        ) : meeting.audioFileId ? null : (
-          <p className="ma-meeting-detail__no-audio">{t('detail.audioDeleted')}</p>
-        )}
 
         <MeetingDetailActions
           roomId={roomId}
@@ -236,13 +280,6 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
           onSaveToFiles={() => setShowSaveModal(true)}
           onShare={() => void shareSummary()}
           onSentToChat={() => void reload()}
-        />
-
-        <MeetingSpeakersPanel
-          roomId={roomId}
-          meetingId={meetingId}
-          speakers={speakers}
-          onRelabeled={(speakerId, displayName) => setSpeakers((prev) => prev.map((s) => (s.speakerId === speakerId ? { ...s, displayName } : s)))}
         />
 
         <TranscriptToolbar
@@ -265,33 +302,43 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
           onToggleAutoScroll={() => setAutoScroll((v) => !v)}
         />
 
-        <TranscriptView
-          segments={segments}
-          displayNameBySpeaker={displayNameBySpeaker}
-          colorKeyBySpeaker={colorKeyBySpeaker}
-          activeSegmentId={activeHit ? activeHit.segmentId : activeSegmentId}
-          showTranslation={showTranslation}
-          highlightQuery={searchQuery || undefined}
-          autoScroll={autoScroll}
-          speakerFilter={speakerFilter}
-          onSeek={seek}
-        />
+        {loading && segments.length === 0 ? (
+          <p className="ma-live__waiting">{t('history.loading')}</p>
+        ) : (
+          <TranscriptView
+            segments={segments}
+            displayNameBySpeaker={displayNameBySpeaker}
+            colorKeyBySpeaker={colorKeyBySpeaker}
+            activeSegmentId={activeHit ? activeHit.segmentId : activeSegmentId}
+            showTranslation={showTranslation}
+            highlightQuery={searchQuery || undefined}
+            autoScroll={autoScroll}
+            speakerFilter={speakerFilter}
+            onSeek={seek}
+          />
+        )}
+
+        {audioUrl ? (
+          <div className="ma-detail__player">
+            <AudioPlayer
+              ref={playerRef}
+              src={audioUrl}
+              bookmarks={bookmarks.map((b) => ({ id: b.id, atSec: b.atSec }))}
+              onTimeUpdate={setCurrentSec}
+              onError={() => void retryAudioUrl()}
+            />
+          </div>
+        ) : meeting.audioFileId ? null : (
+          <p className="ma-detail__no-audio">{t('detail.audioDeleted')}</p>
+        )}
       </div>
 
-      <aside className="ma-meeting-detail__side">
-        <SummaryCard
-          roomId={roomId}
-          meetingId={meetingId}
-          summaryText={meeting.summaryText}
-          keyTopics={meeting.keyTopics}
-          summaryError={meeting.summaryError}
-          onRegenerated={() => void reload()}
-        />
-        <ActionItemsCard roomId={roomId} meetingTitle={meeting.title ?? ''} items={actionItems} onSeek={seek} onChanged={() => void reload()} />
-        <section className="ma-meeting-detail__bookmarks">
-          <h3>{t('recording.side.bookmarks')}</h3>
-          <BookmarksPanel bookmarks={bookmarks} onSeek={seek} onDelete={(id) => void removeBookmark(id)} />
-        </section>
+      {sideOpen ? <button type="button" className="ma-live__side-scrim" aria-label={t('recording.side.close')} onClick={() => setSideOpen(false)} /> : null}
+      <aside className={`ma-live__side${sideOpen ? ' ma-live__side--open' : ''}`}>
+        <button type="button" className="ma-live__side-close" onClick={() => setSideOpen(false)} aria-label={t('recording.side.close')}>
+          <Icon name="close" size={18} />
+        </button>
+        <MeetingDetailSidePanel tabs={sideTabs} />
       </aside>
 
       {showSaveModal ? (

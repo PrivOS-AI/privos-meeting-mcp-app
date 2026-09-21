@@ -6,7 +6,7 @@
  */
 import type { McpApp } from '@privos_ai/app-react';
 
-import { resolveFileUrl } from './file-download.js';
+import { downloadFileParsed, resolveFileUrl } from './file-download.js';
 
 export interface TranscriptSpeakerDoc {
   speakerId: string;
@@ -40,10 +40,13 @@ export interface TranscriptDoc {
 const cache = new Map<string, Promise<TranscriptDoc>>();
 
 async function fetchTranscript(app: McpApp, fileId: string): Promise<TranscriptDoc> {
-  const { url } = await resolveFileUrl(app, fileId, 'application/json');
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to load transcript.json (HTTP ${response.status}).`);
-  return (await response.json()) as TranscriptDoc;
+  // transcript.json is JSON, so `app.rest(.../download)` hands the parsed object
+  // straight back — no presigned URL / CSP connect-src origin needed (that path
+  // only matters for binary audio). A text-shaped body is parsed defensively.
+  const body = await downloadFileParsed<unknown>(app, fileId);
+  if (body && typeof body === 'object') return body as TranscriptDoc;
+  if (typeof body === 'string') return JSON.parse(body) as TranscriptDoc;
+  throw new Error(`Failed to load transcript.json (unexpected download body: ${body === null ? 'null' : typeof body}).`);
 }
 
 /** Cached by `fileId` for this tab's session — a second call for the same file returns the same in-flight/settled promise. */

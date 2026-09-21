@@ -252,6 +252,8 @@
   "detail.autoScroll": "Tự cuộn",
   "detail.editSpeaker": "Sửa nhãn",
   "detail.speakers": "người nói",
+  "detail.speakersTab": "Người nói",
+  "detail.backToHistory": "Quay lại lịch sử",
   "detail.savedOnPrivos": "Transcript lưu trên PrivOS",
   "detail.audioDeleted": "Audio gốc đã xoá theo cài đặt lưu trữ",
   "detail.saveToFiles": "Lưu vào Files",
