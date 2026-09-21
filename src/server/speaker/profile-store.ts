@@ -16,6 +16,16 @@
 import { AppDbBotClient, extractDbRecords, type DbRow } from '../hub/app-db-bot-client.js';
 import { openEmbedding, parseSealedEmbedding, sealEmbedding, type SealedEmbedding } from './voiceprint-crypto.js';
 
+/**
+ * Canonical enrolment-source taxonomy (plan.md finding #6/#8) — recorded on
+ * every stored embedding so phase 7's hygiene audit can tell a human-confirmed
+ * vector from an automatic guess. Also the value phase-1 diagnostics' `enrol`
+ * event uses for its own `source` field — this is the one taxonomy, not two.
+ * `undefined`/absent on a decoded legacy embedding means "sealed before this
+ * field existed".
+ */
+export type EnrolSource = 'user-live' | 'user-post' | 'auto-post';
+
 export const EMBEDDING_CAP = 20;
 const COLLECTION = 'speaker_profiles';
 const SCOPE = 'global' as const;
@@ -25,6 +35,9 @@ export interface StoredEmbedding {
   meetingId: string;
   durationSec: number;
   createdAt: string;
+  /** `${meetingId}:${speakerKey}` — identifies which meeting SPEAKER this vector came from (not just which meeting), so a repeated enrol for the SAME speaker replaces rather than appends (idempotent enrol, plan.md § Requirements). Empty on a legacy embedding sealed before this field existed. */
+  speakerKey: string;
+  source?: EnrolSource;
 }
 
 export interface SpeakerProfile {
@@ -69,7 +82,7 @@ function openStoredEmbedding(json: string): StoredEmbedding | null {
   if (!sealed) return null;
   const vector = openEmbedding(sealed);
   if (!vector) return null;
-  return { vector, meetingId: '', durationSec: 0, createdAt: sealed.createdAt };
+  return { vector, meetingId: '', durationSec: 0, createdAt: sealed.createdAt, speakerKey: '' };
 }
 
 /**
@@ -82,11 +95,13 @@ function openStoredEmbedding(json: string): StoredEmbedding | null {
 interface StoredEmbeddingEnvelope extends SealedEmbedding {
   meetingId: string;
   durationSec: number;
+  speakerKey?: string;
+  source?: EnrolSource;
 }
 
-function sealStoredEmbedding(vector: Float32Array, meta: { profileId: string; meetingId: string; durationSec: number; createdAt: string }): string {
+function sealStoredEmbedding(vector: Float32Array, meta: { profileId: string; meetingId: string; durationSec: number; createdAt: string; speakerKey?: string; source?: EnrolSource }): string {
   const sealed = sealEmbedding(vector, { profileId: meta.profileId, createdAt: meta.createdAt });
-  const envelope: StoredEmbeddingEnvelope = { ...sealed, meetingId: meta.meetingId, durationSec: meta.durationSec };
+  const envelope: StoredEmbeddingEnvelope = { ...sealed, meetingId: meta.meetingId, durationSec: meta.durationSec, speakerKey: meta.speakerKey, source: meta.source };
   return JSON.stringify(envelope);
 }
 
@@ -107,6 +122,8 @@ function openStoredEmbeddingEnvelope(json: string): StoredEmbedding | null {
     meetingId: typeof envelope.meetingId === 'string' ? envelope.meetingId : '',
     durationSec: typeof envelope.durationSec === 'number' ? envelope.durationSec : 0,
     createdAt: envelope.createdAt,
+    speakerKey: typeof envelope.speakerKey === 'string' ? envelope.speakerKey : '',
+    source: envelope.source,
   };
 }
 
@@ -223,6 +240,10 @@ export interface EnrolInput {
   vector: Float32Array;
   meetingId: string;
   durationSec: number;
+  /** REQUIRED at compile time — every enrol site must say where the vector came from (plan.md § Requirements: "no enrol site is untagged"). */
+  source: EnrolSource;
+  /** Identifies which meeting SPEAKER this vector is for (`sessionSpeakerId` for a live enrol, `speakerId` for a post-meeting one) — enables the idempotent-enrol replace-not-append rule below. */
+  speakerKey: string;
 }
 
 /**
@@ -232,6 +253,11 @@ export interface EnrolInput {
  * `lastSeenAt`. `dim` is taken from the incoming vector — a model swap that
  * changes dimensionality naturally "wins" going forward; `speaker-matcher.ts`
  * already skips stored embeddings whose length differs from the query vector.
+ *
+ * Idempotent per `(profileId, meetingId, speakerKey)`: any embedding already
+ * on this profile for the SAME meeting+speaker is dropped before the new one
+ * is appended — a repeated `speaker_resolve`/job pass on a named-but-not-yet-
+ * enrolled row REPLACES its vector, never appends a duplicate.
  */
 /** Returns the profile's `sampleCount` AFTER this enrolment — diagnostics-only convenience so a caller does not need a second read just to log `vectorCountAfter`. */
 export async function enrolEmbedding(db: AppDbBotClient, profileId: string, input: EnrolInput): Promise<number> {
@@ -241,13 +267,16 @@ export async function enrolEmbedding(db: AppDbBotClient, profileId: string, inpu
     const current = rowToProfile(row);
     const createdAt = new Date().toISOString();
 
-    const nextEmbeddings = [...current.embeddings, { vector: input.vector, meetingId: input.meetingId, durationSec: input.durationSec, createdAt }].slice(
-      -EMBEDDING_CAP,
-    );
+    const sourceKey = `${input.meetingId}:${input.speakerKey}`;
+    const withoutSameSource = current.embeddings.filter((e) => `${e.meetingId}:${e.speakerKey}` !== sourceKey);
+    const nextEmbeddings = [
+      ...withoutSameSource,
+      { vector: input.vector, meetingId: input.meetingId, durationSec: input.durationSec, createdAt, speakerKey: input.speakerKey, source: input.source },
+    ].slice(-EMBEDDING_CAP);
     const centroid = computeCentroid(nextEmbeddings.map((e) => e.vector));
 
     const embeddingsJson = nextEmbeddings.map((e) =>
-      sealStoredEmbedding(e.vector, { profileId, meetingId: e.meetingId, durationSec: e.durationSec, createdAt: e.createdAt }),
+      sealStoredEmbedding(e.vector, { profileId, meetingId: e.meetingId, durationSec: e.durationSec, createdAt: e.createdAt, speakerKey: e.speakerKey, source: e.source }),
     );
     const centroidJson = centroid ? JSON.stringify(sealEmbedding(centroid, { profileId, createdAt })) : '';
 
@@ -273,7 +302,9 @@ export async function removeEmbeddingsOfMeeting(db: AppDbBotClient, profileId: s
 
     const createdAt = new Date().toISOString();
     const centroid = computeCentroid(remaining.map((e) => e.vector));
-    const embeddingsJson = remaining.map((e) => sealStoredEmbedding(e.vector, { profileId, meetingId: e.meetingId, durationSec: e.durationSec, createdAt: e.createdAt }));
+    const embeddingsJson = remaining.map((e) =>
+      sealStoredEmbedding(e.vector, { profileId, meetingId: e.meetingId, durationSec: e.durationSec, createdAt: e.createdAt, speakerKey: e.speakerKey, source: e.source }),
+    );
     const centroidJson = centroid ? JSON.stringify(sealEmbedding(centroid, { profileId, createdAt })) : '';
 
     await db.update(COLLECTION, SCOPE, profileId, {
@@ -290,6 +321,63 @@ export async function renameProfile(db: AppDbBotClient, profileId: string, displ
 
 export async function linkPrivosUser(db: AppDbBotClient, profileId: string, privosUserId: string, privosUsername?: string): Promise<void> {
   await db.update(COLLECTION, SCOPE, profileId, { privosUserId, privosUsername: privosUsername ?? '' });
+}
+
+/** A human-confirmed identity to resolve/create a profile for, shared by every `user-live`/`user-post` enrol site. */
+export interface EnrolIdentity {
+  displayName: string;
+  privosUserId?: string;
+  /** mode `merge` — an EXPLICIT existing target; never auto-created when set. */
+  profileId?: string;
+  createdByUserId: string;
+  createdInRoomId?: string;
+}
+
+/**
+ * Shared find-or-create-then-enrol used by every human-confirmed identity
+ * path (`speaker-resolve-tool.ts`'s 3 modes, `resolve-speakers.ts`'s
+ * `user-post` branch) — one place owns "which profile does this identity
+ * mean", so the tool and the job can never diverge on it (plan.md
+ * Architecture: "no copy"). Resolution order: an explicit `profileId` (mode
+ * `merge`, never created if missing — returns `null`); else an existing
+ * profile by `privosUserId`; else an existing profile by `displayName`; else
+ * a freshly created profile. Returns `null` only when `profileId` was given
+ * but no longer exists — the caller reports `profile_not_found` rather than
+ * silently creating a different profile than the one the human picked.
+ */
+export async function findOrCreateProfileAndEnrol(
+  db: AppDbBotClient,
+  identity: EnrolIdentity,
+  vector: Float32Array,
+  meta: { meetingId: string; durationSec: number; source: EnrolSource; speakerKey: string },
+): Promise<{ profile: SpeakerProfile; vectorCountAfter: number } | null> {
+  let profile: SpeakerProfile | null = null;
+  if (identity.profileId) {
+    profile = await getProfile(db, identity.profileId);
+    if (!profile) return null;
+  } else {
+    if (identity.privosUserId) profile = await findProfileByPrivosUserId(db, identity.privosUserId);
+    if (!profile) profile = await findProfileByName(db, identity.displayName);
+    if (!profile) {
+      profile = await createProfile(db, {
+        displayName: identity.displayName,
+        createdByUserId: identity.createdByUserId,
+        createdInRoomId: identity.createdInRoomId,
+        privosUserId: identity.privosUserId,
+      });
+    } else if (identity.privosUserId && !profile.privosUserId) {
+      await linkPrivosUser(db, profile.id, identity.privosUserId);
+    }
+  }
+
+  const vectorCountAfter = await enrolEmbedding(db, profile.id, {
+    vector,
+    meetingId: meta.meetingId,
+    durationSec: meta.durationSec,
+    source: meta.source,
+    speakerKey: meta.speakerKey,
+  });
+  return { profile, vectorCountAfter };
 }
 
 /**

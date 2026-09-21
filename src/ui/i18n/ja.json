@@ -135,6 +135,8 @@
   "speaker.resolveModal.later": "後で",
   "speaker.resolveModal.submit": "確認",
   "speaker.resolveModal.submitting": "保存中…",
+  "speaker.resolveModal.enrolDeferredNotice": "名前を設定しました。音声サンプルがまだ自動認識には不十分です — この会議の処理が完了すると改善されます。",
+  "speaker.resolveModal.done": "完了",
 
   "speaker.memberPicker.placeholder": "メンバーの名前を入力…",
   "speaker.memberPicker.searching": "検索中…",

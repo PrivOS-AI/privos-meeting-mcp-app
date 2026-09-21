@@ -22,8 +22,8 @@ const B = new Float32Array([0, 1, 0, 0]);
 describe('matchSpeaker', () => {
   it('matches the profile whose embedding is above threshold', () => {
     const profiles = [
-      profile({ id: 'p1', displayName: 'An', embeddings: [{ vector: A, meetingId: 'm1', durationSec: 10, createdAt: 'now' }] }),
-      profile({ id: 'p2', displayName: 'Binh', embeddings: [{ vector: B, meetingId: 'm1', durationSec: 10, createdAt: 'now' }] }),
+      profile({ id: 'p1', displayName: 'An', embeddings: [{ vector: A, meetingId: 'm1', durationSec: 10, createdAt: 'now', speakerKey: 'spk-m1' }] }),
+      profile({ id: 'p2', displayName: 'Binh', embeddings: [{ vector: B, meetingId: 'm1', durationSec: 10, createdAt: 'now', speakerKey: 'spk-m1' }] }),
     ];
     const result = matchSpeaker(CLOSE_TO_A, profiles, 0.5);
     expect(result.profileId).toBe('p1');
@@ -32,7 +32,7 @@ describe('matchSpeaker', () => {
   });
 
   it('returns no profileId when the best score is below threshold', () => {
-    const profiles = [profile({ id: 'p1', displayName: 'An', embeddings: [{ vector: A, meetingId: 'm1', durationSec: 10, createdAt: 'now' }] })];
+    const profiles = [profile({ id: 'p1', displayName: 'An', embeddings: [{ vector: A, meetingId: 'm1', durationSec: 10, createdAt: 'now', speakerKey: 'spk-m1' }] })];
     const result = matchSpeaker(B, profiles, 0.5);
     expect(result.profileId).toBeUndefined();
     expect(result.confidence).toBeLessThan(0.5);
@@ -45,15 +45,15 @@ describe('matchSpeaker', () => {
 
   it('skips embeddings whose dim does not match the query, without throwing', () => {
     const mismatched = new Float32Array([1, 0, 0]); // dim 3, query is dim 4
-    const profiles = [profile({ id: 'p1', displayName: 'An', embeddings: [{ vector: mismatched, meetingId: 'm1', durationSec: 10, createdAt: 'now' }] })];
+    const profiles = [profile({ id: 'p1', displayName: 'An', embeddings: [{ vector: mismatched, meetingId: 'm1', durationSec: 10, createdAt: 'now', speakerKey: 'spk-m1' }] })];
     expect(() => matchSpeaker(A, profiles, 0.5)).not.toThrow();
     expect(matchSpeaker(A, profiles, 0.5)).toEqual({ confidence: 0, runnerUpConfidence: 0 });
   });
 
   it('reports the runner-up profile/score as a margin diagnostic, never affecting the accepted match', () => {
     const profiles = [
-      profile({ id: 'p1', displayName: 'An', embeddings: [{ vector: A, meetingId: 'm1', durationSec: 10, createdAt: 'now' }] }),
-      profile({ id: 'p2', displayName: 'Binh', embeddings: [{ vector: CLOSE_TO_A, meetingId: 'm1', durationSec: 10, createdAt: 'now' }] }),
+      profile({ id: 'p1', displayName: 'An', embeddings: [{ vector: A, meetingId: 'm1', durationSec: 10, createdAt: 'now', speakerKey: 'spk-m1' }] }),
+      profile({ id: 'p2', displayName: 'Binh', embeddings: [{ vector: CLOSE_TO_A, meetingId: 'm1', durationSec: 10, createdAt: 'now', speakerKey: 'spk-m1' }] }),
     ];
     const result = matchSpeaker(A, profiles, 0.5);
     expect(result.profileId).toBe('p1');
@@ -64,7 +64,7 @@ describe('matchSpeaker', () => {
   });
 
   it('exposes bestProfileId for a near-miss even when it does not clear threshold', () => {
-    const profiles = [profile({ id: 'p1', displayName: 'An', embeddings: [{ vector: A, meetingId: 'm1', durationSec: 10, createdAt: 'now' }] })];
+    const profiles = [profile({ id: 'p1', displayName: 'An', embeddings: [{ vector: A, meetingId: 'm1', durationSec: 10, createdAt: 'now', speakerKey: 'spk-m1' }] })];
     const result = matchSpeaker(B, profiles, 0.5);
     expect(result.profileId).toBeUndefined();
     expect(result.bestProfileId).toBe('p1');
@@ -78,8 +78,8 @@ describe('matchSpeaker', () => {
         id: 'p1',
         displayName: 'An',
         embeddings: [
-          { vector: A, meetingId: 'm1', durationSec: 10, createdAt: 'now' },
-          { vector: B, meetingId: 'm2', durationSec: 10, createdAt: 'now' },
+          { vector: A, meetingId: 'm1', durationSec: 10, createdAt: 'now', speakerKey: 'spk-m1' },
+          { vector: B, meetingId: 'm2', durationSec: 10, createdAt: 'now', speakerKey: 'spk-m2' },
         ],
       }),
     ];

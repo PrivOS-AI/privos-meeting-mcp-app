@@ -29,8 +29,17 @@ import * as profileStore from './profile-store.js';
 import { planEnrolment, type EnrolRange } from './segment-picker.js';
 import { logEvent } from './speaker-diagnostics-log.js';
 import { matchSpeaker } from './speaker-matcher.js';
-import { openEmbedding, sealEmbedding, type SealedEmbedding } from './voiceprint-crypto.js';
+import { openEmbeddingWithMeta, sealEmbeddingWithMeta, openEmbedding, type SealedEmbedding } from './voiceprint-crypto.js';
 import type { Segment } from '../transcript/segment-builder.js';
+
+/** A user identity carried into this pass from a live-named speaker (`meeting-job.ts`'s `computeAsyncToLiveMap`) — skips matching/auto-enrol entirely; the identified speaker's coherent representative enrols straight into this profile as `user-post`. */
+export interface UserIdentity {
+  displayName: string;
+  privosUserId?: string;
+  profileId?: string;
+  createdByUserId: string;
+  createdInRoomId?: string;
+}
 
 export interface ResolvedSpeaker {
   speakerId: string;
@@ -41,6 +50,8 @@ export interface ResolvedSpeaker {
   displayName?: string;
   confidence?: number;
   resolved: boolean;
+  /** Set to `'user'` when this speaker's identity came from `userIdentityBySpeakerId` (a live-named speaker carried into this pass) — the caller (`meeting-job.ts`) writes it verbatim instead of its own `resolved ? 'async' : undefined` default. */
+  nameSource?: 'user';
   /** Sealed ciphertext (never a raw vector) — written to `meeting_speakers.pendingEmbedding` by the caller when present. */
   pendingEmbeddingJson?: string;
 }
@@ -53,13 +64,30 @@ export interface PendingEmbeddingEnvelope extends SealedEmbedding {
 }
 
 export function sealPendingEmbedding(vector: Float32Array, meta: { profileId: string; minPairwiseCosine: number; rangeCount: number; durationSec: number }): string {
-  const sealed = sealEmbedding(vector, { profileId: meta.profileId, createdAt: new Date().toISOString() });
-  const envelope: PendingEmbeddingEnvelope = { ...sealed, minPairwiseCosine: meta.minPairwiseCosine, rangeCount: meta.rangeCount, durationSec: meta.durationSec };
-  return JSON.stringify(envelope);
+  const sealed = sealEmbeddingWithMeta(
+    vector,
+    { profileId: meta.profileId, createdAt: new Date().toISOString() },
+    { minPairwiseCosine: meta.minPairwiseCosine, rangeCount: meta.rangeCount, durationSec: meta.durationSec },
+  );
+  return JSON.stringify(sealed);
 }
 
-/** Opens a `pendingEmbedding` string back into its vector + coherence metadata, or `null` on any parse/HMAC/decrypt failure (never throws — same contract as `voiceprint-crypto.openEmbedding`). */
-export function openPendingEmbedding(json: string): { vector: Float32Array; minPairwiseCosine: number; rangeCount: number; durationSec: number } | null {
+/**
+ * Opens a `pendingEmbedding` string back into its vector + coherence
+ * metadata, asserting it belongs to `expectedProfileId`
+ * (`live:<meetingId>:<sessionSpeakerId>` / `pending:<meetingId>:<speakerId>`
+ * — the caller derives this from the ROW it read the JSON from, never from
+ * the JSON itself). Returns `null` on any parse/binding/HMAC/decrypt
+ * failure (never throws).
+ *
+ * Tries the current sealed-meta shape first (meta MAC-covered, inside the
+ * payload); falls back to the legacy POST-MEETING shape (meta as plain
+ * sibling JSON keys OUTSIDE the sealed payload, still binding-checked and
+ * HMAC-verified) so an envelope parked before this deploy stays enrolable.
+ * An OLD-shape LIVE row (plain `sealEmbedding`, no coherence meta at all —
+ * pre-phase-3 production output) matches neither shape and returns `null`.
+ */
+export function openPendingEmbedding(json: string, expectedProfileId: string): { vector: Float32Array; minPairwiseCosine: number; rangeCount: number; durationSec: number } | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -67,16 +95,48 @@ export function openPendingEmbedding(json: string): { vector: Float32Array; minP
     return null;
   }
   if (!parsed || typeof parsed !== 'object') return null;
-  const envelope = parsed as Partial<PendingEmbeddingEnvelope>;
-  if (typeof envelope.ct !== 'string' || typeof envelope.minPairwiseCosine !== 'number') return null;
-  const vector = openEmbedding(envelope as SealedEmbedding);
+  const sealed = parsed as Partial<SealedEmbedding>;
+  if (typeof sealed.ct !== 'string' || typeof sealed.profileId !== 'string') return null;
+
+  const withMeta = openEmbeddingWithMeta<Partial<{ minPairwiseCosine: number; rangeCount: number; durationSec: number }>>(sealed as SealedEmbedding, expectedProfileId);
+  if (withMeta && typeof withMeta.meta.minPairwiseCosine === 'number') {
+    return {
+      vector: withMeta.vector,
+      minPairwiseCosine: withMeta.meta.minPairwiseCosine,
+      rangeCount: typeof withMeta.meta.rangeCount === 'number' ? withMeta.meta.rangeCount : 1,
+      durationSec: typeof withMeta.meta.durationSec === 'number' ? withMeta.meta.durationSec : 0,
+    };
+  }
+
+  // Legacy POST-MEETING shape: meta sits outside the sealed payload.
+  const legacy = parsed as Partial<PendingEmbeddingEnvelope>;
+  if (typeof legacy.minPairwiseCosine !== 'number' || legacy.profileId !== expectedProfileId) return null;
+  const vector = openEmbedding(legacy as SealedEmbedding);
   if (!vector) return null;
   return {
     vector,
-    minPairwiseCosine: envelope.minPairwiseCosine,
-    rangeCount: typeof envelope.rangeCount === 'number' ? envelope.rangeCount : 1,
-    durationSec: typeof envelope.durationSec === 'number' ? envelope.durationSec : 0,
+    minPairwiseCosine: legacy.minPairwiseCosine,
+    rangeCount: typeof legacy.rangeCount === 'number' ? legacy.rangeCount : 1,
+    durationSec: typeof legacy.durationSec === 'number' ? legacy.durationSec : 0,
   };
+}
+
+/** Historical post-meeting coherence rule, unchanged: a single picked range is trivially coherent (its own `minPairwiseCosine` is forced to 1 at seal time); two or more ranges must clear `threshold`. */
+export function isPostMeetingCoherent(pending: { minPairwiseCosine: number; rangeCount: number }, threshold: number): boolean {
+  return pending.rangeCount < 2 || pending.minPairwiseCosine >= threshold;
+}
+
+/**
+ * The live one-shot enrolment bar (plan's "live path is ONE-SHOT" + "the live
+ * bar applies to EVERY enrol path reading a live-sourced envelope"): a
+ * single- or double-turn live centroid is NEVER trusted regardless of its
+ * (trivially high) `minPairwiseCosine`, unlike the post-meeting rule above —
+ * shared-mic live turns are short and noisy enough that real signal only
+ * shows up over several independent turns. Uses its OWN coherence env value
+ * (`SPEAKER_LIVE_ENROL_COHERENCE`), never `speakerMatchThreshold`.
+ */
+export function isLiveEnrolBarMet(pending: { minPairwiseCosine: number; rangeCount: number; durationSec: number }): boolean {
+  return pending.rangeCount >= 3 && pending.durationSec >= env.liveEnrolMinSpeechSec && pending.minPairwiseCosine >= env.speakerLiveEnrolCoherence;
 }
 
 /** Cosine of two same-length vectors without `cosineSimilarity`'s length-mismatch throw — callers here already skip mismatched pairs. */
@@ -142,7 +202,13 @@ async function embedRanges(wavPath: string, ranges: readonly EnrolRange[]): Prom
  * response" invariant, enforced by construction here rather than trusted at
  * the tool boundary).
  */
-export async function resolveSpeakers(db: AppDbBotClient, wavPath: string, segments: readonly Segment[], meetingId: string): Promise<ResolvedSpeaker[]> {
+export async function resolveSpeakers(
+  db: AppDbBotClient,
+  wavPath: string,
+  segments: readonly Segment[],
+  meetingId: string,
+  userIdentityBySpeakerId?: ReadonlyMap<string, UserIdentity>,
+): Promise<ResolvedSpeaker[]> {
   const threshold = await readMatchThreshold(db);
   const profiles = await profileStore.listProfiles(db);
   const plans = planEnrolment(segments, { minSegSec: env.speakerMinSegmentSec, targetSec: env.speakerEnrolTargetSec });
@@ -150,15 +216,35 @@ export async function resolveSpeakers(db: AppDbBotClient, wavPath: string, segme
   const out: ResolvedSpeaker[] = [];
 
   for (const plan of plans) {
+    // A speaker already identified live (carried in by `meeting-job.ts` from a
+    // `nameSource:'user'` live row with enough overlap) SKIPS matching
+    // entirely — never guessed against, never at risk of landing in the
+    // wrong auto-matched profile (plan.md finding #4).
+    const userIdentity = userIdentityBySpeakerId?.get(plan.speakerId);
+
     if (plan.ranges.length === 0) {
-      out.push({ speakerId: plan.speakerId, totalSpeakSec: plan.totalSpeakSec, sampleSec: 0, resolved: false });
+      out.push({
+        speakerId: plan.speakerId,
+        totalSpeakSec: plan.totalSpeakSec,
+        sampleSec: 0,
+        resolved: Boolean(userIdentity),
+        displayName: userIdentity?.displayName,
+        nameSource: userIdentity ? 'user' : undefined,
+      });
       continue;
     }
 
     const rangeEmbeddings = await embedRanges(wavPath, plan.ranges);
     if (rangeEmbeddings.length === 0) {
       // Every picked range turned out to be near-silent once actually read from the wav — same "too little data" outcome as an empty plan.
-      out.push({ speakerId: plan.speakerId, totalSpeakSec: plan.totalSpeakSec, sampleSec: 0, resolved: false });
+      out.push({
+        speakerId: plan.speakerId,
+        totalSpeakSec: plan.totalSpeakSec,
+        sampleSec: 0,
+        resolved: Boolean(userIdentity),
+        displayName: userIdentity?.displayName,
+        nameSource: userIdentity ? 'user' : undefined,
+      });
       continue;
     }
 
@@ -166,6 +252,63 @@ export async function resolveSpeakers(db: AppDbBotClient, wavPath: string, segme
     const coherent = coherence >= threshold;
     const representative = averageVectors(rangeEmbeddings);
     const sampleRange = plan.ranges[0];
+
+    if (userIdentity) {
+      if (!coherent) {
+        // Named already (the live identity), just not enrol-worthy yet — kept for a later confirmation, same as any other incoherent cluster.
+        const pendingEmbeddingJson = sealPendingEmbedding(representative, {
+          profileId: `pending:${meetingId}:${plan.speakerId}`,
+          minPairwiseCosine: coherence,
+          rangeCount: rangeEmbeddings.length,
+          durationSec: plan.totalSec,
+        });
+        out.push({
+          speakerId: plan.speakerId,
+          totalSpeakSec: plan.totalSpeakSec,
+          sampleSec: plan.totalSec,
+          sampleRange,
+          resolved: true,
+          displayName: userIdentity.displayName,
+          nameSource: 'user',
+          pendingEmbeddingJson,
+        });
+        continue;
+      }
+
+      const enrolResult = await profileStore.findOrCreateProfileAndEnrol(db, userIdentity, representative, {
+        meetingId,
+        durationSec: plan.totalSec,
+        source: 'user-post',
+        speakerKey: plan.speakerId,
+      });
+      if (!enrolResult) {
+        // The explicit merge target (mode 'merge', carried via `userIdentity.profileId`) vanished mid-job — still named, never silently dropped.
+        out.push({ speakerId: plan.speakerId, totalSpeakSec: plan.totalSpeakSec, sampleSec: plan.totalSec, sampleRange, resolved: true, displayName: userIdentity.displayName, nameSource: 'user' });
+        continue;
+      }
+      await logEvent(meetingId, {
+        t: Date.now(),
+        meetingId,
+        type: 'enrol',
+        profile: enrolResult.profile.id,
+        source: 'user-post',
+        coherence,
+        durationSec: plan.totalSec,
+        vectorCountAfter: enrolResult.vectorCountAfter,
+      });
+      out.push({
+        speakerId: plan.speakerId,
+        totalSpeakSec: plan.totalSpeakSec,
+        sampleSec: plan.totalSec,
+        sampleRange,
+        profileId: enrolResult.profile.id,
+        displayName: enrolResult.profile.displayName || userIdentity.displayName,
+        confidence: 1,
+        resolved: true,
+        nameSource: 'user',
+      });
+      continue;
+    }
 
     if (!coherent) {
       // Bimodal cluster (likely two voices in one diarization turn) — never
@@ -196,13 +339,19 @@ export async function resolveSpeakers(db: AppDbBotClient, wavPath: string, segme
       accepted: Boolean(match.profileId),
     });
     if (match.profileId) {
-      const vectorCountAfter = await profileStore.enrolEmbedding(db, match.profileId, { vector: representative, meetingId, durationSec: plan.totalSec });
+      const vectorCountAfter = await profileStore.enrolEmbedding(db, match.profileId, {
+        vector: representative,
+        meetingId,
+        durationSec: plan.totalSec,
+        source: 'auto-post',
+        speakerKey: plan.speakerId,
+      });
       await logEvent(meetingId, {
         t: Date.now(),
         meetingId,
         type: 'enrol',
         profile: match.profileId,
-        source: 'async',
+        source: 'auto-post',
         coherence,
         durationSec: plan.totalSec,
         vectorCountAfter,

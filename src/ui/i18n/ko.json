@@ -135,6 +135,8 @@
   "speaker.resolveModal.later": "나중에",
   "speaker.resolveModal.submit": "확인",
   "speaker.resolveModal.submitting": "저장 중…",
+  "speaker.resolveModal.enrolDeferredNotice": "이름이 지정되었습니다. 음성 샘플이 아직 자동 인식에 충분히 명확하지 않습니다 — 이 회의 처리가 끝나면 개선됩니다.",
+  "speaker.resolveModal.done": "완료",
 
   "speaker.memberPicker.placeholder": "구성원 이름 입력…",
   "speaker.memberPicker.searching": "검색 중…",

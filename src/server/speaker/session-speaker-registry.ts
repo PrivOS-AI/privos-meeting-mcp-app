@@ -91,6 +91,7 @@ export interface SessionSpeakerSnapshot {
   displayName?: string;
   profileId?: string;
   nameSource?: NameSource;
+  privosUserId?: string;
   liveConfidence?: number;
   liveSpeechSec: number;
   colorKey: string;
@@ -115,6 +116,7 @@ export interface LoadableSpeakerRow {
   profileId?: string;
   displayName?: string;
   nameSource?: NameSource;
+  privosUserId?: string;
   liveConfidence?: number;
   colorKey?: string;
 }
@@ -130,6 +132,7 @@ interface SessionSpeaker {
   profileId?: string;
   displayName?: string;
   nameSource?: NameSource;
+  privosUserId?: string;
   liveConfidence?: number;
   profileAttempts: number;
   colorKey: string;
@@ -158,6 +161,16 @@ function nextInstanceLabel(label: string, alreadyTaken: ReadonlySet<string>): st
 /** `cosineSimilarity` without its length-mismatch throw — diagnostics scoring compares against every live speaker, including one built from a since-swapped embedding model. */
 function safeCosine(a: Float32Array, b: Float32Array): number {
   return a.length === b.length ? cosineSimilarity(a, b) : 0;
+}
+
+/** The minimum pairwise cosine across a set of held embeddings — 1 (trivially "coherent") when there are fewer than 2, same convention as `resolve-speakers.ts`'s post-meeting coherence score. */
+function minPairwiseCosineOfHeld(vectors: readonly Float32Array[]): number {
+  if (vectors.length < 2) return 1;
+  let min = 1;
+  for (let i = 0; i < vectors.length; i++) {
+    for (let j = i + 1; j < vectors.length; j++) min = Math.min(min, safeCosine(vectors[i], vectors[j]));
+  }
+  return min;
 }
 
 function fnv1aHex(input: string): string {
@@ -490,7 +503,7 @@ export class MeetingSessionRegistry {
         displayName: speaker.displayName ?? '',
         colorKey: speaker.colorKey,
         createdByUserId: '',
-        embeddings: speaker.embeddings.map((vector) => ({ vector, meetingId: this.meetingId, durationSec: 0, createdAt: '' })),
+        embeddings: speaker.embeddings.map((vector) => ({ vector, meetingId: this.meetingId, durationSec: 0, createdAt: '', speakerKey: speaker.sessionSpeakerId })),
         centroid: speaker.centroid,
         dim: speaker.centroid.length,
         sampleCount: speaker.embeddings.length,
@@ -558,11 +571,20 @@ export class MeetingSessionRegistry {
     return this.byId.get(sessionSpeakerId)?.centroid ?? null;
   }
 
-  /** Returns the speaker's `profileAttempts` count AFTER this attempt (0 if `sessionSpeakerId` is unknown) — lets the caller stamp a `profile-match` diagnostics event without a separate lookup. */
+  /**
+   * Returns the speaker's `profileAttempts` count AFTER this attempt (0 if
+   * `sessionSpeakerId` is unknown) — lets the caller stamp a `profile-match`
+   * diagnostics event without a separate lookup. A speaker already carrying a
+   * human-confirmed identity (`nameSource:'user'`, set by
+   * {@link applyUserIdentity}) is a no-op here beyond bumping the attempt
+   * counter — "user identity beats guesses" (plan.md § Requirements): a live
+   * profile match must never overwrite a name/profile the user just gave.
+   */
   applyProfileMatch(sessionSpeakerId: string, match: { profileId?: string; displayName?: string; confidence: number }): number {
     const speaker = this.byId.get(sessionSpeakerId);
     if (!speaker) return 0;
     speaker.profileAttempts += 1;
+    if (speaker.nameSource === 'user') return speaker.profileAttempts;
     if (match.profileId) {
       speaker.profileId = match.profileId;
       speaker.displayName = match.displayName;
@@ -570,6 +592,43 @@ export class MeetingSessionRegistry {
       speaker.liveConfidence = match.confidence;
     }
     return speaker.profileAttempts;
+  }
+
+  /**
+   * Applies a human-confirmed identity (`speaker_resolve`, every mode) to the
+   * in-memory session speaker — the counterpart to the App DB row write the
+   * caller does in the SAME queued task (plan.md § Requirements: "no
+   * interleaving"). Sets `nameSource:'user'`, which both `applyProfileMatch`
+   * above and the next `upsertAll` (its own no-downgrade rule) respect from
+   * this point on. A no-op (returns `false`) when `sessionSpeakerId` is
+   * unknown to this registry — the caller falls back to the DB-only write.
+   */
+  applyUserIdentity(sessionSpeakerId: string, identity: { displayName: string; privosUserId?: string; profileId?: string }): boolean {
+    const speaker = this.byId.get(sessionSpeakerId);
+    if (!speaker) return false;
+    speaker.displayName = identity.displayName;
+    speaker.nameSource = 'user';
+    speaker.privosUserId = identity.privosUserId;
+    if (identity.profileId) speaker.profileId = identity.profileId;
+    return true;
+  }
+
+  /**
+   * Coherence stats over this session speaker's CURRENTLY held embeddings
+   * (capped at `EMBEDDING_CAP`) — feeds `sealPendingEmbedding`'s meta at
+   * `upsertAll` time so a live row's `pendingEmbedding` is a REAL envelope
+   * (root cause 1: production used to seal a plain centroid with no coherence
+   * data at all, so `speaker_resolve` could never enrol it). `null` when the
+   * speaker has no centroid yet (nothing observed).
+   */
+  coherenceFor(sessionSpeakerId: string): { minPairwiseCosine: number; rangeCount: number; durationSec: number } | null {
+    const speaker = this.byId.get(sessionSpeakerId);
+    if (!speaker || !speaker.centroid) return null;
+    return {
+      minPairwiseCosine: minPairwiseCosineOfHeld(speaker.embeddings),
+      rangeCount: speaker.embeddings.length,
+      durationSec: speaker.speechSec,
+    };
   }
 
   // -------------------------------------------------------- persistence
@@ -588,6 +647,7 @@ export class MeetingSessionRegistry {
       displayName: s.displayName,
       profileId: s.profileId,
       nameSource: s.nameSource,
+      privosUserId: s.privosUserId,
       liveConfidence: s.liveConfidence,
       liveSpeechSec: s.speechSec,
       colorKey: s.colorKey,
@@ -598,7 +658,10 @@ export class MeetingSessionRegistry {
 
   private computeHash(): string {
     const parts = this.snapshot()
-      .map((s) => `${s.sessionSpeakerId}:${s.sonioxLabels.join(',')}:${s.profileId ?? ''}:${s.displayName ?? ''}:${Math.round(s.liveSpeechSec)}:${s.mergedInto ?? ''}`)
+      .map(
+        (s) =>
+          `${s.sessionSpeakerId}:${s.sonioxLabels.join(',')}:${s.profileId ?? ''}:${s.displayName ?? ''}:${s.nameSource ?? ''}:${s.privosUserId ?? ''}:${Math.round(s.liveSpeechSec)}:${s.mergedInto ?? ''}`,
+      )
       .sort()
       .join('|');
     return fnv1aHex(parts);
@@ -613,9 +676,16 @@ export class MeetingSessionRegistry {
     return this.computeHash();
   }
 
-  /** Call after a successful `live-speaker-repository.upsertAll` — resets the change-gate. */
-  markPersisted(): void {
-    this.lastPersistedHash = this.computeHash();
+  /**
+   * Call after a successful `live-speaker-repository.upsertAll`, passing the
+   * hash of the snapshot it ACTUALLY WROTE (captured before its own DB
+   * awaits) — never re-derived from whatever the registry looks like NOW.
+   * Recomputing here would mark an unwritten mutation (e.g. a `speaker_resolve`
+   * that landed mid-write, before this fix's queue serialization) as already
+   * persisted, silently dropping it (plan.md red-team finding #5).
+   */
+  markPersisted(hash: string): void {
+    this.lastPersistedHash = hash;
   }
 
   /** Rebuilds state from `meeting_speakers` rows after a restart/eviction (`loadForMeeting`). Restored session speakers are treated as already-sticky and already profile-attempted-if-resolved: their `liveSpeechSec` already cleared the sticky bar before the restart, and re-running profile matching on an already-linked speaker would be wasted work. */
@@ -633,6 +703,7 @@ export class MeetingSessionRegistry {
         profileId: row.profileId,
         displayName: row.displayName,
         nameSource: row.nameSource,
+        privosUserId: row.privosUserId,
         liveConfidence: row.liveConfidence,
         profileAttempts: row.profileId ? 5 : 0,
         colorKey: row.colorKey || this.nextColor(),
@@ -670,6 +741,16 @@ export class SessionRegistryStore {
     registry = new MeetingSessionRegistry(meetingId);
     this.registries.set(meetingId, registry);
     return registry;
+  }
+
+  /**
+   * Explicit eviction — the post-meeting job calls this right before its
+   * speaker steps (after `chunkQueue.abort(meetingId)`) so a still-draining
+   * chunk cannot resurrect stale live rows mid-reconcile (plan.md § job
+   * reordering). A no-op when the meeting has no registry.
+   */
+  delete(meetingId: string): void {
+    this.registries.delete(meetingId);
   }
 
   private sweepIdle(): void {

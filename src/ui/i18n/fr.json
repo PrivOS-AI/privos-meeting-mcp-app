@@ -135,6 +135,8 @@
   "speaker.resolveModal.later": "Plus tard",
   "speaker.resolveModal.submit": "Confirmer",
   "speaker.resolveModal.submitting": "Enregistrement…",
+  "speaker.resolveModal.enrolDeferredNotice": "Nommé. L'échantillon vocal n'est pas encore assez clair pour être reconnu automatiquement — cela s'améliorera une fois cette réunion traitée.",
+  "speaker.resolveModal.done": "Terminé",
 
   "speaker.memberPicker.placeholder": "Saisissez le nom d'un membre…",
   "speaker.memberPicker.searching": "Recherche…",

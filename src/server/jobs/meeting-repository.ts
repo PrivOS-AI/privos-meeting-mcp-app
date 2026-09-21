@@ -95,7 +95,7 @@ function nameSourceRank(nameSource: unknown): number {
  * Folds a LIVE-only `meeting_speakers` row (keyed by `sessionSpeakerId`,
  * written during the meeting by `live-speaker-repository.ts`) into the
  * matching ASYNC row (keyed by `speakerId`, written by this job) for the
- * SAME person — `reconcileWithLiveSpeakers` (`meeting-job.ts`) already
+ * SAME person — `computeAsyncToLiveMap`/`applyLiveReconciliation` (`meeting-job.ts`) already
  * decided the two rows are the same person via `caption-aligner`'s
  * max-overlap alignment. Only ever ONE row per person survives: the async
  * row absorbs the live row's `sessionSpeakerId`/`sonioxLabels`/live metadata,
@@ -138,15 +138,50 @@ export async function mergeLiveIntoAsyncSpeaker(db: AppDbBotClient, meetingId: s
  * corroborated (noise, a false split, or someone who only spoke during a
  * part that failed to process). Async segmentation is authoritative
  * (plan.md), so an orphaned live guess does not get its own permanent row.
+ *
+ * EXCEPT a row already `nameSource:'user'` — a human confirmed that identity
+ * live, so an unmapped row is kept (not the noise this function otherwise
+ * assumes) and surfaced instead on the post-meeting resolve screen, which can
+ * still look it up by its `sessionSpeakerId` (`speaker-resolve-tool.ts`'s
+ * quick-assign lookup).
  */
 export async function deleteUnmappedLiveSpeakers(db: AppDbBotClient, meetingId: string, mappedSessionSpeakerIds: ReadonlySet<string>): Promise<void> {
   const result = await db.query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 });
   for (const row of extractDbRecords(result)) {
     const isLiveOnly = typeof row.sessionSpeakerId === 'string' && row.sessionSpeakerId && !(typeof row.speakerId === 'string' && row.speakerId);
-    if (isLiveOnly && !mappedSessionSpeakerIds.has(row.sessionSpeakerId as string)) {
+    if (isLiveOnly && row.nameSource !== 'user' && !mappedSessionSpeakerIds.has(row.sessionSpeakerId as string)) {
       await db.delete('meeting_speakers', 'room', row._id);
     }
   }
+}
+
+export interface LiveIdentity {
+  displayName?: string;
+  privosUserId?: string;
+  profileId?: string;
+  nameSource?: string;
+}
+
+/**
+ * Every LIVE `meeting_speakers` row's identity fields, keyed by
+ * `sessionSpeakerId` — read BEFORE the async pass runs (`meeting-job.ts`'s
+ * mapping-before-resolve order) so a `nameSource:'user'` live row's identity
+ * can be carried into `resolveSpeakers`'s `userIdentityBySpeakerId`, whether
+ * or not it has been folded into an async row yet.
+ */
+export async function loadLiveIdentities(db: AppDbBotClient, meetingId: string): Promise<Map<string, LiveIdentity>> {
+  const result = await db.query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 });
+  const out = new Map<string, LiveIdentity>();
+  for (const row of extractDbRecords(result)) {
+    if (typeof row.sessionSpeakerId !== 'string' || !row.sessionSpeakerId) continue;
+    out.set(row.sessionSpeakerId, {
+      displayName: typeof row.displayName === 'string' && row.displayName ? row.displayName : undefined,
+      privosUserId: typeof row.privosUserId === 'string' && row.privosUserId ? row.privosUserId : undefined,
+      profileId: typeof row.profileId === 'string' && row.profileId ? row.profileId : undefined,
+      nameSource: typeof row.nameSource === 'string' ? row.nameSource : undefined,
+    });
+  }
+  return out;
 }
 
 export interface ActionItemInput {

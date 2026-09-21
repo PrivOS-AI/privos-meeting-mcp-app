@@ -70,7 +70,7 @@ let deletedFileIds: string[];
 let uploadSeq: number;
 
 const { decodeToWav16k } = await import('../media/decode-audio.js');
-const { runMeetingJob } = await import('./meeting-job.js');
+const { runMeetingJob, computeAsyncToLiveMap } = await import('./meeting-job.js');
 
 const MEETING_ID = 'meeting1abcdefgh';
 const DIGEST = MEETING_ID.slice(0, 8);
@@ -101,7 +101,7 @@ function buildJobHub(fixtureBytes: Buffer): RoomBoundHubClient {
         return { ok: true, status: 200, body: stream } as unknown as Response;
       }
       if (requestPath.startsWith('/api/v1/file-management.files.channel/')) {
-        // No live-turns.json in this test — reconcileWithLiveSpeakers short-circuits.
+        // No live-turns.json in this test — computeAsyncToLiveMap short-circuits to an empty map.
         return { ok: true, status: 200, json: async () => ({ success: true, files: [] }) } as unknown as Response;
       }
       return dbHub.authorizedFetch(requestPath, init);
@@ -195,6 +195,25 @@ describe('runMeetingJob — integration (real ffmpeg decode)', () => {
     expect(meetingRow?.status).toBe('failed');
     // transcript/summary artifacts never got a chance to upload.
     expect(uploadedFiles.length).toBe(1); // only audio.webm, uploaded BEFORE transcribe runs
+  });
+});
+
+describe('computeAsyncToLiveMap', () => {
+  it('maps an async speaker to whichever live turn overlaps it the most, with the overlap as a fraction of the async speaker\'s own total time', () => {
+    const segments = [
+      { id: 's1', speakerId: 'spkA', startSec: 0, endSec: 10, text: 'x', lang: 'vi', tokenCount: 1 },
+      { id: 's2', speakerId: 'spkA', startSec: 20, endSec: 30, text: 'y', lang: 'vi', tokenCount: 1 },
+    ];
+    const liveTurns = [
+      { id: 't1', speakerKey: 'ss-1', startMs: 0, endMs: 8000, text: '', sessionIndex: 0 }, // overlaps 8s of spkA's first 10s segment
+    ];
+    const map = computeAsyncToLiveMap(segments, liveTurns);
+    expect(map.get('spkA')).toEqual({ sessionSpeakerId: 'ss-1', overlapFraction: 8000 / 20000 }); // 8s overlap / 20s total speech
+  });
+
+  it('returns an empty map when there are no live turns at all', () => {
+    const segments = [{ id: 's1', speakerId: 'spkA', startSec: 0, endSec: 10, text: 'x', lang: 'vi', tokenCount: 1 }];
+    expect(computeAsyncToLiveMap(segments, []).size).toBe(0);
   });
 });
 

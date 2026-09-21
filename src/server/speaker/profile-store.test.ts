@@ -52,7 +52,7 @@ describe('profile-store', () => {
 
   it('enrols an embedding: pushes, recomputes centroid, bumps sampleCount', async () => {
     const profile = await createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
-    await enrolEmbedding(db(), profile.id, { vector: vec(1), meetingId: 'm1', durationSec: 20 });
+    await enrolEmbedding(db(), profile.id, { vector: vec(1), meetingId: 'm1', durationSec: 20, source: 'auto-post', speakerKey: 'm1' });
 
     const reloaded = await getProfile(db(), profile.id);
     expect(reloaded?.embeddings).toHaveLength(1);
@@ -64,7 +64,7 @@ describe('profile-store', () => {
   it('caps embeddings at EMBEDDING_CAP, keeping only the most recent', async () => {
     const profile = await createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
     for (let i = 0; i < EMBEDDING_CAP + 5; i++) {
-      await enrolEmbedding(db(), profile.id, { vector: vec(i), meetingId: `m${i}`, durationSec: 10 });
+      await enrolEmbedding(db(), profile.id, { vector: vec(i), meetingId: `m${i}`, durationSec: 10, source: 'auto-post', speakerKey: `m${i}` });
     }
     const reloaded = await getProfile(db(), profile.id);
     expect(reloaded?.embeddings).toHaveLength(EMBEDDING_CAP);
@@ -75,7 +75,7 @@ describe('profile-store', () => {
   it('serializes concurrent enrolments for the same profile without losing any (withProfileLock + re-read)', async () => {
     const profile = await createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
     await Promise.all(
-      Array.from({ length: 10 }, (_, i) => enrolEmbedding(db(), profile.id, { vector: vec(i), meetingId: `m${i}`, durationSec: 5 })),
+      Array.from({ length: 10 }, (_, i) => enrolEmbedding(db(), profile.id, { vector: vec(i), meetingId: `m${i}`, durationSec: 5, source: 'auto-post', speakerKey: `m${i}` })),
     );
     const reloaded = await getProfile(db(), profile.id);
     expect(reloaded?.embeddings).toHaveLength(10);
@@ -84,8 +84,8 @@ describe('profile-store', () => {
 
   it('removeEmbeddingsOfMeeting drops only the targeted meeting and recomputes centroid', async () => {
     const profile = await createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
-    await enrolEmbedding(db(), profile.id, { vector: vec(1), meetingId: 'm1', durationSec: 10 });
-    await enrolEmbedding(db(), profile.id, { vector: vec(2), meetingId: 'm2', durationSec: 10 });
+    await enrolEmbedding(db(), profile.id, { vector: vec(1), meetingId: 'm1', durationSec: 10, source: 'auto-post', speakerKey: 'm1' });
+    await enrolEmbedding(db(), profile.id, { vector: vec(2), meetingId: 'm2', durationSec: 10, source: 'auto-post', speakerKey: 'm2' });
 
     await removeEmbeddingsOfMeeting(db(), profile.id, 'm1');
 
@@ -97,8 +97,8 @@ describe('profile-store', () => {
   it('listProfiles decodes every embedding across all profiles', async () => {
     const p1 = await createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
     const p2 = await createProfile(db(), { displayName: 'Binh', createdByUserId: 'user-1' });
-    await enrolEmbedding(db(), p1.id, { vector: vec(1), meetingId: 'm1', durationSec: 10 });
-    await enrolEmbedding(db(), p2.id, { vector: vec(2), meetingId: 'm1', durationSec: 10 });
+    await enrolEmbedding(db(), p1.id, { vector: vec(1), meetingId: 'm1', durationSec: 10, source: 'auto-post', speakerKey: 'm1' });
+    await enrolEmbedding(db(), p2.id, { vector: vec(2), meetingId: 'm1', durationSec: 10, source: 'auto-post', speakerKey: 'm1' });
 
     const all = await listProfiles(db());
     expect(all.map((p) => p.displayName).sort()).toEqual(['An', 'Binh']);
@@ -107,7 +107,7 @@ describe('profile-store', () => {
 
   it('deleteProfile removes the profile row AND clears meeting_speakers links in every known room', async () => {
     const profile = await createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
-    await enrolEmbedding(db(), profile.id, { vector: vec(1), meetingId: 'm1', durationSec: 10 });
+    await enrolEmbedding(db(), profile.id, { vector: vec(1), meetingId: 'm1', durationSec: 10, source: 'auto-post', speakerKey: 'm1' });
 
     store.meeting_speakers = [
       { _id: 'ms1', meeting: 'm1', profileId: profile.id, pendingEmbedding: 'stale-ciphertext', roomId: 'room-a' },

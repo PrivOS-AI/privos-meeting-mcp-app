@@ -135,6 +135,8 @@
   "speaker.resolveModal.later": "Später",
   "speaker.resolveModal.submit": "Bestätigen",
   "speaker.resolveModal.submitting": "Wird gespeichert…",
+  "speaker.resolveModal.enrolDeferredNotice": "Benannt. Die Sprachprobe ist noch nicht klar genug für automatische Erkennung — das verbessert sich, sobald dieses Meeting verarbeitet wurde.",
+  "speaker.resolveModal.done": "Fertig",
 
   "speaker.memberPicker.placeholder": "Namen eines Mitglieds eingeben…",
   "speaker.memberPicker.searching": "Suche läuft…",

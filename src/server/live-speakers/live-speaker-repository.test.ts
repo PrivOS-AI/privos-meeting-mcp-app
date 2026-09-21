@@ -86,6 +86,36 @@ describe('live-speaker-repository', () => {
     expect(sessionRegistries.get(meetingId)).toBe(rebuilt);
   });
 
+  it('upsertAll never downgrades a DB row already nameSource:user, even if the in-memory snapshot has not caught up (defense in depth)', async () => {
+    const meetingId = `m-${Math.random()}`;
+    const registry = new MeetingSessionRegistry(meetingId);
+    registry.observe('s0:1', new Float32Array([1, 0, 0, 0]), 5, seg('s0:1', 0));
+    const sessionSpeakerId = registry.snapshot()[0].sessionSpeakerId;
+    await upsertAll(db(), meetingId, registry);
+
+    // Simulate a DB row already confirmed by a human (e.g. written by `speaker_resolve` on another path)
+    // while THIS registry's own in-memory copy is stale (never learned the identity) — the write below
+    // must not clobber the confirmed name/profile back down to a guess.
+    const row = store.meeting_speakers.find((r) => r.sessionSpeakerId === sessionSpeakerId)!;
+    row.displayName = 'Thanh';
+    row.nameSource = 'user';
+    row.privosUserId = 'user-9';
+    row.profileId = 'profile-9';
+    row.resolved = true;
+
+    registry.observe('s0:1', new Float32Array([1, 0, 0, 0]), 5, seg('s0:1', 20_000)); // new observation -> snapshot changes -> writes again
+    await upsertAll(db(), meetingId, registry);
+
+    const after = store.meeting_speakers.find((r) => r.sessionSpeakerId === sessionSpeakerId)!;
+    expect(after.displayName).toBe('Thanh');
+    expect(after.nameSource).toBe('user');
+    expect(after.privosUserId).toBe('user-9');
+    expect(after.profileId).toBe('profile-9');
+    expect(after.resolved).toBe(true);
+    // Live-only fields the registry DOES own are still refreshed.
+    expect(after.liveSpeechSec).toBeCloseTo(10);
+  });
+
   it('merges field-by-field: a live write never clobbers fields it does not itself set', async () => {
     const meetingId = `m-${Math.random()}`;
     store.meeting_speakers.push({ _id: 'async-row', meeting: meetingId, speakerId: 'spkA', displayName: 'Async Name', totalSpeakSec: 30, nameSource: 'async' });

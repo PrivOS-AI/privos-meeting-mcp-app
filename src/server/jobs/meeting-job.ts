@@ -20,9 +20,11 @@ import { uploadBotFile } from '../files/hub-file-upload.js';
 import { concatParts, deletePartFiles, type PartRef } from '../media/concat-parts.js';
 import { decodeToWav16k } from '../media/decode-audio.js';
 import { deleteRoomFile } from '../media/hub-file-download.js';
-import { readLiveTurns } from '../media/live-turns-store.js';
+import { readLiveTurns, type LiveTurnSpan } from '../media/live-turns-store.js';
 import { dataDir } from '../paths.js';
-import { resolveSpeakers as resolveSpeakersEmbed } from '../speaker/resolve-speakers.js';
+import { abortMeetingQueue } from '../live-speakers/chunk-worker.js';
+import { resolveSpeakers as resolveSpeakersEmbed, type UserIdentity } from '../speaker/resolve-speakers.js';
+import { sessionRegistries } from '../speaker/session-speaker-registry.js';
 import { uploadRoomCopy } from '../speaker/speaker-diagnostics-log.js';
 import { chunkTranscript } from '../summary/chunker.js';
 import { renderSummaryMarkdown } from '../summary/summary-markdown.js';
@@ -37,6 +39,7 @@ import { buildSrt } from '../transcript/srt-writer.js';
 import { HEARTBEAT_INTERVAL_MS, JobRepository, type JobRecord, type JobResultSpeaker } from './job-repository.js';
 import {
   deleteUnmappedLiveSpeakers,
+  loadLiveIdentities,
   mergeLiveIntoAsyncSpeaker,
   replaceActionItems,
   upsertMeeting,
@@ -57,41 +60,33 @@ export interface RunMeetingJobInput {
 // call site never moves once that phase lands. ----
 
 const RECONCILE_TOLERANCE_MS = 1500;
+/** Below this share of an async speaker's own overlapped time, a live identity is NOT carried forward (risk table: "a name lands on the wrong cluster"). The async speaker stays unnamed and the user-named live row is kept, never deleted — nothing is lost, the post-meeting screen can still resolve it. */
+const USER_IDENTITY_OVERLAP_FRACTION = 0.6;
+
+export interface AsyncToLiveMapping {
+  sessionSpeakerId: string;
+  /** This live speaker's overlap with the async speaker, as a share of the async speaker's OWN total segment time. */
+  overlapFraction: number;
+}
 
 /**
- * Reconciles the async pass's segmentation (authoritative — plan.md) against
- * `live-turns.json` (P5's live registry) so each real person ends up with
- * exactly ONE `meeting_speakers` row, `sessionSpeakerId` filled in, and no
- * lingering standalone live-only rows.
- *
- * For each async `speakerId`, picks whichever live `sessionSpeakerId`
- * overlaps its segments the MOST (summed overlap, via
- * `caption-aligner.alignByMaxOverlap`) and folds that live row's metadata
- * into the async row (`mergeLiveIntoAsyncSpeaker` — name priority `user` >
- * `async` > `live`). Live session speakers that never overlapped any async
- * speaker are deleted as noise. A no-op when the meeting never produced a
- * `live-turns.json` (ElevenLabs-degraded meetings, or a meeting with no
- * speech long enough to go live).
- *
- * Returns `speakerId -> sessionSpeakerId` for the mapped speakers, so the
- * caller can also carry `liveSessionSpeakerId` onto the `JobResult` it
- * returns from the tool (never re-querying App DB just for that).
+ * PURE (no I/O): maps each async `speakerId` to whichever live
+ * `sessionSpeakerId` overlaps its segments the MOST (summed overlap, via
+ * `caption-aligner.alignByMaxOverlap`), plus what share of that async
+ * speaker's OWN time the overlap covers. Runs BEFORE `resolveSpeakers` (no
+ * async `meeting_speakers` rows exist yet at this point) so its result can
+ * feed `userIdentityBySpeakerId` into that very pass — see `applyLiveReconciliation`
+ * for the DB-writing half that runs AFTER.
  */
-async function reconcileWithLiveSpeakers(
-  db: AppDbBotClient,
-  hub: RoomBoundHubClient,
-  roomId: string,
-  folderId: string,
-  meetingId: string,
-  segments: readonly Segment[],
-  speakers: readonly JobResultSpeaker[],
-): Promise<Map<string, string>> {
-  const mapped = new Map<string, string>();
-  const live = await readLiveTurns(hub, roomId, folderId);
-  if (!live || live.turns.length === 0) return mapped;
+export function computeAsyncToLiveMap(segments: readonly Segment[], liveTurns: readonly LiveTurnSpan[]): Map<string, AsyncToLiveMapping> {
+  const mapped = new Map<string, AsyncToLiveMapping>();
+  if (liveTurns.length === 0) return mapped;
 
   const asyncSpans = segments.map((s) => ({ startMs: Math.round(s.startSec * 1000), endMs: Math.round(s.endSec * 1000), speakerId: s.speakerId }));
-  const aligned = alignByMaxOverlap(asyncSpans, live.turns, { toleranceMs: RECONCILE_TOLERANCE_MS });
+  const totalMsBySpeaker = new Map<string, number>();
+  for (const s of asyncSpans) totalMsBySpeaker.set(s.speakerId, (totalMsBySpeaker.get(s.speakerId) ?? 0) + Math.max(0, s.endMs - s.startMs));
+
+  const aligned = alignByMaxOverlap(asyncSpans, liveTurns, { toleranceMs: RECONCILE_TOLERANCE_MS });
 
   const overlapMsBySpeaker = new Map<string, Map<string, number>>();
   for (const { a, b } of aligned) {
@@ -103,16 +98,52 @@ async function reconcileWithLiveSpeakers(
     overlapMsBySpeaker.set(a.speakerId, bySession);
   }
 
-  for (const speaker of speakers) {
-    const bySession = overlapMsBySpeaker.get(speaker.speakerId);
-    if (!bySession || bySession.size === 0) continue;
-    const [sessionSpeakerId] = [...bySession.entries()].sort((x, y) => y[1] - x[1])[0];
-    await mergeLiveIntoAsyncSpeaker(db, meetingId, speaker.speakerId, sessionSpeakerId);
-    mapped.set(speaker.speakerId, sessionSpeakerId);
+  for (const [speakerId, bySession] of overlapMsBySpeaker) {
+    if (bySession.size === 0) continue;
+    const [sessionSpeakerId, overlapMs] = [...bySession.entries()].sort((x, y) => y[1] - x[1])[0];
+    const totalMs = totalMsBySpeaker.get(speakerId) ?? 0;
+    mapped.set(speakerId, { sessionSpeakerId, overlapFraction: totalMs > 0 ? overlapMs / totalMs : 0 });
   }
-
-  await deleteUnmappedLiveSpeakers(db, meetingId, new Set(mapped.values()));
   return mapped;
+}
+
+/**
+ * Derives `resolveSpeakers`'s `userIdentityBySpeakerId` from the async->live
+ * mapping + this meeting's live-only rows' OWN identity fields
+ * (`loadLiveIdentities`): only a live speaker holding `nameSource:'user'`
+ * AND at least {@link USER_IDENTITY_OVERLAP_FRACTION} of the async speaker's
+ * overlapped time is carried forward — below that bar, nothing is guessed.
+ */
+function deriveUserIdentities(
+  mapping: ReadonlyMap<string, AsyncToLiveMapping>,
+  liveIdentities: ReadonlyMap<string, { displayName?: string; privosUserId?: string; profileId?: string; nameSource?: string }>,
+  createdByUserId: string,
+): Map<string, UserIdentity> {
+  const out = new Map<string, UserIdentity>();
+  for (const [speakerId, { sessionSpeakerId, overlapFraction }] of mapping) {
+    if (overlapFraction < USER_IDENTITY_OVERLAP_FRACTION) continue;
+    const identity = liveIdentities.get(sessionSpeakerId);
+    if (identity?.nameSource === 'user' && identity.displayName) {
+      out.set(speakerId, { displayName: identity.displayName, privosUserId: identity.privosUserId, profileId: identity.profileId, createdByUserId });
+    }
+  }
+  return out;
+}
+
+/**
+ * DB-writing half of P5 reconciliation — runs AFTER `upsertMeetingSpeakers`
+ * (the async rows now exist) using the SAME mapping `computeAsyncToLiveMap`
+ * already produced. Folds each live row's metadata into its matched async
+ * row (`mergeLiveIntoAsyncSpeaker` — name priority `user` > `async` > `live`)
+ * then deletes live-only rows that never mapped to an async speaker (noise),
+ * EXCEPT a `nameSource:'user'` one (`deleteUnmappedLiveSpeakers`'s own
+ * guard) — nothing a human confirmed live is ever silently dropped.
+ */
+async function applyLiveReconciliation(db: AppDbBotClient, meetingId: string, mapping: ReadonlyMap<string, AsyncToLiveMapping>): Promise<void> {
+  for (const [speakerId, { sessionSpeakerId }] of mapping) {
+    await mergeLiveIntoAsyncSpeaker(db, meetingId, speakerId, sessionSpeakerId);
+  }
+  await deleteUnmappedLiveSpeakers(db, meetingId, new Set([...mapping.values()].map((m) => m.sessionSpeakerId)));
 }
 
 /** Best-effort parse of the model's free-text `due` into an ISO date App DB's `date` field accepts; unparseable text is dropped rather than sent as an invalid date (the task text itself still carries any human phrasing like "this weekend"). */
@@ -255,15 +286,33 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
 
     // 4. segments — ONE builder for both providers, they already share `SttToken`.
     await jobRepo.patch(job._id, { step: 'segment', progress: 0.6 });
-    const segments = buildSegments(sttResult.tokens, { pauseSplitSec: 1.5 });
+    // soniox-async tokens carry their own spacing (concatenate); elevenlabs-batch
+    // tokens are bare words (join with a space) — see segment-builder options.
+    const segments = buildSegments(sttResult.tokens, { pauseSplitSec: 1.5, tokensCarrySpacing: providerVendor === 'soniox' });
 
-    // 5. P4 embed + match/enrol against `speaker_profiles`; P5 reconciles against live-turns.json right after.
+    // 5. P4 embed + match/enrol against `speaker_profiles`; P5 reconciles against live-turns.json.
+    // Mapping-before-resolve (plan.md § Requirements): the async<->live map and
+    // any `nameSource:'user'` live identity it carries are computed BEFORE
+    // `resolveSpeakers` runs, so a user-identified speaker skips matching
+    // entirely instead of risking an auto-match into the WRONG profile. The
+    // live worker is stopped and its registry evicted first so a still-
+    // draining chunk cannot `upsertAll` into rows this job is about to
+    // reconcile (KeyedSerialQueue.abort awaits the actual stop).
+    await abortMeetingQueue(job.meetingId);
+    sessionRegistries.delete(job.meetingId);
+    const meetingRow = await db.getById('meetings', 'room', job.meetingId);
+    const meetingOwnerUserId = typeof meetingRow?.ownerUserId === 'string' && meetingRow.ownerUserId ? meetingRow.ownerUserId : 'unknown';
+    const liveTurnsFile = await readLiveTurns(agentBotHub, roomId, folderId);
+    const asyncToLiveMap = computeAsyncToLiveMap(segments, liveTurnsFile?.turns ?? []);
+    const liveIdentities = await loadLiveIdentities(db, job.meetingId);
+    const userIdentityBySpeakerId = deriveUserIdentities(asyncToLiveMap, liveIdentities, meetingOwnerUserId);
+
     await jobRepo.patch(job._id, { step: 'embed', progress: 0.7 });
-    const resolved = await resolveSpeakersEmbed(db, wavPath, segments, job.meetingId);
+    const resolved = await resolveSpeakersEmbed(db, wavPath, segments, job.meetingId, userIdentityBySpeakerId);
     const speakerUpserts: SpeakerUpsertInput[] = resolved.map((s, i) => ({
       speakerId: s.speakerId,
       totalSpeakSec: s.totalSpeakSec,
-      nameSource: s.resolved ? ('async' as const) : undefined,
+      nameSource: s.nameSource ?? (s.resolved ? ('async' as const) : undefined),
       sampleStartSec: s.sampleRange?.startSec,
       sampleEndSec: s.sampleRange?.endSec,
       profileId: s.profileId,
@@ -286,7 +335,8 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       resolved: s.resolved,
       sampleRange: s.sampleRange,
     }));
-    const liveSessionSpeakerIds = await reconcileWithLiveSpeakers(db, agentBotHub, roomId, folderId, job.meetingId, segments, speakers);
+    await applyLiveReconciliation(db, job.meetingId, asyncToLiveMap);
+    const liveSessionSpeakerIds = new Map([...asyncToLiveMap].map(([speakerId, m]) => [speakerId, m.sessionSpeakerId]));
     for (const speaker of speakers) {
       const sessionSpeakerId = liveSessionSpeakerIds.get(speaker.speakerId);
       if (sessionSpeakerId) speaker.liveSessionSpeakerId = sessionSpeakerId;
@@ -299,7 +349,6 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
     // 6. P6 translate (optional) + map-reduce summarize via Hub AI. Non-fatal: a failure here is recorded as
     // `meetings.summaryError` and the job still completes with the transcript intact (plan.md § Requirements).
     await jobRepo.patch(job._id, { step: 'summarize', progress: 0.75 });
-    const meetingRow = await db.getById('meetings', 'room', job.meetingId);
     const translationEnabled = meetingRow?.translationEnabled === true;
     const translationLang = typeof meetingRow?.translationLang === 'string' ? meetingRow.translationLang : undefined;
 
@@ -351,7 +400,7 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       segments: finalSegments,
       displayNameBySpeaker,
     });
-    const srt = buildSrt(finalSegments, sttResult.tokens);
+    const srt = buildSrt(finalSegments, sttResult.tokens, providerVendor === 'soniox');
 
     const [jsonUpload, mdUpload, srtUpload] = await Promise.all([
       uploadBotFile({

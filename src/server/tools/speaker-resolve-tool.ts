@@ -1,45 +1,53 @@
 /**
  * `speaker_resolve {roomId, meetingId, assignments[]}` — owner only. For each
  * still-unresolved `meeting_speakers` row, applies one of 4 modes against its
- * `pendingEmbedding` (sealed by `resolve-speakers.ts`'s embed step):
+ * `pendingEmbedding` (sealed by `resolve-speakers.ts`/`live-speaker-repository.ts`):
  *   - `user`   — link a specific PrivOS member (biometric identity claim).
  *   - `name`   — free-text name; creates/reuses a profile by that name.
  *   - `merge`  — enrol into an EXISTING profile the caller picked.
  *   - `skip`   — leave the numbered placeholder as-is.
  *
- * `user`/`merge` REQUIRE a coherent cluster (plan.md's enrolment gate — see
- * `resolve-speakers.ts` header) and are rejected per-assignment when it is
- * not: `{enrolled:false, reason:'cluster_not_coherent'}`. `name` degrades
- * gracefully instead of rejecting — the meeting gets a display name even when
- * the voiceprint itself is not trustworthy enough to enrol.
+ * The IDENTITY (`displayName`/`privosUserId`/`nameSource:'user'`/`resolved:true`)
+ * is persisted for EVERY mode as soon as the human confirms it, even when
+ * enrolment itself is deferred — a person named live must never be forgotten
+ * within a part just because their voiceprint cluster is not enrol-worthy yet
+ * (plan.md root cause 2). `already_resolved` only short-circuits once the row
+ * ALSO has a `profileId` — a named-but-not-yet-enrolled row stays open to a
+ * later resolve attempt.
  *
- * Also the quick-assign code path mid-meeting: when `meetings.status ===
- * 'recording'`, `speakerId` in an assignment is treated as a
- * `sessionSpeakerId` lookup (P5 registry — falls through to "not found" until
- * P5 ships, which is expected and non-fatal for this phase).
+ * A row found via `sessionSpeakerId` (no `speakerId` — a still-live, not yet
+ * async-reconciled row) reads a LIVE-sourced envelope and is held to the
+ * stricter one-shot live enrolment bar (`resolve-speakers.ts#isLiveEnrolBarMet`)
+ * instead of the post-meeting coherence rule; when this process holds the
+ * meeting's registry, the identity mutation + row write both run on the SAME
+ * keyed queue the chunk worker uses (`chunk-worker.ts#runOnMeetingQueue`) so
+ * they can never interleave with a chunk's own `upsertAll`.
  *
  * `pendingEmbedding` is intentionally NEVER cleared here (plan.md: "keep it
  * until the async job finishes... do not clear it at speaker_resolve time")
- * — only `profileId`/`displayName`/`resolved`/`nameSource`/`privosUserId` change.
+ * — only identity/enrolment fields change.
  */
 import { sanitizeDisplayName } from '../../shared/sanitize-display-name.js';
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, extractDbRecords, type DbRow } from '../hub/app-db-bot-client.js';
 import * as profileStore from '../speaker/profile-store.js';
-import { openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
+import type { EnrolIdentity, EnrolSource } from '../speaker/profile-store.js';
+import { isLiveEnrolBarMet, isPostMeetingCoherent, openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
+import { sessionRegistries } from '../speaker/session-speaker-registry.js';
 import { logEvent } from '../speaker/speaker-diagnostics-log.js';
+import { invalidateProfileCache, runOnMeetingQueue } from '../live-speakers/chunk-worker.js';
 import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
 
 /**
  * Logs one `enrol` event for a `speaker_resolve` confirmation — every mode
- * here is a human-confirmed identity, so `source` is always `'user'`.
- * Awaited (not fire-and-forget) so the event is durably on disk before this
- * tool call returns; `logEvent` itself never throws (see
+ * here is a human-confirmed identity, so `source` is always one of the
+ * `user-*` values. Awaited (not fire-and-forget) so the event is durably on
+ * disk before this tool call returns; `logEvent` itself never throws (see
  * `speaker-diagnostics-log.ts`), so awaiting it adds no failure mode here.
  */
-async function logResolveEnrol(meetingId: string, profileId: string, coherence: number, durationSec: number, vectorCountAfter: number): Promise<void> {
-  await logEvent(meetingId, { t: Date.now(), meetingId, type: 'enrol', profile: profileId, source: 'user', coherence, durationSec, vectorCountAfter });
+async function logResolveEnrol(meetingId: string, profileId: string, source: EnrolSource, coherence: number, durationSec: number, vectorCountAfter: number): Promise<void> {
+  await logEvent(meetingId, { t: Date.now(), meetingId, type: 'enrol', profile: profileId, source, coherence, durationSec, vectorCountAfter });
 }
 
 type Mode = 'user' | 'name' | 'merge' | 'skip';
@@ -86,12 +94,18 @@ async function findSpeakerRow(db: AppDbBotClient, meetingId: string, speakerId: 
   });
   const direct = extractDbRecords(bySpeakerId)[0];
   if (direct) return direct;
-  // Quick-assign path (mid-meeting, P5 registry): `speakerId` may be a `sessionSpeakerId`.
+  // Quick-assign path (mid-meeting, or a user-named live row the post-meeting job kept because it never mapped to an async speaker): `speakerId` may be a `sessionSpeakerId`.
   const bySession = await db.query('meeting_speakers', 'room', {
     where: [{ field: 'meeting', op: '==', value: meetingId }, { field: 'sessionSpeakerId', op: '==', value: speakerId }],
     limit: 1,
   });
   return extractDbRecords(bySession)[0] ?? null;
+}
+
+/** Applies the identity to this process's in-memory registry (if it holds one for this meeting) — a no-op when this process is not running that meeting's live worker. Call only from inside the meeting's queued task (see `execute` below) so it never races the chunk worker's own registry reads/writes. */
+function applyRegistryIdentity(meetingId: string, sessionSpeakerId: string, identity: { displayName: string; privosUserId?: string; profileId?: string }): void {
+  if (!sessionRegistries.has(meetingId)) return;
+  sessionRegistries.get(meetingId).applyUserIdentity(sessionSpeakerId, identity);
 }
 
 export const speakerResolveTool: AppTool = {
@@ -134,108 +148,110 @@ export const speakerResolveTool: AppTool = {
     await requireMeetingOwner(db, actor, roomId, meetingId);
 
     const threshold = await readMatchThreshold(db);
-    const resolved: AssignmentResult[] = [];
+    // Whether THIS process is running the meeting's live chunk worker — decided
+    // once, before the loop: it cannot change mid-call, and it is what gates
+    // whether an assignment's row-write + registry-mutation must be
+    // queue-serialized against that worker's own `upsertAll` (plan.md § "no
+    // interleaving"). A meeting no longer live (registry evicted — recording
+    // ended, or the post-meeting job already took over) has no such worker to
+    // race, so a plain `await` is correct and cheaper.
+    const holdsRegistry = sessionRegistries.has(meetingId);
 
-    for (const assignment of assignments) {
+    async function resolveOneAssignment(assignment: Assignment): Promise<AssignmentResult> {
       const row = await findSpeakerRow(db, meetingId, assignment.speakerId);
       if (!row) {
-        resolved.push({ speakerId: assignment.speakerId, enrolled: false, reason: 'not_found' });
-        continue;
+        return { speakerId: assignment.speakerId, enrolled: false, reason: 'not_found' };
       }
-      if (row.resolved === true) {
-        resolved.push({
-          speakerId: assignment.speakerId,
-          enrolled: Boolean(row.profileId),
-          profileId: typeof row.profileId === 'string' && row.profileId ? row.profileId : undefined,
-          reason: 'already_resolved',
-        });
-        continue;
+      // Only a row that ALSO enrolled a voiceprint short-circuits — a named-but-not-yet-enrolled row stays open to a later attempt.
+      if (row.resolved === true && typeof row.profileId === 'string' && row.profileId) {
+        return { speakerId: assignment.speakerId, enrolled: true, profileId: row.profileId, reason: 'already_resolved' };
       }
 
       if (assignment.mode === 'skip') {
-        resolved.push({ speakerId: assignment.speakerId, enrolled: false, reason: 'skipped' });
-        continue;
+        return { speakerId: assignment.speakerId, enrolled: false, reason: 'skipped' };
       }
 
+      // A row found via `sessionSpeakerId` with no `speakerId` is still LIVE (never async-reconciled) — its
+      // envelope was sealed under a `live:` id and is held to the stricter one-shot live enrolment bar.
+      const isLive = Boolean(row.sessionSpeakerId) && !(typeof row.speakerId === 'string' && row.speakerId);
+      const rowKey = isLive ? (row.sessionSpeakerId as string) : (typeof row.speakerId === 'string' ? row.speakerId : assignment.speakerId);
+      const expectedProfileId = isLive ? `live:${meetingId}:${rowKey}` : `pending:${meetingId}:${rowKey}`;
       const pendingJson = typeof row.pendingEmbedding === 'string' && row.pendingEmbedding ? row.pendingEmbedding : null;
-      const pending = pendingJson ? openPendingEmbedding(pendingJson) : null;
-      const coherent = pending ? pending.rangeCount < 2 || pending.minPairwiseCosine >= threshold : false;
+      const pending = pendingJson ? openPendingEmbedding(pendingJson, expectedProfileId) : null;
+      const coherent = pending ? (isLive ? isLiveEnrolBarMet(pending) : isPostMeetingCoherent(pending, threshold)) : false;
+
+      let displayName: string | undefined;
+      let privosUserId: string | undefined;
+      let identity: EnrolIdentity | null = null;
 
       if (assignment.mode === 'name') {
-        const displayName = sanitizeDisplayName(assignment.displayName ?? '');
+        displayName = sanitizeDisplayName(assignment.displayName ?? '');
         if (!displayName) {
-          resolved.push({ speakerId: assignment.speakerId, enrolled: false, reason: 'invalid_display_name' });
-          continue;
+          return { speakerId: assignment.speakerId, enrolled: false, reason: 'invalid_display_name' };
         }
-        if (pending && coherent) {
-          let profile = await profileStore.findProfileByName(db, displayName);
-          if (!profile) profile = await profileStore.createProfile(db, { displayName, createdByUserId: actor.userId, createdInRoomId: roomId });
-          const vectorCountAfter = await profileStore.enrolEmbedding(db, profile.id, { vector: pending.vector, meetingId, durationSec: pending.durationSec });
-          await logResolveEnrol(meetingId, profile.id, pending.minPairwiseCosine, pending.durationSec, vectorCountAfter);
-          await db.update('meeting_speakers', 'room', row._id, { profileId: profile.id, displayName, nameSource: 'user', resolved: true });
-          resolved.push({ speakerId: assignment.speakerId, enrolled: true, profileId: profile.id, displayName });
-        } else {
-          await db.update('meeting_speakers', 'room', row._id, { displayName, nameSource: 'user', resolved: true });
-          resolved.push({
-            speakerId: assignment.speakerId,
-            enrolled: false,
-            displayName,
-            reason: pending ? 'cluster_not_coherent' : 'no_pending_embedding',
-          });
-        }
-        continue;
-      }
-
-      // `user` and `merge` both require a coherent voiceprint cluster — reject per-assignment, not the whole call.
-      if (!pending || !coherent) {
-        resolved.push({ speakerId: assignment.speakerId, enrolled: false, reason: pending ? 'cluster_not_coherent' : 'no_pending_embedding' });
-        continue;
-      }
-
-      if (assignment.mode === 'user') {
+        identity = { displayName, createdByUserId: actor.userId, createdInRoomId: roomId };
+      } else if (assignment.mode === 'user') {
         if (!assignment.privosUserId) {
-          resolved.push({ speakerId: assignment.speakerId, enrolled: false, reason: 'missing_privos_user_id' });
-          continue;
+          return { speakerId: assignment.speakerId, enrolled: false, reason: 'missing_privos_user_id' };
         }
-        let profile = await profileStore.findProfileByPrivosUserId(db, assignment.privosUserId);
-        const displayName = sanitizeDisplayName(assignment.displayName ?? '') || `User ${assignment.privosUserId.slice(0, 6)}`;
-        if (!profile) {
-          profile = await profileStore.createProfile(db, {
-            displayName,
-            createdByUserId: actor.userId,
-            createdInRoomId: roomId,
-            privosUserId: assignment.privosUserId,
-          });
-        } else {
-          await profileStore.linkPrivosUser(db, profile.id, assignment.privosUserId);
+        privosUserId = assignment.privosUserId;
+        displayName = sanitizeDisplayName(assignment.displayName ?? '') || `User ${privosUserId.slice(0, 6)}`;
+        identity = { displayName, privosUserId, createdByUserId: actor.userId, createdInRoomId: roomId };
+      } else {
+        // mode === 'merge'
+        if (!assignment.profileId) {
+          return { speakerId: assignment.speakerId, enrolled: false, reason: 'missing_profile_id' };
         }
-        const vectorCountAfter = await profileStore.enrolEmbedding(db, profile.id, { vector: pending.vector, meetingId, durationSec: pending.durationSec });
-        await logResolveEnrol(meetingId, profile.id, pending.minPairwiseCosine, pending.durationSec, vectorCountAfter);
-        await db.update('meeting_speakers', 'room', row._id, {
-          profileId: profile.id,
-          displayName: profile.displayName || displayName,
-          privosUserId: assignment.privosUserId,
-          nameSource: 'user',
-          resolved: true,
-        });
-        resolved.push({ speakerId: assignment.speakerId, enrolled: true, profileId: profile.id });
-        continue;
+        const target = await profileStore.getProfile(db, assignment.profileId);
+        if (!target) {
+          return { speakerId: assignment.speakerId, enrolled: false, reason: 'profile_not_found' };
+        }
+        displayName = target.displayName;
+        identity = { displayName, profileId: target.id, createdByUserId: actor.userId, createdInRoomId: roomId };
       }
 
-      // mode === 'merge'
-      if (!assignment.profileId) {
-        resolved.push({ speakerId: assignment.speakerId, enrolled: false, reason: 'missing_profile_id' });
-        continue;
+      const identityPatch: Record<string, unknown> = { displayName, nameSource: 'user', resolved: true };
+      if (privosUserId) identityPatch.privosUserId = privosUserId;
+
+      if (pending && coherent) {
+        const source: EnrolSource = isLive ? 'user-live' : 'user-post';
+        const enrolResult = await profileStore.findOrCreateProfileAndEnrol(db, identity, pending.vector, {
+          meetingId,
+          durationSec: pending.durationSec,
+          source,
+          speakerKey: rowKey,
+        });
+        if (!enrolResult) {
+          // mode 'merge' pointed at a profile that vanished between the read above and here — extremely rare, never silently drop the identity.
+          await db.update('meeting_speakers', 'room', row._id, identityPatch);
+          applyRegistryIdentity(meetingId, rowKey, { displayName: displayName!, privosUserId });
+          return { speakerId: assignment.speakerId, enrolled: false, displayName, reason: 'profile_not_found' };
+        }
+        identityPatch.profileId = enrolResult.profile.id;
+        identityPatch.displayName = enrolResult.profile.displayName || displayName;
+        await db.update('meeting_speakers', 'room', row._id, identityPatch);
+        await logResolveEnrol(meetingId, enrolResult.profile.id, source, pending.minPairwiseCosine, pending.durationSec, enrolResult.vectorCountAfter);
+        if (isLive) invalidateProfileCache();
+        applyRegistryIdentity(meetingId, rowKey, { displayName: identityPatch.displayName as string, privosUserId, profileId: enrolResult.profile.id });
+        return { speakerId: assignment.speakerId, enrolled: true, profileId: enrolResult.profile.id, displayName: identityPatch.displayName as string };
       }
-      const target = await profileStore.getProfile(db, assignment.profileId);
-      if (!target) {
-        resolved.push({ speakerId: assignment.speakerId, enrolled: false, reason: 'profile_not_found' });
-        continue;
-      }
-      const vectorCountAfter = await profileStore.enrolEmbedding(db, target.id, { vector: pending.vector, meetingId, durationSec: pending.durationSec });
-      await logResolveEnrol(meetingId, target.id, pending.minPairwiseCosine, pending.durationSec, vectorCountAfter);
-      await db.update('meeting_speakers', 'room', row._id, { profileId: target.id, displayName: target.displayName, nameSource: 'user', resolved: true });
-      resolved.push({ speakerId: assignment.speakerId, enrolled: true, profileId: target.id, displayName: target.displayName });
+
+      await db.update('meeting_speakers', 'room', row._id, identityPatch);
+      applyRegistryIdentity(meetingId, rowKey, { displayName: displayName!, privosUserId });
+      const reason = isLive ? 'enrol_deferred' : pending ? 'cluster_not_coherent' : 'no_pending_embedding';
+      return { speakerId: assignment.speakerId, enrolled: false, displayName, reason };
+    }
+
+    const resolved: AssignmentResult[] = [];
+    for (const assignment of assignments) {
+      // While this process holds the meeting's live registry, the ENTIRE
+      // per-assignment read-decide-write (including the registry mutation)
+      // runs as ONE task on the SAME keyed queue the chunk worker uses — the
+      // whole point is that nothing else touching this meetingId's registry
+      // or `meeting_speakers` rows can run in between (plan.md § "no
+      // interleaving"); splitting the DB write and the registry mutation into
+      // two separate queued calls would reopen exactly that window.
+      resolved.push(holdsRegistry ? await runOnMeetingQueue(meetingId, () => resolveOneAssignment(assignment)) : await resolveOneAssignment(assignment));
     }
 
     return { resolved };

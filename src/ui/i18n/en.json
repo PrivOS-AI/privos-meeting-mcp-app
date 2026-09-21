@@ -135,6 +135,8 @@
   "speaker.resolveModal.later": "Later",
   "speaker.resolveModal.submit": "Confirm",
   "speaker.resolveModal.submitting": "Saving…",
+  "speaker.resolveModal.enrolDeferredNotice": "Named. Their voice sample wasn't clear enough yet to remember automatically — it will improve after this meeting finishes processing.",
+  "speaker.resolveModal.done": "Done",
 
   "speaker.memberPicker.placeholder": "Type a member's name…",
   "speaker.memberPicker.searching": "Searching…",

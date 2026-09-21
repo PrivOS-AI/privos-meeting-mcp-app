@@ -76,7 +76,8 @@ export interface EnrolEvent extends EventEnvelope {
   type: 'enrol';
   /** Real `profileId` in the node copy; replaced by a per-meeting alias (`p1`, `p2`, …) in the room copy. */
   profile: string;
-  source: 'live' | 'async' | 'user';
+  /** Canonical enrolment-source taxonomy (`profile-store.ts#EnrolSource`) — the stored vector's OWN source value, never re-derived here. */
+  source: 'user-live' | 'user-post' | 'auto-post';
   coherence: number;
   durationSec: number;
   vectorCountAfter: number;

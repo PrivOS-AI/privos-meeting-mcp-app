@@ -579,6 +579,10 @@ export class RecordingStore {
             { speakerId: session.sessionSpeakerId, mode: choice.mode, displayName: choice.displayName, privosUserId: choice.privosUserId, profileId: choice.profileId },
           ]);
           if (result?.reason === 'not_found') continue; // row not written yet; retry next poll
+          // Any other reason — including `enrol_deferred` (named, but the live voiceprint cluster
+          // isn't enrol-worthy yet; the post-meeting job carries the load from here) — is treated as a
+          // SUCCESSFUL name assignment: the identity is already persisted server-side either way, and
+          // there is no client retry loop for enrolment itself (plan.md § Requirements).
           this.pendingAssignments.delete(speakerKey);
           const displayName = result?.displayName ?? choice.displayName ?? this.state.speakerMap[speakerKey]?.displayName ?? '';
           const liveSpeakers = this.state.liveSpeakers.map((s) =>

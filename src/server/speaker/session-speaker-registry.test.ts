@@ -156,7 +156,7 @@ describe('MeetingSessionRegistry', () => {
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
     expect(reg.snapshotChanged()).toBe(true);
-    reg.markPersisted();
+    reg.markPersisted(reg.snapshotHash());
     expect(reg.snapshotChanged()).toBe(false);
     reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 10_000));
     expect(reg.snapshotChanged()).toBe(true);
@@ -267,6 +267,43 @@ describe('diagnostics facts (onFact)', () => {
     expect(reg.applyProfileMatch(id, { confidence: 0.2 })).toBe(1);
     expect(reg.applyProfileMatch(id, { confidence: 0.3 })).toBe(2);
     expect(reg.applyProfileMatch('unknown-id', { confidence: 0 })).toBe(0);
+  });
+
+  it('applyUserIdentity sets nameSource:user and resolved:true; a later profile match never overwrites it', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 9, seg('s0:1', 0));
+    const id = reg.snapshot()[0].sessionSpeakerId;
+
+    expect(reg.applyUserIdentity(id, { displayName: 'Thanh', privosUserId: 'user-9' })).toBe(true);
+    let snap = reg.snapshot()[0];
+    expect(snap.displayName).toBe('Thanh');
+    expect(snap.nameSource).toBe('user');
+    expect(snap.privosUserId).toBe('user-9');
+    expect(snap.resolved).toBe(true);
+
+    // A live guess arriving afterwards must never downgrade the user identity (plan.md: "user identity beats guesses").
+    reg.applyProfileMatch(id, { profileId: 'guessed-profile', displayName: 'Someone Else', confidence: 0.9 });
+    snap = reg.snapshot()[0];
+    expect(snap.displayName).toBe('Thanh');
+    expect(snap.nameSource).toBe('user');
+    expect(snap.profileId).toBeUndefined();
+
+    expect(reg.applyUserIdentity('unknown-id', { displayName: 'X' })).toBe(false);
+  });
+
+  it('coherenceFor reports minPairwiseCosine=1/rangeCount=1 for a single held embedding, and the real min for several', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
+    const id = reg.snapshot()[0].sessionSpeakerId;
+    expect(reg.coherenceFor(id)).toEqual({ minPairwiseCosine: 1, rangeCount: 1, durationSec: 5 });
+
+    reg.observe('s0:1', vec(0, 1), 5, seg('s0:1', 6000)); // orthogonal — drags the min down
+    const stats = reg.coherenceFor(id)!;
+    expect(stats.rangeCount).toBe(2);
+    expect(stats.minPairwiseCosine).toBeCloseTo(0);
+    expect(stats.durationSec).toBeCloseTo(10);
+
+    expect(reg.coherenceFor('unknown-id')).toBeNull();
   });
 });
 

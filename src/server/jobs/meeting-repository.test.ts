@@ -9,7 +9,7 @@ vi.mock('../hub/resolve-own-mcp-app-id.js', () => ({ resolveOwnMcpAppId: async (
 
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
 import { installFakeHub, type Store } from '../tools/test-support/fake-hub.js';
-import { deleteUnmappedLiveSpeakers, mergeLiveIntoAsyncSpeaker, replaceActionItems } from './meeting-repository.js';
+import { deleteUnmappedLiveSpeakers, loadLiveIdentities, mergeLiveIntoAsyncSpeaker, replaceActionItems } from './meeting-repository.js';
 
 let store: Store;
 let fakeHub: ReturnType<typeof installFakeHub>;
@@ -84,6 +84,36 @@ describe('deleteUnmappedLiveSpeakers', () => {
 
     const rows = extractDbRecords(await db().query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: 'm1' }] }));
     expect(rows.map((r) => r._id).sort()).toEqual(['async-1', 'live-mapped']);
+  });
+
+  it('(f) a user-named live speaker with NO async mapping survives the job — never deleted even though unmapped', async () => {
+    store.meeting_speakers.push(
+      { _id: 'live-user', meeting: 'm1', sessionSpeakerId: 'ss-user', nameSource: 'user', displayName: 'Thanh', resolved: true },
+      { _id: 'live-guess', meeting: 'm1', sessionSpeakerId: 'ss-guess', nameSource: 'live', displayName: 'Speaker 2' },
+    );
+
+    await deleteUnmappedLiveSpeakers(db(), 'm1', new Set()); // neither mapped to any async speaker
+
+    const rows = extractDbRecords(await db().query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: 'm1' }] }));
+    expect(rows.map((r) => r._id)).toEqual(['live-user']); // the unnamed guess is noise and is deleted; the user-named row survives
+  });
+});
+
+describe('loadLiveIdentities', () => {
+  beforeEach(() => {
+    store = { meeting_speakers: [] };
+    fakeHub = installFakeHub({ store });
+  });
+
+  it('reads identity fields keyed by sessionSpeakerId, skipping rows without one', async () => {
+    store.meeting_speakers.push(
+      { _id: 'live-1', meeting: 'm1', sessionSpeakerId: 'ss-1', nameSource: 'user', displayName: 'Thanh', privosUserId: 'user-9', profileId: 'profile-9' },
+      { _id: 'async-1', meeting: 'm1', speakerId: 'spkA' }, // no sessionSpeakerId yet — skipped
+    );
+
+    const identities = await loadLiveIdentities(db(), 'm1');
+    expect(identities.size).toBe(1);
+    expect(identities.get('ss-1')).toEqual({ displayName: 'Thanh', privosUserId: 'user-9', profileId: 'profile-9', nameSource: 'user' });
   });
 });
 

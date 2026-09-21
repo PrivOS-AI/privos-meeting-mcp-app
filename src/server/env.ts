@@ -49,6 +49,10 @@ export interface AppEnv {
   speakerSessionMergeThreshold: number;
   liveMinSpeechSec: number;
   liveChunkOverlapSec: number;
+  /** One-shot live enrolment bar (speaker_resolve time): minimum accumulated speech before a live centroid is trusted enough to enrol as `user-live`. */
+  liveEnrolMinSpeechSec: number;
+  /** Own coherence bar for the live one-shot enrol decision — a min-pairwise-cosine over ~2-5s noisy shared-mic turns is a different distribution than the post-meeting picked-range coherence, so it must not share `speakerMatchThreshold`. */
+  speakerLiveEnrolCoherence: number;
   voiceprintEncKey?: string;
   summaryModel?: string;
   /** Hub AI provider id paired with `summaryModel` (Hub default when unset). */
@@ -85,6 +89,8 @@ export function loadEnv(): AppEnv {
     speakerSessionMergeThreshold: num('SPEAKER_SESSION_MERGE_THRESHOLD', 0.6),
     liveMinSpeechSec: num('LIVE_MIN_SPEECH_SEC', 8),
     liveChunkOverlapSec: num('LIVE_CHUNK_OVERLAP_SEC', 8),
+    liveEnrolMinSpeechSec: num('LIVE_ENROL_MIN_SPEECH_SEC', 20),
+    speakerLiveEnrolCoherence: num('SPEAKER_LIVE_ENROL_COHERENCE', 0.5),
     voiceprintEncKey: str('VOICEPRINT_ENC_KEY'),
     summaryModel: str('SUMMARY_MODEL'),
     summaryProvider: str('SUMMARY_PROVIDER'),

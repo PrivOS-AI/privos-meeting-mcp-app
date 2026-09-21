@@ -77,9 +77,14 @@ async function cachedProfiles(db: AppDbBotClient): Promise<SpeakerProfile[]> {
   return profiles;
 }
 
+/** Drops the cached `speaker_profiles` list — call after any enrolment (e.g. a live one-shot `user-live` enrol) so the very next live match sees the new vector instead of waiting up to `PROFILE_CACHE_TTL_MS`. */
+export function invalidateProfileCache(): void {
+  profileCache = null;
+}
+
 /** Test-only: forces the next `cachedProfiles` call to re-query. */
 export function resetProfileCacheForTests(): void {
-  profileCache = null;
+  invalidateProfileCache();
 }
 
 async function matchPendingAgainstProfiles(db: AppDbBotClient, registry: MeetingSessionRegistry): Promise<void> {
@@ -380,29 +385,69 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
 }
 
 /**
- * One process-wide queue, keyed by `meetingId`. `onDropped` fires
- * synchronously from `enqueue` (it cannot await `ensureRegistry`'s possible
- * DB rebuild) — a registry dropped from the backlog before it ever ran had
- * no `meeting_speakers` write pending for it either way, so touching the
- * in-memory store directly here (no DB rebuild) is correct: there is nothing
- * to rebuild FROM yet. It still advances that meeting's clock and flags
- * `degraded`, same contract as a chunk that ran and failed (S2-08).
+ * One process-wide queue, keyed by `meetingId`, shared by BOTH the chunk
+ * worker AND `speaker_resolve` (via {@link runOnMeetingQueue}) — the tool's
+ * registry mutation + row write must never interleave with a chunk's own
+ * `upsertAll` for the same meeting (plan.md red-team finding #5: "no
+ * interleaving"). `onDropped` fires synchronously from `enqueue` (it cannot
+ * await `ensureRegistry`'s possible DB rebuild) — a CHUNK dropped from the
+ * backlog before it ever ran had no `meeting_speakers` write pending for it
+ * either way, so touching the in-memory store directly here (no DB rebuild)
+ * is correct: there is nothing to rebuild FROM yet. It still advances that
+ * meeting's clock and flags `degraded`, same contract as a chunk that ran and
+ * failed (S2-08). A dropped `resolve` work item has no clock to advance —
+ * `runOnMeetingQueue` surfaces the drop as a rejected promise instead.
  */
-const chunkQueue = new KeyedSerialQueue<{ ctx: ChunkWorkerCtx; req: ChunkReadyRequest }>({
-  onDropped: (meetingId, { req }) => {
-    sessionRegistries.get(meetingId).markDropped(req.seq, req.durationMs);
-    console.warn('[chunk-worker] backlog full — dropping chunk, marking degraded.', { meetingId, seq: req.seq });
+type QueuedWork = { kind: 'chunk'; ctx: ChunkWorkerCtx; req: ChunkReadyRequest } | { kind: 'task' };
+
+const chunkQueue = new KeyedSerialQueue<QueuedWork>({
+  onDropped: (meetingId, item) => {
+    if (item.kind !== 'chunk') return;
+    sessionRegistries.get(meetingId).markDropped(item.req.seq, item.req.durationMs);
+    console.warn('[chunk-worker] backlog full — dropping chunk, marking degraded.', { meetingId, seq: item.req.seq });
   },
 });
 
 /** Enqueues one chunk for processing — fire-and-forget from the tool's perspective (`meeting_chunk_ready` returns `{accepted:true}` immediately). */
 export function enqueueChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest): void {
-  void chunkQueue.enqueue(req.meetingId, { ctx, req }, async ({ ctx: taskCtx, req: taskReq }, signal) => {
-    await processChunk(taskCtx, taskReq, signal);
+  void chunkQueue.enqueue(req.meetingId, { kind: 'chunk', ctx, req }, async (item, signal) => {
+    if (item.kind !== 'chunk') return;
+    await processChunk(item.ctx, item.req, signal);
   });
 }
 
+/**
+ * Runs `fn` as a task on the SAME per-meeting serial queue the chunk worker
+ * uses, so it can never interleave with that meeting's `processChunk`/
+ * `upsertAll` — the primary guard behind `speaker_resolve`'s registry
+ * mutation + row write (plan.md § Requirements: "no interleaving"). Rejects
+ * if the task is evicted from a full backlog before it ever ran (rare: the
+ * cap is "latest + 2" chunks, and a resolve call is quick) rather than
+ * silently reporting success for work that never happened.
+ */
+export function runOnMeetingQueue<T>(meetingId: string, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  let outcome: { ok: true; value: T } | { ok: false; error: unknown } | undefined;
+  return chunkQueue
+    .enqueue(meetingId, { kind: 'task' }, async (_item, signal) => {
+      try {
+        outcome = { ok: true, value: await fn(signal) };
+      } catch (error) {
+        outcome = { ok: false, error };
+      }
+    })
+    .then(() => {
+      if (!outcome) throw new AppError('This meeting is too busy to process that right now — try again in a moment.');
+      if (!outcome.ok) throw outcome.error;
+      return outcome.value;
+    });
+}
+
+/** Aborts the meeting's in-flight chunk (if any) and drops its queued backlog, awaiting the actual stop — used by the post-meeting job right before its speaker steps so a still-draining chunk cannot `upsertAll` into rows being reconciled. */
+export async function abortMeetingQueue(meetingId: string): Promise<void> {
+  await chunkQueue.abort(meetingId);
+}
+
 /** Test-only: exposes the queue for backlog/timing assertions. */
-export function getChunkQueueForTests(): KeyedSerialQueue<{ ctx: ChunkWorkerCtx; req: ChunkReadyRequest }> {
+export function getChunkQueueForTests(): KeyedSerialQueue<QueuedWork> {
   return chunkQueue;
 }

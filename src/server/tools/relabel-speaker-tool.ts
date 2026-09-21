@@ -18,7 +18,7 @@ import { sanitizeDisplayName } from '../../shared/sanitize-display-name.js';
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
 import * as profileStore from '../speaker/profile-store.js';
-import { openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
+import { isPostMeetingCoherent, openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
 import { logEvent } from '../speaker/speaker-diagnostics-log.js';
 import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
@@ -89,11 +89,13 @@ export const relabelSpeakerTool: AppTool = {
         await profileStore.removeEmbeddingsOfMeeting(db, oldProfileId, meetingId);
       }
     } else if (!oldProfileId) {
+      // This tool's row lookup is always by `speakerId` (a live-only row has none), so any `pendingEmbedding`
+      // read here is always the POST-MEETING shape sealed by `resolve-speakers.ts` under a `pending:` id.
       const pendingJson = typeof row.pendingEmbedding === 'string' && row.pendingEmbedding ? row.pendingEmbedding : null;
-      const pending = pendingJson ? openPendingEmbedding(pendingJson) : null;
+      const pending = pendingJson ? openPendingEmbedding(pendingJson, `pending:${meetingId}:${speakerId}`) : null;
       if (pending) {
         const threshold = await readMatchThreshold(db);
-        const coherent = pending.rangeCount < 2 || pending.minPairwiseCosine >= threshold;
+        const coherent = isPostMeetingCoherent(pending, threshold);
         if (coherent) {
           movedVector = pending.vector;
           movedDurationSec = pending.durationSec;
@@ -103,14 +105,20 @@ export const relabelSpeakerTool: AppTool = {
     }
 
     if (movedVector) {
-      const vectorCountAfter = await profileStore.enrolEmbedding(db, target.id, { vector: movedVector, meetingId, durationSec: movedDurationSec });
-      // A relabel is always a human correction — `source:'user'` regardless of where the vector came from.
+      const vectorCountAfter = await profileStore.enrolEmbedding(db, target.id, {
+        vector: movedVector,
+        meetingId,
+        durationSec: movedDurationSec,
+        source: 'user-post',
+        speakerKey: speakerId,
+      });
+      // A relabel is always a human correction — canonical taxonomy `user-post` regardless of where the vector came from.
       await logEvent(meetingId, {
         t: Date.now(),
         meetingId,
         type: 'enrol',
         profile: target.id,
-        source: 'user',
+        source: 'user-post',
         coherence: movedCoherence,
         durationSec: movedDurationSec,
         vectorCountAfter,

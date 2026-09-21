@@ -135,6 +135,8 @@
   "speaker.resolveModal.later": "Để sau",
   "speaker.resolveModal.submit": "Xác nhận",
   "speaker.resolveModal.submitting": "Đang lưu…",
+  "speaker.resolveModal.enrolDeferredNotice": "Đã đặt tên. Mẫu giọng nói chưa đủ rõ để nhận diện tự động — sẽ được cải thiện sau khi xử lý xong cuộc họp này.",
+  "speaker.resolveModal.done": "Xong",
 
   "speaker.memberPicker.placeholder": "Gõ tên thành viên…",
   "speaker.memberPicker.searching": "Đang tìm…",

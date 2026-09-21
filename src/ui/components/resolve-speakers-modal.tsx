@@ -57,6 +57,8 @@ export function ResolveSpeakersModal({ roomId, meetingId, speakers, onClose, onR
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Set instead of closing immediately when any row came back `enrol_deferred` (named, voiceprint not enrol-worthy yet) — the human should see that before the modal disappears. `null` once dismissed via "Done". */
+  const [deferredResults, setDeferredResults] = useState<SpeakerResolveResult[] | null>(null);
 
   useEffect(() => {
     speakerProfileList(app)
@@ -80,6 +82,13 @@ export function ResolveSpeakersModal({ roomId, meetingId, speakers, onClose, onR
         return { speakerId: s.speakerId, mode: 'name', displayName: row.displayName };
       });
       const results = await speakerResolve(app, roomId, meetingId, assignments);
+      // A row named live but not yet coherent enough to enrol (`enrol_deferred`) is still a SUCCESSFUL name —
+      // no client retry loop (plan.md) — but the human should see that the voiceprint itself is still pending
+      // before the modal disappears, instead of it looking like nothing happened.
+      if (results.some((r) => r.reason === 'enrol_deferred')) {
+        setDeferredResults(results);
+        return;
+      }
       onResolved(results);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -163,13 +172,25 @@ export function ResolveSpeakersModal({ roomId, meetingId, speakers, onClose, onR
           </p>
         ) : null}
 
+        {deferredResults ? (
+          <p className="ma-notice ma-notice--info ma-resolve-speakers__deferred-notice">{t('speaker.resolveModal.enrolDeferredNotice')}</p>
+        ) : null}
+
         <div className="ma-resolve-speakers__actions">
-          <button type="button" className="ma-resolve-speakers__later" onClick={onClose} disabled={submitting}>
-            {t('speaker.resolveModal.later')}
-          </button>
-          <button type="button" className="ma-resolve-speakers__submit" onClick={() => void submit()} disabled={submitting}>
-            {submitting ? t('speaker.resolveModal.submitting') : t('speaker.resolveModal.submit')}
-          </button>
+          {deferredResults ? (
+            <button type="button" className="ma-resolve-speakers__submit" onClick={() => onResolved(deferredResults)}>
+              {t('speaker.resolveModal.done')}
+            </button>
+          ) : (
+            <>
+              <button type="button" className="ma-resolve-speakers__later" onClick={onClose} disabled={submitting}>
+                {t('speaker.resolveModal.later')}
+              </button>
+              <button type="button" className="ma-resolve-speakers__submit" onClick={() => void submit()} disabled={submitting}>
+                {submitting ? t('speaker.resolveModal.submitting') : t('speaker.resolveModal.submit')}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

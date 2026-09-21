@@ -135,6 +135,8 @@
   "speaker.resolveModal.later": "稍后",
   "speaker.resolveModal.submit": "确认",
   "speaker.resolveModal.submitting": "正在保存…",
+  "speaker.resolveModal.enrolDeferredNotice": "已命名。语音样本还不够清晰,无法自动识别——本次会议处理完成后会有所改善。",
+  "speaker.resolveModal.done": "完成",
 
   "speaker.memberPicker.placeholder": "输入成员姓名…",
   "speaker.memberPicker.searching": "正在搜索…",

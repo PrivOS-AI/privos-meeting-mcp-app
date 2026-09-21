@@ -93,12 +93,16 @@ export function sealEmbedding(vec: Float32Array, meta: { profileId: string; crea
 }
 
 /**
- * Opens a sealed embedding. Returns `null` (never throws) on ANY integrity or
- * format failure — HMAC mismatch, corrupt base64, wrong IV/tag length, GCM
+ * Verifies + decrypts a sealed envelope down to its raw plaintext buffer.
+ * Shared by `openEmbedding` (plaintext = the vector's own bytes) and
+ * `openEmbeddingWithMeta` (plaintext = a length-prefixed JSON meta blob
+ * followed by the vector's bytes) so the HMAC/AES-GCM verification logic
+ * lives in exactly one place. Returns `null` (never throws) on ANY integrity
+ * or format failure — HMAC mismatch, corrupt base64, wrong IV/tag length, GCM
  * auth failure — logging a reason so an operator can spot tampering without
  * this ever crashing a match/enrol pass for the workspace's other profiles.
  */
-export function openEmbedding(sealed: SealedEmbedding): Float32Array | null {
+function verifyAndDecrypt(sealed: SealedEmbedding): Buffer | null {
   let key: Buffer;
   let macKey: Buffer;
   try {
@@ -126,13 +130,89 @@ export function openEmbedding(sealed: SealedEmbedding): Float32Array | null {
 
     const decipher = createDecipheriv(AES_ALGO, key, iv);
     decipher.setAuthTag(tag);
-    const plain = Buffer.concat([decipher.update(ct), decipher.final()]);
-    const usable = plain.byteLength & ~3;
-    return new Float32Array(plain.buffer.slice(plain.byteOffset, plain.byteOffset + usable));
+    return Buffer.concat([decipher.update(ct), decipher.final()]);
   } catch (error) {
     console.warn('[voiceprint-crypto] decryption failed, skipping record.', { profileId: sealed.profileId, error: error instanceof Error ? error.message : String(error) });
     return null;
   }
+}
+
+/**
+ * Opens a sealed embedding. Returns `null` (never throws) on ANY integrity or
+ * format failure — see {@link verifyAndDecrypt}.
+ */
+export function openEmbedding(sealed: SealedEmbedding): Float32Array | null {
+  const plain = verifyAndDecrypt(sealed);
+  if (!plain) return null;
+  const usable = plain.byteLength & ~3;
+  return new Float32Array(plain.buffer.slice(plain.byteOffset, plain.byteOffset + usable));
+}
+
+/**
+ * Seals a vector TOGETHER WITH small JSON-serializable metadata inside the
+ * SAME encrypted payload — the AES-GCM auth tag (verified by
+ * {@link verifyAndDecrypt} before any byte is trusted) then covers the meta
+ * too, unlike a plain sibling JSON field sitting outside `ct`. Used for the
+ * live/pending voiceprint envelopes, whose coherence metadata must not be
+ * forgeable by a direct App DB write (the iframe shares the bot's `db:*`
+ * scope — see file header). Plaintext layout: 4-byte little-endian length
+ * prefix + UTF-8 JSON meta + raw Float32 vector bytes.
+ */
+export function sealEmbeddingWithMeta<M>(vec: Float32Array, meta: { profileId: string; createdAt: string }, extra: M): SealedEmbedding {
+  const { key, macKey } = keyMaterial();
+  const iv = randomBytes(IV_BYTES);
+  const cipher = createCipheriv(AES_ALGO, key, iv);
+  const metaJson = Buffer.from(JSON.stringify(extra), 'utf8');
+  const lenPrefix = Buffer.alloc(4);
+  lenPrefix.writeUInt32LE(metaJson.length, 0);
+  const vecBuf = Buffer.from(vec.buffer, vec.byteOffset, vec.byteLength);
+  const plain = Buffer.concat([lenPrefix, metaJson, vecBuf]);
+  const ct = Buffer.concat([cipher.update(plain), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  const hmac = computeHmac(macKey, meta.profileId, ct, meta.createdAt);
+  return {
+    ct: ct.toString('base64'),
+    iv: iv.toString('base64'),
+    tag: tag.toString('base64'),
+    hmac: hmac.toString('base64'),
+    profileId: meta.profileId,
+    createdAt: meta.createdAt,
+  };
+}
+
+/**
+ * Opens an envelope sealed by {@link sealEmbeddingWithMeta}, additionally
+ * asserting the embedded `profileId` equals `expectedProfileId` — binds a
+ * sealed row to the exact `meeting_speakers` row it was read from, so a copy
+ * of one row's `pendingEmbedding` string onto another row is rejected even
+ * though the HMAC itself still verifies (the HMAC alone cannot know which
+ * row a JSON string is currently sitting on in App DB). Returns `null`
+ * (never throws) on a binding mismatch, integrity failure, or malformed
+ * plaintext layout (e.g. an OLD-shape envelope sealed by plain
+ * `sealEmbedding`, which has no length-prefixed meta at all).
+ */
+export function openEmbeddingWithMeta<M>(sealed: SealedEmbedding, expectedProfileId: string): { vector: Float32Array; meta: M } | null {
+  if (sealed.profileId !== expectedProfileId) {
+    console.warn('[voiceprint-crypto] profile_id_mismatch — envelope does not belong to the row it was read from, rejecting.', {
+      expected: expectedProfileId,
+      actual: sealed.profileId,
+    });
+    return null;
+  }
+  const plain = verifyAndDecrypt(sealed);
+  if (!plain || plain.length < 4) return null;
+  const metaLen = plain.readUInt32LE(0);
+  if (metaLen < 0 || 4 + metaLen > plain.length) return null;
+  let meta: M;
+  try {
+    meta = JSON.parse(plain.subarray(4, 4 + metaLen).toString('utf8')) as M;
+  } catch {
+    return null;
+  }
+  const vecBuf = plain.subarray(4 + metaLen);
+  const usable = vecBuf.byteLength & ~3;
+  const vector = new Float32Array(vecBuf.buffer.slice(vecBuf.byteOffset, vecBuf.byteOffset + usable));
+  return { vector, meta };
 }
 
 /** Type guard + shape check for a value read back as JSON from App DB. */
