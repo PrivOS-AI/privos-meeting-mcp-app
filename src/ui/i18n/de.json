@@ -260,6 +260,8 @@
   "detail.autoScroll": "Automatisches Scrollen",
   "detail.editSpeaker": "Bezeichnung bearbeiten",
   "detail.speakers": "Sprecher",
+  "detail.speakersTab": "Sprecher",
+  "detail.backToHistory": "Zurück zum Verlauf",
   "detail.savedOnPrivos": "Transkript auf PrivOS gespeichert",
   "detail.audioDeleted": "Das Originalaudio wurde gemäß der Speichereinstellung gelöscht",
   "detail.saveToFiles": "In Files speichern",

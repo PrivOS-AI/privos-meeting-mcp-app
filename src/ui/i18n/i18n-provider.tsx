@@ -22,10 +22,11 @@ import zh from './zh.json';
 import ko from './ko.json';
 import ja from './ja.json';
 import de from './de.json';
+import tr from './tr.json';
 
 export { SUPPORTED_LANGUAGES, type Language } from './languages.js';
 
-const bundles: Record<Language, Record<string, string>> = { vi, en, fr, zh, ko, ja, de };
+const bundles: Record<Language, Record<string, string>> = { vi, en, fr, zh, ko, ja, de, tr };
 
 const STORAGE_KEY = 'meeting-agent.language';
 

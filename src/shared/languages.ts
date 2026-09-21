@@ -8,7 +8,7 @@
  * providers. Primary-subtag codes only — the app translates a language, not a
  * region.
  */
-export const SUPPORTED_LANGUAGES = ['vi', 'en', 'fr', 'zh', 'ko', 'ja', 'de'] as const;
+export const SUPPORTED_LANGUAGES = ['vi', 'en', 'fr', 'zh', 'ko', 'ja', 'de', 'tr'] as const;
 
 export type LanguageCode = (typeof SUPPORTED_LANGUAGES)[number];
 
@@ -20,6 +20,7 @@ export const LANGUAGE_ENDONYMS: Record<LanguageCode, string> = {
   ko: '한국어',
   ja: '日本語',
   de: 'Deutsch',
+  tr: 'Türkçe',
 };
 
 export const LANGUAGE_ENGLISH_NAMES: Record<LanguageCode, string> = {
@@ -30,6 +31,7 @@ export const LANGUAGE_ENGLISH_NAMES: Record<LanguageCode, string> = {
   ko: 'Korean',
   ja: 'Japanese',
   de: 'German',
+  tr: 'Turkish',
 };
 
 export function isLanguageCode(value: unknown): value is LanguageCode {
