@@ -67,8 +67,12 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
         setMicError(t('screen.new.micDenied')); // user/policy denied the mic prompt
       } else if (name === 'NotSupportedError') {
         setMicError(t('screen.new.micUnavailable')); // iframe not granted allow="microphone"
+      } else if (name === 'NotFoundError') {
+        setMicError(t('screen.new.micNotFound')); // no capture device on this machine
+      } else if (name === 'NotReadableError') {
+        setMicError(t('screen.new.micBusy')); // mic exists but is held by another app/tab
       } else if (name) {
-        setMicError(t('screen.new.micError')); // NotFound/NotReadable — real device fault
+        setMicError(t('screen.new.micError')); // other device faults — mic present but unusable
       } else {
         // Surface the real cause: the generic message hid folder/token/relay
         // failures and forced blind server-side debugging.

@@ -49,6 +49,8 @@
   "screen.new.starting": "Đang xin quyền micro…",
   "screen.new.micDenied": "Trình duyệt từ chối quyền micro. Vui lòng cấp quyền micro cho trang này rồi thử lại.",
   "screen.new.micError": "Không thể truy cập micro. Kiểm tra thiết bị rồi thử lại.",
+  "screen.new.micNotFound": "Không tìm thấy micro trên thiết bị này. Kết nối micro rồi thử lại.",
+  "screen.new.micBusy": "Micro đang được ứng dụng hoặc tab khác sử dụng. Đóng nó rồi thử lại.",
   "screen.new.micUnavailable": "Ứng dụng chưa được cấp quyền micro trong phòng này. Nhờ quản trị viên workspace duyệt quyền micro cho ứng dụng rồi tải lại trang.",
   "screen.new.startFailed": "Micro vẫn hoạt động, nhưng không khởi tạo được cuộc họp. Vui lòng thử lại.",
 

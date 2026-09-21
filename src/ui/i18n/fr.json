@@ -49,6 +49,8 @@
   "screen.new.starting": "Demande d'accès au microphone…",
   "screen.new.micDenied": "Le navigateur a refusé l'accès au microphone. Autorisez l'accès au micro pour cette page et réessayez.",
   "screen.new.micError": "Impossible d'accéder au microphone. Vérifiez votre appareil et réessayez.",
+  "screen.new.micNotFound": "Aucun microphone détecté sur cet appareil. Connectez un microphone et réessayez.",
+  "screen.new.micBusy": "Le microphone est utilisé par une autre application ou un autre onglet. Fermez-le et réessayez.",
   "screen.new.micUnavailable": "Cette application n'a pas obtenu l'accès au microphone dans ce salon. Demandez à un administrateur de l'espace d'approuver l'autorisation de microphone de l'application, puis rechargez la page.",
   "screen.new.startFailed": "Le microphone fonctionne, mais la réunion n'a pas pu démarrer. Veuillez réessayer.",
 

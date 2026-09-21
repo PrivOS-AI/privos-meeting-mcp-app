@@ -49,6 +49,8 @@
   "screen.new.starting": "Mikrofonzugriff wird angefragt…",
   "screen.new.micDenied": "Der Browser hat den Mikrofonzugriff verweigert. Erteilen Sie dieser Seite die Mikrofonberechtigung und versuchen Sie es erneut.",
   "screen.new.micError": "Auf das Mikrofon konnte nicht zugegriffen werden. Überprüfen Sie Ihr Gerät und versuchen Sie es erneut.",
+  "screen.new.micNotFound": "Auf diesem Gerät wurde kein Mikrofon gefunden. Schließen Sie ein Mikrofon an und versuchen Sie es erneut.",
+  "screen.new.micBusy": "Das Mikrofon wird von einer anderen App oder einem anderen Tab verwendet. Schließen Sie diese und versuchen Sie es erneut.",
   "screen.new.micUnavailable": "Dieser App wurde in diesem Raum kein Mikrofonzugriff gewährt. Bitten Sie einen Workspace-Administrator, die Mikrofonberechtigung der App zu genehmigen, und laden Sie die Seite dann neu.",
   "screen.new.startFailed": "Das Mikrofon funktioniert einwandfrei, aber die Besprechung konnte nicht gestartet werden. Bitte versuchen Sie es erneut.",
 

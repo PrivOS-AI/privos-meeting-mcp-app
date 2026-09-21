@@ -49,6 +49,8 @@
   "screen.new.starting": "正在请求麦克风权限…",
   "screen.new.micDenied": "浏览器拒绝了麦克风访问权限。请为此页面授予麦克风权限后重试。",
   "screen.new.micError": "无法访问麦克风。请检查您的设备后重试。",
+  "screen.new.micNotFound": "此设备未检测到麦克风。请连接麦克风后重试。",
+  "screen.new.micBusy": "麦克风正被其他应用或标签页占用。请关闭后重试。",
   "screen.new.micUnavailable": "此应用在该房间中尚未获得麦克风访问权限。请让工作区管理员批准该应用的麦克风权限，然后重新加载。",
   "screen.new.startFailed": "麦克风正常，但会议未能启动。请重试。",
 

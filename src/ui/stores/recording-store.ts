@@ -243,10 +243,19 @@ export class RecordingStore {
       return host.stream;
     }
     if (host.kind === 'denied') {
-      // Map the host denial to a DOMException name the UI already classifies.
-      const name =
-        host.reason === 'not_declared' ? 'NotSupportedError' : host.reason === 'unavailable' ? 'NotFoundError' : 'NotAllowedError';
-      throw new DOMException(`Microphone denied by host: ${host.reason}`, name);
+      if (host.reason === 'not_declared') {
+        throw new DOMException('Microphone not declared by host', 'NotSupportedError');
+      }
+      if (host.reason === 'unavailable') {
+        // The host collapses "no capture device" and "device busy" into one
+        // `unavailable` reason. Probe the device list to tell them apart so the
+        // UI can advise correctly: a present-but-unusable mic → NotReadableError
+        // ("in use"), none at all → NotFoundError ("no microphone").
+        const name = (await this.hasAudioInputDevice()) ? 'NotReadableError' : 'NotFoundError';
+        throw new DOMException(`Microphone unavailable on host: ${host.reason}`, name);
+      }
+      // denied | user_activation_required — a permission/gesture problem.
+      throw new DOMException(`Microphone denied by host: ${host.reason}`, 'NotAllowedError');
     }
     // Older host without brokered capture — direct getUserMedia (only succeeds
     // if this frame is not opaque-origin).
@@ -260,6 +269,23 @@ export class RecordingStore {
       for (const track of stream.getTracks()) track.stop();
     };
     return stream;
+  }
+
+  /**
+   * Whether the machine exposes any audio-input device. `enumerateDevices`
+   * lists an `audioinput` entry (with an empty label, pre-permission) when a mic
+   * exists, so a missing entry means there is genuinely no microphone. Any probe
+   * failure is treated as "no device" — the safe default for the caller's
+   * not-found vs. busy split.
+   */
+  private async hasAudioInputDevice(): Promise<boolean> {
+    try {
+      if (!navigator.mediaDevices?.enumerateDevices) return false;
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.some((device) => device.kind === 'audioinput');
+    } catch {
+      return false;
+    }
   }
 
   subscribe = (listener: () => void): (() => void) => {
