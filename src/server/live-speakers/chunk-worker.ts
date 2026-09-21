@@ -40,13 +40,17 @@ import { KeyedSerialQueue } from '../jobs/keyed-serial-queue.js';
 import { ensureRegistry, upsertAll } from './live-speaker-repository.js';
 import { downloadPartBySeq } from './part-window.js';
 import { extractWebmInitSegment } from './webm-init-segment.js';
-import { hasRealEnergy, isWithinPartWindow, type ChunkSegment } from '../tools/span-validation.js';
+import { hasRealEnergy, isWithinPartWindow, validatePartStamp, type ChunkSegment } from '../tools/span-validation.js';
 
 export interface ChunkReadyRequest {
   roomId: string;
   meetingId: string;
   seq: number;
   durationMs: number;
+  /** Absolute part-boundary stamp from a NEW client — `undefined` for an older tab across a deploy, which falls back to the registry's cumulative clock (see `processChunk`). */
+  partStartMs?: number;
+  /** Server wall-clock `Date.now()` when `meeting_chunk_ready` was received — diagnostics only (`uploadLagMs`), set by `chunk-ready-tool.ts`; defaults to "now" so hand-built test requests need not set it. */
+  arrivedAtMs?: number;
   segments: ChunkSegment[];
 }
 
@@ -198,20 +202,45 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
   const tmpDir = path.join(dataDir, 'tmp', `live-${req.meetingId}-${req.seq}-${randomUUID()}`);
 
   // A seq the server never saw at all (not a queue-backlog drop, which already
-  // marks `discontinuous` itself — this is a client-side gap) — diagnostics
-  // only, logged before anything below can throw.
+  // marks `discontinuous` itself — this is a client-side gap, e.g. the upload
+  // queue's own cap dropped a part while recording continued). With absolute
+  // per-part stamps the parts AFTER the gap stay aligned on their own, but the
+  // overlap ring spanning the missing part is no longer trustworthy, so this
+  // is treated exactly like any other discontinuity: ring cleared, degraded
+  // raised, logged before anything below can throw.
   const expectedSeq = registry.nextExpectedSeq();
   if (req.seq > expectedSeq) {
     append(registry, { t: Date.now(), meetingId: req.meetingId, type: 'gap', fromSeq: expectedSeq, toSeq: req.seq });
+    registry.markDiscontinuity(req.seq);
   }
 
   let chunkOk = true;
   let decodedDurationSec = 0;
   let overlapSec = 0;
   let deferredCount = 0;
+  /** Set only once the client's stamp validates — an estimate of network+queue lag, never derived from a rejected/absent stamp. */
+  let uploadLagMs: number | null = null;
   const skipped = { window: 0, silence: 0, short: 0 };
 
   try {
+    // A NEW client's absolute stamp is validated BEFORE anything is
+    // downloaded/decoded: finite/non-negative, monotonic, within tolerance of
+    // where the previous part should have ended, and not an implausible
+    // duration. A violation skips this whole chunk (never sliced from a
+    // guessed position) exactly like a decode failure below — `chunkOk=false`,
+    // `markDiscontinuity`, logged via the `finally` block's `chunk` event. An
+    // absent `partStartMs` (older client tab across a deploy) skips this
+    // check entirely and keeps today's cumulative-clock behaviour.
+    if (req.partStartMs !== undefined) {
+      const violation = validatePartStamp(
+        { seq: req.seq, partStartMs: req.partStartMs, durationMs: req.durationMs },
+        registry.lastPartStampForValidation(),
+      );
+      if (violation) throw new AppError(`Rejected client part stamp — ${violation}`);
+      registry.noteValidPartStamp(req.seq, req.partStartMs, req.durationMs);
+      uploadLagMs = registry.estimateUploadLagMs(req.arrivedAtMs ?? Date.now(), req.partStartMs, req.durationMs);
+    }
+
     await mkdir(tmpDir, { recursive: true });
     if (signal.aborted) throw new AppError('Chunk was cancelled before downloading the recording part.');
 
@@ -228,8 +257,11 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
     const overlap = registry.ringTake();
     overlapSec = overlap.length / 16000;
     const pcm = concatPcm([overlap, chunkPcm]);
-    const chunkStartSec = registry.decodedSecBefore(req.seq) - overlap.length / 16000;
-    const partStartMs = registry.decodedSecBefore(req.seq) * 1000;
+    // A NEW client's own absolute stamp positions this part directly; an
+    // OLDER client (no `partStartMs`) falls back to the registry's cumulative
+    // decoded-duration clock, unchanged from before this stamp existed.
+    const partStartMs = req.partStartMs ?? registry.decodedSecBefore(req.seq) * 1000;
+    const chunkStartSec = partStartMs / 1000 - overlap.length / 16000;
 
     /**
      * Cuts + embeds one turn against the CURRENT chunk's pcm/window. Deferred
@@ -318,10 +350,9 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
     // chunk after it (S2-08).
     registry.noteDecoded(req.seq, req.durationMs / 1000);
 
-    // `uploadLagMs`/`captureDriftMs` both reduce to the same "client-declared
-    // duration minus what actually decoded" quantity until phase 2 lands an
-    // absolute wall-clock emit stamp — see plan.md's diagnostics decision.
-    const durationGapMs = req.durationMs - decodedDurationSec * 1000;
+    // `captureDriftMs`: this part's own wall span (the client's emit-stamped
+    // `durationMs`) minus what actually decoded — per part, never cumulative.
+    const captureDriftMs = req.durationMs - decodedDurationSec * 1000;
     append(registry, {
       t: Date.now(),
       meetingId: req.meetingId,
@@ -330,8 +361,13 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
       spans: req.segments.map((s) => ({ label: s.speaker, startMs: s.startMs, endMs: s.endMs, final: s.final })),
       clientDurationMs: req.durationMs,
       decodedDurationSec,
-      uploadLagMs: durationGapMs,
-      captureDriftMs: durationGapMs,
+      // `uploadLagMs`: server arrival time vs the client's emit stamp
+      // (`registry.estimateUploadLagMs`) once a validated `partStartMs`
+      // establishes the meeting's wall-clock anchor; for an older client (no
+      // `partStartMs`) or a rejected stamp, falls back to the same
+      // duration-vs-decoded proxy `captureDriftMs` uses.
+      uploadLagMs: uploadLagMs ?? captureDriftMs,
+      captureDriftMs,
       overlapSec,
       deferredCount,
       skipped,

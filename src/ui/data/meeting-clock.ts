@@ -28,14 +28,10 @@ export interface PartWindow {
   endMs: number;
 }
 
-/** |skew| beyond this is no longer "close enough" — the part gets flagged `approxClock` for the backend. */
-const SKEW_TOLERANCE_MS = 1500;
-
 export class MeetingClock {
   private readonly sessions = new Map<number, SessionMeta>();
   /** Turns already sent to the backend in their final form — never resent (S2-03). */
   private readonly sentFinalTurnIds = new Set<string>();
-  private lastPartBoundaryMs = 0;
 
   constructor(public readonly recorderEpochMs: number) {}
 
@@ -62,27 +58,6 @@ export class MeetingClock {
     const offset = session?.wsSessionOffsetMs ?? 0;
     const skew = session?.clockSkewMs ?? 0;
     return offset + rawMs + skew;
-  }
-
-  /**
-   * Resync when a part closes: compare the recorder's own elapsed time against
-   * where the last FINAL token of that session claims the audio ended. Beyond
-   * tolerance, the part is `approxClock` — P5 skips embedding it rather than
-   * risking a mis-cut voiceprint sample.
-   */
-  resyncOnPartClose(sessionIndex: number, elapsedRecorderMs: number, lastFinalEndMsRaw: number): { skewMs: number; approxClock: boolean } {
-    const session = this.sessions.get(sessionIndex);
-    const offset = session?.wsSessionOffsetMs ?? 0;
-    const skewMs = elapsedRecorderMs - (offset + lastFinalEndMsRaw);
-    if (session) session.clockSkewMs = skewMs;
-    return { skewMs, approxClock: Math.abs(skewMs) > SKEW_TOLERANCE_MS };
-  }
-
-  /** Actual elapsed recorder time since the previous part boundary — what the backend uses to advance its own clock even if a chunk fails to process. */
-  measuredPartMs(nowElapsedMs: number): number {
-    const duration = nowElapsedMs - this.lastPartBoundaryMs;
-    this.lastPartBoundaryMs = nowElapsedMs;
-    return Math.max(0, Math.round(duration));
   }
 
   /** `{ recorderEpochMs, sessions[] }` for `meetings.sttSessionMeta`. */

@@ -72,10 +72,10 @@ describe('listParts', () => {
 describe('notifyChunkReady', () => {
   it('calls meeting_chunk_ready with the given arguments', async () => {
     const app = fakeApp({ callServerTool: vi.fn(async () => ({})) });
-    await notifyChunkReady(app, { roomId: 'r', meetingId: 'm', seq: 0, durationMs: 1000, segments: [] });
+    await notifyChunkReady(app, { roomId: 'r', meetingId: 'm', seq: 0, durationMs: 1000, partStartMs: 0, segments: [] });
     expect(app.callServerTool).toHaveBeenCalledWith({
       name: 'meeting_chunk_ready',
-      arguments: { roomId: 'r', meetingId: 'm', seq: 0, durationMs: 1000, segments: [] },
+      arguments: { roomId: 'r', meetingId: 'm', seq: 0, durationMs: 1000, partStartMs: 0, segments: [] },
     });
   });
 
@@ -83,9 +83,9 @@ describe('notifyChunkReady', () => {
     const app = fakeApp({ callServerTool: vi.fn(async () => Promise.reject(new Error('boom'))) });
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    await expect(notifyChunkReady(app, { roomId: 'r', meetingId: 'm', seq: 0, durationMs: 1000, segments: [] })).resolves.toBeUndefined();
+    await expect(notifyChunkReady(app, { roomId: 'r', meetingId: 'm', seq: 0, durationMs: 1000, partStartMs: 0, segments: [] })).resolves.toBeUndefined();
     // A second call right after must still be attempted — nothing latches into a failed state.
-    await expect(notifyChunkReady(app, { roomId: 'r', meetingId: 'm', seq: 1, durationMs: 1000, segments: [] })).resolves.toBeUndefined();
+    await expect(notifyChunkReady(app, { roomId: 'r', meetingId: 'm', seq: 1, durationMs: 1000, partStartMs: 60_000, segments: [] })).resolves.toBeUndefined();
 
     expect(warnSpy).toHaveBeenCalledTimes(2);
     warnSpy.mockRestore();

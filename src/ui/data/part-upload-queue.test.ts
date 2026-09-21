@@ -16,9 +16,9 @@ describe('PartUploadQueue', () => {
       { retryWindowMin: 15 },
     );
 
-    queue.enqueue(0, blob());
-    queue.enqueue(1, blob());
-    queue.enqueue(2, blob());
+    queue.enqueue(0, blob(), 0, 60_000);
+    queue.enqueue(1, blob(), 60_000, 60_000);
+    queue.enqueue(2, blob(), 120_000, 60_000);
 
     await vi.waitFor(() => expect(queue.pendingCount).toBe(0));
     expect(uploaded).toEqual([0, 1, 2]);
@@ -45,8 +45,8 @@ describe('PartUploadQueue', () => {
       },
     );
 
-    queue.enqueue(0, blob());
-    queue.enqueue(1, blob());
+    queue.enqueue(0, blob(), 0, 60_000);
+    queue.enqueue(1, blob(), 60_000, 60_000);
 
     await vi.waitFor(() => expect(queue.pendingCount).toBe(0), { timeout: 5000 });
     expect(uploaded).toEqual([0, 1]);
@@ -75,7 +75,7 @@ describe('PartUploadQueue', () => {
       },
     );
 
-    queue.enqueue(0, blob());
+    queue.enqueue(0, blob(), 0, 60_000);
     await vi.waitFor(() => expect(expired).toEqual([0]));
     expect(queue.pendingCount).toBe(1); // still queued, not dropped
 
@@ -93,9 +93,9 @@ describe('PartUploadQueue', () => {
       onCapReached: (seq) => capReached.push(seq),
     });
 
-    queue.enqueue(0, blob());
-    queue.enqueue(1, blob());
-    queue.enqueue(2, blob());
+    queue.enqueue(0, blob(), 0, 60_000);
+    queue.enqueue(1, blob(), 60_000, 60_000);
+    queue.enqueue(2, blob(), 120_000, 60_000);
 
     expect(queue.pendingCount).toBe(2);
     expect(capReached).toEqual([2]);

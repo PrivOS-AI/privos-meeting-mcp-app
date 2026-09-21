@@ -66,6 +66,8 @@ export interface NotifyChunkReadyInput {
   meetingId: string;
   seq: number;
   durationMs: number;
+  /** Absolute part-boundary stamp (`performance.now() - recorderEpochMs`) this part starts at — see `media-recorder-service.ts`. Optional only so an older bundle open across a deploy keeps working; this build always sends it. */
+  partStartMs: number;
   segments: ChunkReadySegment[];
 }
 

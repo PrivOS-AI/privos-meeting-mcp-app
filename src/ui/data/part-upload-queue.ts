@@ -10,6 +10,10 @@
 export interface QueuedPart {
   seq: number;
   blob: Blob;
+  /** Absolute part-boundary stamp (`performance.now() - recorderEpochMs`) this part starts at — see `media-recorder-service.ts`. */
+  partStartMs: number;
+  /** This part's wall span, measured at blob-emit time. */
+  durationMs: number;
   attempts: number;
 }
 
@@ -29,7 +33,7 @@ export interface PartUploadQueueOptions {
   sleep?(ms: number): Promise<void>;
 }
 
-export type UploadFn = (part: { seq: number; blob: Blob }) => Promise<void>;
+export type UploadFn = (part: { seq: number; blob: Blob; partStartMs: number; durationMs: number }) => Promise<void>;
 
 const DEFAULT_MAX_BACKOFF_MS = 30_000;
 const DEFAULT_MAX_QUEUED_PARTS = 20;
@@ -64,12 +68,12 @@ export class PartUploadQueue {
   }
 
   /** Queue one part for upload. Never blocks the caller (recording continues regardless of network state). */
-  enqueue(seq: number, blob: Blob): void {
+  enqueue(seq: number, blob: Blob, partStartMs: number, durationMs: number): void {
     if (this.isFull) {
       this.opts.onCapReached?.(seq);
       return;
     }
-    this.queue.push({ seq, blob, attempts: 0 });
+    this.queue.push({ seq, blob, partStartMs, durationMs, attempts: 0 });
     this.opts.onPendingCountChange?.(this.queue.length);
     if (!this.running) void this.run();
   }
@@ -86,7 +90,7 @@ export class PartUploadQueue {
       if (!this.firstAttemptAt.has(part.seq)) this.firstAttemptAt.set(part.seq, this.now());
 
       try {
-        await this.upload({ seq: part.seq, blob: part.blob });
+        await this.upload({ seq: part.seq, blob: part.blob, partStartMs: part.partStartMs, durationMs: part.durationMs });
         this.queue.shift();
         this.firstAttemptAt.delete(part.seq);
         this.opts.onPendingCountChange?.(this.queue.length);

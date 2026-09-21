@@ -179,6 +179,9 @@ export class MeetingSessionRegistry {
   private ringPcm: Float32Array = new Float32Array(0);
   private decodedSecTotal = 0;
   private lastProcessedSeq = -1;
+  private lastPartStamp: { seq: number; partStartMs: number; durationMs: number } | null = null;
+  /** Server `Date.now()` minus the client's emit stamp for this meeting's first validated part — `estimateUploadLagMs`'s anchor, `null` until set once. */
+  private wallEpochAnchorMs: number | null = null;
   private discontinuous = false;
   private degradedFlag = false;
   private lastPersistedHash = '';
@@ -332,6 +335,44 @@ export class MeetingSessionRegistry {
   /** The `seq` the next chunk is expected to carry (`lastProcessedSeq + 1`, `0` before any chunk ever ran) — diagnostics-only (`gap` event); never gates or rejects a chunk. */
   nextExpectedSeq(): number {
     return this.lastProcessedSeq + 1;
+  }
+
+  /**
+   * Last absolute per-part stamp (`seq`, `partStartMs`, `durationMs`) this
+   * meeting accepted from a NEW client's `partStartMs` — `null` before any
+   * such part, including right after a restart/eviction rebuilt this
+   * registry from scratch (this tracking is in-memory only, never persisted;
+   * a fresh registry validates its next part with no continuity requirement,
+   * `span-validation.ts#validatePartStamp`'s restart-safe-by-construction
+   * contract). Unrelated to `decodedSecBefore`'s cumulative fallback clock,
+   * which keeps working unchanged for a meeting whose client never sends
+   * `partStartMs` at all.
+   */
+  lastPartStampForValidation(): { seq: number; partStartMs: number; durationMs: number } | null {
+    return this.lastPartStamp;
+  }
+
+  /** Records a stamp that already passed `validatePartStamp` — the anchor the NEXT part's continuity check compares against. */
+  noteValidPartStamp(seq: number, partStartMs: number, durationMs: number): void {
+    this.lastPartStamp = { seq, partStartMs, durationMs };
+  }
+
+  /**
+   * Diagnostics-only estimate of `uploadLagMs` (server arrival time vs the
+   * client's emit stamp). The first validated part for a meeting DEFINES the
+   * wall-clock anchor (its own upload lag is assumed ~0 and folded into the
+   * anchor rather than reported) — every later part compares its actual
+   * server arrival against what that anchor predicts. A heuristic, not a
+   * synced clock: never used for slicing/validation, only logged.
+   */
+  estimateUploadLagMs(arrivedAtMs: number, partStartMs: number, durationMs: number): number {
+    const emitAtMs = partStartMs + durationMs;
+    if (this.wallEpochAnchorMs === null) {
+      this.wallEpochAnchorMs = arrivedAtMs - emitAtMs;
+      return 0;
+    }
+    const expectedArrivedAtMs = this.wallEpochAnchorMs + emitAtMs;
+    return arrivedAtMs - expectedArrivedAtMs;
   }
 
   // ------------------------------------------------------- diagnostics

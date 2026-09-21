@@ -377,8 +377,9 @@ export class RecordingStore {
 
       this.recorder = new MediaRecorderService(
         stream,
+        recorderEpochMs,
         (part) => {
-          this.uploadQueue?.enqueue(part.seq, part.blob);
+          this.uploadQueue?.enqueue(part.seq, part.blob, part.partStartMs, part.durationMs);
         },
         () => this.setState({ error: 'recorder-error' }),
       );
@@ -595,19 +596,23 @@ export class RecordingStore {
 
   // -------------------------------------------------------------- upload
 
-  private async handleUpload(meetingId: string, folderId: string, part: { seq: number; blob: Blob }): Promise<void> {
+  private async handleUpload(
+    meetingId: string,
+    folderId: string,
+    part: { seq: number; blob: Blob; partStartMs: number; durationMs: number },
+  ): Promise<void> {
     await uploadPart(this.app, { roomId: this.ctx.roomId, folderId, meetingId, seq: part.seq, blob: part.blob });
     this.nextPartSeq = Math.max(this.nextPartSeq, part.seq + 1);
-    const nowElapsedMs = performance.now() - this.state.recorderEpochMs;
-    const durationMs = this.clock?.measuredPartMs(nowElapsedMs) ?? 60_000;
     void updateRecordingMeeting(this.app, meetingId, { partCount: this.nextPartSeq, lastPartAt: new Date().toISOString() });
 
     if (this.state.capabilities?.speakerLabels && this.clock) {
-      const windowStart = nowElapsedMs - durationMs;
+      // The window comes straight from the part's own emit-time stamps — never
+      // from wall time measured HERE (which would still be skewed by however
+      // long `uploadPart` just took, the original bug this fixes).
       const segments = this.clock
-        .turnsInPart(this.allTurns, { seq: part.seq, startMs: windowStart, endMs: nowElapsedMs })
+        .turnsInPart(this.allTurns, { seq: part.seq, startMs: part.partStartMs, endMs: part.partStartMs + part.durationMs })
         .map((t) => ({ speaker: t.speakerKey, startMs: t.startMs, endMs: t.endMs, final: t.final }));
-      await notifyChunkReady(this.app, { roomId: this.ctx.roomId, meetingId, seq: part.seq, durationMs, segments });
+      await notifyChunkReady(this.app, { roomId: this.ctx.roomId, meetingId, seq: part.seq, durationMs: part.durationMs, partStartMs: part.partStartMs, segments });
     }
 
     // Persist the caption TEXT alongside the audio, on the same ~60s cadence, so
@@ -638,9 +643,12 @@ export class RecordingStore {
   // -------------------------------------------------------------- controls
 
   toggleMute(): void {
-    if (!this.stream) return;
+    if (!this.recorder) return;
     const nextMuted = !this.state.muted;
-    for (const track of this.stream.getAudioTracks()) track.enabled = !nextMuted;
+    // `MediaRecorderService` owns `track.enabled` (it combines mute AND pause)
+    // so pausing after this still respects the mute state, and resuming
+    // restores it instead of unconditionally un-muting.
+    this.recorder.setMuted(nextMuted);
     this.setState({ muted: nextMuted });
   }
 

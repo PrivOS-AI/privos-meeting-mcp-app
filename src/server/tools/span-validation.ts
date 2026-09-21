@@ -88,3 +88,50 @@ export function isWithinPartWindow(seg: Pick<ChunkSegment, 'startMs'>, partStart
 export function hasRealEnergy(pcm: Float32Array): boolean {
   return hasSpeechEnergy(pcm);
 }
+
+/**
+ * Generous ceiling on one part's declared wall span — twice the recorder's
+ * ~60s timeslice, to tolerate a slow/backgrounded tab without accepting a
+ * fabricated value.
+ */
+export const MAX_PART_DURATION_MS = 120_000;
+
+/** Same tolerance as `PART_WINDOW_TOLERANCE_MS` (clock rounding, not a hostile gap). */
+export const PART_STAMP_TOLERANCE_MS = PART_WINDOW_TOLERANCE_MS;
+
+export interface PartStamp {
+  seq: number;
+  /** Absolute part-boundary stamp on the recorder's clock — `performance.now() - recorderEpochMs` at blob-emit time. */
+  partStartMs: number;
+  durationMs: number;
+}
+
+/**
+ * Validates a NEW client's absolute per-part stamp: the client stamps every
+ * part boundary at blob-emit time and sends it as-is, so the server never
+ * sums durations itself to find where a part starts (that summing is exactly
+ * what let upload latency shift every slice — the bug this stamp fixes).
+ *
+ * `previous` is the last stamp this meeting's registry accepted, or `null`
+ * for the very first part it has ever validated — including right after a
+ * restart/eviction rebuilt the registry from scratch, since this tracking is
+ * in-memory only and never persisted. With no previous stamp to compare
+ * against, only the bounds check applies (restart-safe by construction).
+ *
+ * Returns a violation reason, or `null` when the stamp is trustworthy enough
+ * to slice audio against. Never clamps a bad value — the caller skips the
+ * whole part instead of guessing a corrected position.
+ */
+export function validatePartStamp(current: PartStamp, previous: PartStamp | null): string | null {
+  if (!Number.isFinite(current.partStartMs) || current.partStartMs < 0) return 'partStartMs must be a finite number >= 0.';
+  if (!Number.isFinite(current.durationMs) || current.durationMs > MAX_PART_DURATION_MS) return 'durationMs exceeds the maximum allowed part length.';
+  if (!previous) return null;
+  if (current.partStartMs < previous.partStartMs) return 'partStartMs moved backward from the previous part (not monotonic).';
+  if (current.seq === previous.seq + 1) {
+    const expected = previous.partStartMs + previous.durationMs;
+    if (Math.abs(current.partStartMs - expected) > PART_STAMP_TOLERANCE_MS) {
+      return 'partStartMs is not within tolerance of the previous part boundary.';
+    }
+  }
+  return null;
+}

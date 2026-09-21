@@ -38,15 +38,35 @@ export const chunkReadyTool: AppTool = {
       meetingId: { type: 'string' },
       seq: { type: 'number' },
       durationMs: { type: 'number' },
+      // New, optional: the client's absolute part-boundary stamp
+      // (`performance.now() - recorderEpochMs` at blob-emit time). Absent for
+      // an older tab still open across a deploy — the worker falls back to
+      // its own cumulative clock for that meeting; see `chunk-worker.ts`.
+      partStartMs: { type: 'number' },
       segments: { type: 'array', items: { type: 'object' } },
     },
   },
   async execute(args, context, runtime) {
+    const arrivedAtMs = Date.now(); // diagnostics only (`uploadLagMs`) — captured before any DB round-trip below.
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
     const seq = Number(args.seq);
     const durationMs = Number(args.durationMs);
-    if (!roomId || !meetingId || !Number.isInteger(seq) || seq < 0 || !Number.isFinite(durationMs) || durationMs <= 0) {
+    // Only a TYPE/shape check here — a well-typed but suspicious value (out of
+    // bounds, non-monotonic, breaks continuity) is not a malformed call; it is
+    // validated (and, on violation, skipped + logged) once the chunk worker
+    // has this meeting's registry to compare against (`validatePartStamp`).
+    const partStartMsRaw = args.partStartMs;
+    const partStartMs = partStartMsRaw === undefined || partStartMsRaw === null ? undefined : Number(partStartMsRaw);
+    if (
+      !roomId ||
+      !meetingId ||
+      !Number.isInteger(seq) ||
+      seq < 0 ||
+      !Number.isFinite(durationMs) ||
+      durationMs <= 0 ||
+      (partStartMs !== undefined && !Number.isFinite(partStartMs))
+    ) {
       throw new AppError('Invalid meeting_chunk_ready parameters.');
     }
 
@@ -84,7 +104,7 @@ export const chunkReadyTool: AppTool = {
     const folderId = typeof meeting.folderId === 'string' && meeting.folderId ? meeting.folderId : '';
     if (!folderId) throw new AppError('Meeting has no storage folder yet.');
 
-    enqueueChunk({ db, hub: runtime.agentBotHub, folderId }, { roomId, meetingId, seq, durationMs, segments });
+    enqueueChunk({ db, hub: runtime.agentBotHub, folderId }, { roomId, meetingId, seq, durationMs, partStartMs, arrivedAtMs, segments });
 
     return { accepted: true };
   },

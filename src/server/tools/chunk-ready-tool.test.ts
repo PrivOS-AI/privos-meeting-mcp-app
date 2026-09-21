@@ -106,6 +106,26 @@ describe('meeting_chunk_ready', () => {
     expect(enqueueChunk).not.toHaveBeenCalled();
   });
 
+  it('passes a well-formed partStartMs through to the chunk worker unchanged', async () => {
+    const result = await chunkReadyTool.execute({ ...baseArgs, partStartMs: 60_000, segments: [] }, context('user-1'), runtime);
+    expect(result).toEqual({ accepted: true });
+    const [, req] = enqueueChunk.mock.calls[0];
+    expect(req.partStartMs).toBe(60_000);
+  });
+
+  it('enqueues with partStartMs undefined when the caller omits it (old client — fallback clock)', async () => {
+    await chunkReadyTool.execute({ ...baseArgs, segments: [] }, context('user-1'), runtime);
+    const [, req] = enqueueChunk.mock.calls[0];
+    expect(req.partStartMs).toBeUndefined();
+  });
+
+  it('rejects a non-numeric partStartMs as a malformed call', async () => {
+    await expect(
+      chunkReadyTool.execute({ ...baseArgs, partStartMs: 'not-a-number', segments: [] }, context('user-1'), runtime),
+    ).rejects.toThrow(/Invalid meeting_chunk_ready parameters/);
+    expect(enqueueChunk).not.toHaveBeenCalled();
+  });
+
   it('returns labels_not_supported (not an error) when the workspace realtime provider has no speaker labels', async () => {
     store.app_settings.push({ _id: 'row-settings-1', key: 'room:room-1:sttRealtimeProvider', valueJson: JSON.stringify('elevenlabs') });
     const result = await chunkReadyTool.execute({ ...baseArgs, segments: [] }, context('user-1'), runtime);

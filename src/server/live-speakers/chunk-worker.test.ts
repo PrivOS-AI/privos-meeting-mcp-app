@@ -53,9 +53,12 @@ vi.mock('../speaker/resolve-speakers.js', () => ({ readMatchThreshold: vi.fn(asy
 vi.mock('../speaker/profile-store.js', () => ({ listProfiles: vi.fn(async () => []) }));
 
 let embeddingCallCount = 0;
+/** The first sample value of every PCM slice actually embedded, in call order — used with `indexTaggedChunk` to prove WHERE a slice was cut from. */
+const embeddingInputFirstSamples: number[] = [];
 vi.mock('../speaker/embedding-extractor.js', () => ({
-  computeEmbedding: vi.fn(async () => {
+  computeEmbedding: vi.fn(async (pcm: Float32Array) => {
     embeddingCallCount += 1;
+    embeddingInputFirstSamples.push(pcm[0]);
     return new Float32Array([1, 0, 0, 0]);
   }),
 }));
@@ -69,6 +72,19 @@ function toneChunk(durationSec: number, amplitude = 0.5) {
   return samples;
 }
 
+/**
+ * A chunk where `pcm[i] === i` — not realistic audio, but `computeEmbedding`
+ * is mocked (never inspects real audio content) and `hasRealEnergy`'s RMS
+ * gate passes trivially on values this large. Lets a test assert EXACTLY
+ * which sample a slice started at (`embeddingInputFirstSamples`), proving a
+ * turn was cut from the right position rather than merely "some" position.
+ */
+function indexTaggedChunk(durationSec: number) {
+  const samples = new Float32Array(durationSec * SAMPLE_RATE);
+  for (let i = 0; i < samples.length; i++) samples[i] = i;
+  return samples;
+}
+
 const fakeDb = {} as AppDbBotClient;
 const fakeHub = {} as RoomBoundHubClient;
 
@@ -79,6 +95,7 @@ function ctx() {
 describe('chunk-worker processChunk', () => {
   beforeEach(() => {
     embeddingCallCount = 0;
+    embeddingInputFirstSamples.length = 0;
     decodeShouldThrow = false;
     decodedDurationSec = 60;
     appendLiveTurns.mockClear();
@@ -182,5 +199,149 @@ describe('chunk-worker processChunk', () => {
       new AbortController().signal,
     );
     expect(sessionRegistries.get(meetingId).snapshot()).toHaveLength(1);
+  });
+});
+
+describe('chunk-worker processChunk — client-stamped partStartMs', () => {
+  beforeEach(() => {
+    embeddingCallCount = 0;
+    embeddingInputFirstSamples.length = 0;
+    decodeShouldThrow = false;
+    decodedDurationSec = 60;
+    appendLiveTurns.mockClear();
+    upsertAll.mockClear();
+    env.speakerMinSegmentSec = 2;
+    env.liveChunkOverlapSec = 8;
+  });
+
+  it('(a) a processing delay before part 2 does not shift where its turn is sliced from', async () => {
+    const meetingId = `m-${Math.random()}`;
+    currentChunkPcm = indexTaggedChunk(60);
+    await processChunk(
+      ctx(),
+      { roomId: 'room-1', meetingId, seq: 0, durationMs: 60_000, partStartMs: 0, segments: [] },
+      new AbortController().signal,
+    );
+
+    // Stand-in for a real upload retry delaying part 2's arrival — chunk-worker
+    // never reads wall-clock time itself, only the client's own stamps, so a
+    // real delay here (of any length) must not move where the turn is cut from.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    currentChunkPcm = indexTaggedChunk(60);
+    const seg = { speaker: 's0:1', startMs: 65_000, endMs: 69_000, final: true };
+    await processChunk(
+      ctx(),
+      { roomId: 'room-1', meetingId, seq: 1, durationMs: 60_000, partStartMs: 60_000, segments: [seg] },
+      new AbortController().signal,
+    );
+
+    expect(embeddingCallCount).toBe(1);
+    expect(embeddingInputFirstSamples[0]).toBe((seg.startMs - 60_000) * 16); // 5s into part 1's OWN audio
+  });
+
+  it('(b) a client-side seq gap clears the ring and raises degraded, but the next part still aligns from its own stamp', async () => {
+    const meetingId = `m-${Math.random()}`;
+    currentChunkPcm = indexTaggedChunk(60);
+    await processChunk(
+      ctx(),
+      { roomId: 'room-1', meetingId, seq: 0, durationMs: 60_000, partStartMs: 0, segments: [] },
+      new AbortController().signal,
+    );
+
+    // seq 1 never arrives (the upload queue's own cap dropped it client-side) — seq 2 is next.
+    currentChunkPcm = indexTaggedChunk(60);
+    const seg = { speaker: 's0:1', startMs: 125_000, endMs: 129_000, final: true };
+    await processChunk(
+      ctx(),
+      { roomId: 'room-1', meetingId, seq: 2, durationMs: 60_000, partStartMs: 120_000, segments: [seg] },
+      new AbortController().signal,
+    );
+
+    const registry = sessionRegistries.get(meetingId);
+    expect(registry.isDegraded()).toBe(true);
+    expect(embeddingCallCount).toBe(1);
+    expect(embeddingInputFirstSamples[0]).toBe((seg.startMs - 120_000) * 16); // aligned from its OWN stamp, unaffected by the gap
+  });
+
+  it('(c) a rebuilt (fresh) registry aligns the next part from its own absolute stamp, with no prior state', async () => {
+    const meetingId = `m-${Math.random()}`; // never touched before — stands in for a registry rebuilt after a restart mid-meeting
+    currentChunkPcm = indexTaggedChunk(60);
+    const seg = { speaker: 's0:1', startMs: 2_525_000, endMs: 2_529_000, final: true };
+    await processChunk(
+      ctx(),
+      { roomId: 'room-1', meetingId, seq: 42, durationMs: 60_000, partStartMs: 2_520_000, segments: [seg] },
+      new AbortController().signal,
+    );
+
+    expect(embeddingCallCount).toBe(1);
+    expect(embeddingInputFirstSamples[0]).toBe((seg.startMs - 2_520_000) * 16);
+  });
+
+  it('(d) a bogus (negative) partStartMs is rejected — the chunk is skipped and the meeting is flagged degraded', async () => {
+    const meetingId = `m-${Math.random()}`;
+    currentChunkPcm = indexTaggedChunk(60);
+    await processChunk(
+      ctx(),
+      { roomId: 'room-1', meetingId, seq: 0, durationMs: 60_000, partStartMs: -5, segments: [{ speaker: 's0:1', startMs: 0, endMs: 4_000, final: true }] },
+      new AbortController().signal,
+    );
+
+    expect(embeddingCallCount).toBe(0);
+    expect(sessionRegistries.get(meetingId).isDegraded()).toBe(true);
+  });
+
+  it('(d) a durationMs beyond the maximum allowed part length is rejected', async () => {
+    const meetingId = `m-${Math.random()}`;
+    currentChunkPcm = indexTaggedChunk(60);
+    await processChunk(
+      ctx(),
+      { roomId: 'room-1', meetingId, seq: 0, durationMs: 300_000, partStartMs: 0, segments: [] },
+      new AbortController().signal,
+    );
+
+    expect(sessionRegistries.get(meetingId).isDegraded()).toBe(true);
+  });
+
+  it('(d) a partStartMs breaking continuity with the previous part is rejected without embedding', async () => {
+    const meetingId = `m-${Math.random()}`;
+    currentChunkPcm = indexTaggedChunk(60);
+    await processChunk(
+      ctx(),
+      { roomId: 'room-1', meetingId, seq: 0, durationMs: 60_000, partStartMs: 0, segments: [] },
+      new AbortController().signal,
+    );
+
+    currentChunkPcm = indexTaggedChunk(60);
+    await processChunk(
+      ctx(),
+      {
+        roomId: 'room-1',
+        meetingId,
+        seq: 1,
+        durationMs: 60_000,
+        partStartMs: 999_000, // wildly inconsistent with part 0's own declared span (no gap to excuse it — seq is contiguous)
+        segments: [{ speaker: 's0:1', startMs: 999_500, endMs: 1_003_000, final: true }],
+      },
+      new AbortController().signal,
+    );
+
+    expect(embeddingCallCount).toBe(0);
+    expect(sessionRegistries.get(meetingId).isDegraded()).toBe(true);
+  });
+
+  it('(e) an older client that never sends partStartMs keeps using the cumulative fallback clock, unaffected', async () => {
+    const meetingId = `m-${Math.random()}`;
+    currentChunkPcm = toneChunk(60);
+    await processChunk(
+      ctx(),
+      { roomId: 'room-1', meetingId, seq: 0, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 0, endMs: 20_000, final: true }] },
+      new AbortController().signal,
+    );
+
+    const registry = sessionRegistries.get(meetingId);
+    expect(embeddingCallCount).toBe(1);
+    expect(registry.decodedSecBefore(1)).toBe(60); // still governed by noteDecoded, exactly as before this stamp existed
+    expect(registry.lastPartStampForValidation()).toBeNull(); // the new tracking is never touched for an old client
   });
 });

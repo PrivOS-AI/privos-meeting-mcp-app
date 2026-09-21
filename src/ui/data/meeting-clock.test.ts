@@ -17,26 +17,6 @@ describe('MeetingClock', () => {
     expect(clock.toMeetingMs(1, 2_000)).toBe(11_000);
   });
 
-  it('flags a part approxClock when the resync skew exceeds 1.5s', () => {
-    const clock = new MeetingClock(0);
-    clock.registerSessionStart(0, 0); // offset 0
-
-    const small = clock.resyncOnPartClose(0, 60_000, 59_800);
-    expect(small.approxClock).toBe(false);
-    expect(small.skewMs).toBe(200);
-
-    const big = clock.resyncOnPartClose(0, 120_000, 116_000);
-    expect(big.approxClock).toBe(true);
-    expect(big.skewMs).toBe(4_000);
-  });
-
-  it('applies the latest resynced skew to subsequent conversions', () => {
-    const clock = new MeetingClock(0);
-    clock.registerSessionStart(0, 0);
-    clock.resyncOnPartClose(0, 60_000, 58_000); // skew = 2000
-    expect(clock.toMeetingMs(0, 1_000)).toBe(3_000);
-  });
-
   it('serializes recorderEpochMs + sessions for sttSessionMeta', () => {
     const clock = new MeetingClock(42);
     clock.registerSessionStart(0, 42);
@@ -76,11 +56,5 @@ describe('MeetingClock', () => {
       const part1 = clock.turnsInPart(finalTurn, { seq: 1, startMs: 60_000, endMs: 120_000 });
       expect(part1).toEqual([]);
     });
-  });
-
-  it('measuredPartMs advances from the last boundary each call', () => {
-    const clock = new MeetingClock(0);
-    expect(clock.measuredPartMs(60_000)).toBe(60_000);
-    expect(clock.measuredPartMs(125_000)).toBe(65_000);
   });
 });

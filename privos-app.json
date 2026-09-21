@@ -293,6 +293,9 @@
           "durationMs": {
             "type": "number"
           },
+          "partStartMs": {
+            "type": "number"
+          },
           "segments": {
             "type": "array",
             "items": {

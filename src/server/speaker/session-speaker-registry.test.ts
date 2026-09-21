@@ -126,6 +126,25 @@ describe('MeetingSessionRegistry', () => {
     expect(reg.ringTake().length).toBe(0);
   });
 
+  it('the absolute part-stamp anchor starts null and records only what is explicitly noted valid', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    expect(reg.lastPartStampForValidation()).toBeNull();
+    reg.noteValidPartStamp(0, 0, 60_000);
+    expect(reg.lastPartStampForValidation()).toEqual({ seq: 0, partStartMs: 0, durationMs: 60_000 });
+    reg.noteValidPartStamp(1, 60_000, 60_000);
+    expect(reg.lastPartStampForValidation()).toEqual({ seq: 1, partStartMs: 60_000, durationMs: 60_000 });
+  });
+
+  it('estimateUploadLagMs anchors on the first call (returns 0) then reports drift against that anchor', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    // Meeting starts at server wall time 1_000_000; part 0 (emit stamp 0) arrives essentially instantly.
+    expect(reg.estimateUploadLagMs(1_000_000, 0, 60_000)).toBe(0);
+    // Part 1's emit stamp is 60_000 -> expected arrival 1_060_000; it actually arrived 2s late.
+    expect(reg.estimateUploadLagMs(1_062_000, 60_000, 60_000)).toBe(2_000);
+    // A part arriving EARLY relative to the anchor reports a negative lag.
+    expect(reg.estimateUploadLagMs(1_119_500, 120_000, 60_000)).toBe(-500);
+  });
+
   it('markDropped advances the clock by the declared durationMs even though nothing ran', () => {
     const reg = new MeetingSessionRegistry('m1');
     reg.markDropped(2, 60_000);
