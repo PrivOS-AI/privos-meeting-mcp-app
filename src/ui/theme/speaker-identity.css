@@ -1,0 +1,308 @@
+/*
+ * P4 — speaker identity & voice fingerprint UI: the "Resolve speakers"
+ * modal, member picker, speaker avatar, speaker label editor and the
+ * Settings › Speaker identification panel. Split out of app-shell.css /
+ * recording.css to keep each theme file under ~200 lines (repo convention).
+ */
+
+/* ---------- Speaker avatar ---------- */
+
+.ma-speaker-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ma-radius-pill);
+  font-weight: var(--weight-semibold);
+  color: var(--ma-fg-inverse);
+  flex-shrink: 0;
+}
+
+.ma-speaker-avatar--blue { background: var(--privos-blue); }
+.ma-speaker-avatar--gold { background: var(--privos-gold-deep); }
+.ma-speaker-avatar--green { background: #1f9e6f; }
+.ma-speaker-avatar--purple { background: #7c5cd6; }
+.ma-speaker-avatar--coral { background: #e0685a; }
+.ma-speaker-avatar--teal { background: #1f9ea0; }
+
+/* ---------- Generic modal shell (introduced for resolve-speakers-modal) ---------- */
+
+.ma-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 25, 48, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: var(--space-4);
+}
+
+.ma-modal {
+  background: var(--ma-surface);
+  border-radius: var(--ma-radius-lg);
+  box-shadow: var(--ma-shadow-lg);
+  max-width: 560px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: var(--space-6);
+}
+
+/* ---------- resolve-speakers-modal ---------- */
+
+.ma-resolve-speakers__subtitle {
+  color: var(--ma-fg-2);
+  font-size: var(--body-sm-size);
+  margin: var(--space-2) 0 var(--space-5);
+}
+
+.ma-resolve-speakers__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ma-resolve-speakers__row {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--ma-border-1);
+  border-radius: var(--ma-radius-md);
+}
+
+.ma-resolve-speakers__row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ma-resolve-speakers__row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.ma-resolve-speakers__duration {
+  color: var(--ma-fg-3);
+  font-family: var(--ma-font-mono);
+  font-size: var(--caption-size);
+}
+
+.ma-resolve-speakers__modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: var(--body-sm-size);
+}
+
+.ma-resolve-speakers__modes label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.ma-resolve-speakers__name-input,
+.ma-resolve-speakers__profile-select {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  background: var(--ma-bg-canvas);
+  color: var(--ma-fg-1);
+}
+
+.ma-resolve-speakers__error {
+  color: var(--ma-status-danger);
+  font-size: var(--body-sm-size);
+  margin-top: var(--space-3);
+}
+
+.ma-resolve-speakers__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.ma-resolve-speakers__submit {
+  background: var(--ma-brand-blue);
+  color: var(--ma-fg-inverse);
+  border: none;
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-2) var(--space-5);
+  font-weight: var(--weight-semibold);
+}
+
+.ma-resolve-speakers__later {
+  background: none;
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-2) var(--space-5);
+}
+
+/* ---------- member-picker ---------- */
+
+.ma-member-picker {
+  position: relative;
+}
+
+.ma-member-picker__input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  background: var(--ma-bg-canvas);
+  color: var(--ma-fg-1);
+}
+
+.ma-member-picker__hint {
+  font-size: var(--caption-size);
+  color: var(--ma-fg-3);
+  margin: var(--space-1) 0 0;
+}
+
+.ma-member-picker__list {
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1);
+  border: 1px solid var(--ma-border-1);
+  border-radius: var(--ma-radius-sm);
+  background: var(--ma-surface-raised);
+  color: var(--ma-fg-1);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.ma-member-picker__list button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: var(--space-2);
+  border-radius: var(--ma-radius-sm);
+  min-height: auto;
+}
+
+.ma-member-picker__list button:hover {
+  background: var(--bg-hover);
+}
+
+.ma-member-picker--degraded {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Free-text fallback confirm button. Without explicit theme tokens the browser
+   default (light grey / black text) ignores dark mode. */
+.ma-member-picker__confirm {
+  align-self: flex-start;
+  background: var(--ma-brand-blue);
+  color: var(--ma-fg-inverse);
+  border: none;
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-2) var(--space-4);
+  font-weight: var(--weight-semibold);
+}
+
+.ma-member-picker__confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- speaker-label-editor ---------- */
+
+.ma-speaker-label-editor {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.ma-speaker-label-editor__error {
+  color: var(--ma-status-danger);
+  font-size: var(--caption-size);
+}
+
+/* ---------- settings screen + speaker-identification-panel ---------- */
+
+.ma-settings-screen {
+  padding: var(--space-6);
+  max-width: 960px;
+}
+
+.ma-settings-screen__subtitle {
+  color: var(--ma-fg-2);
+  margin: 0 0 var(--space-6);
+}
+
+.ma-speaker-settings__title {
+  margin: 0 0 var(--space-4);
+}
+
+.ma-speaker-settings__threshold {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--ma-border-1);
+  border-radius: var(--ma-radius-md);
+  margin-bottom: var(--space-6);
+}
+
+.ma-speaker-settings__threshold-warning {
+  flex-basis: 100%;
+  color: var(--ma-fg-3);
+  font-size: var(--caption-size);
+  margin: 0;
+}
+
+.ma-speaker-settings__threshold-notice {
+  flex-basis: 100%;
+  color: var(--ma-status-info);
+  font-size: var(--caption-size);
+  margin: 0;
+}
+
+.ma-speaker-settings__error {
+  color: var(--ma-status-danger);
+}
+
+.ma-speaker-settings__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ma-speaker-settings__table th,
+.ma-speaker-settings__table td {
+  text-align: left;
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--ma-border-1);
+  vertical-align: middle;
+}
+
+.ma-speaker-settings__name-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ma-speaker-settings__actions-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ma-speaker-settings__row-error {
+  color: var(--ma-status-danger);
+  font-size: var(--caption-size);
+  flex-basis: 100%;
+}
