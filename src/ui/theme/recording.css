@@ -61,7 +61,8 @@
   padding: var(--space-3);
   font-size: var(--body-sm-size);
   color: var(--ma-fg-2);
-  background: var(--bg-sunken);
+  background: var(--ma-surface-raised);
+  border: 1px solid var(--ma-border-1);
   border-radius: var(--ma-radius-md);
 }
 
