@@ -34,9 +34,6 @@
   --privos-silver: #dcdcdc;
   --privos-ink: #080d0f;
 
-  --privos-gradient: linear-gradient(90deg, #ffc814 0%, #dcdcdc 100%);
-  --privos-gradient-vert: linear-gradient(180deg, #ffc814 0%, #dcdcdc 100%);
-  --privos-gradient-diag: linear-gradient(135deg, #ffc814 0%, #dcdcdc 100%);
 
   /* ---------- NAVY NEUTRAL SCALE ---------- */
   --navy-50: #e6e8eb;
@@ -137,9 +134,16 @@
   /* ============================================================
      --ma-* ALIAS LAYER — the only tokens app code should reference
      ============================================================ */
-  --ma-bg-canvas: #f4f6f8;
-  --ma-surface: #ffffff;
-  --ma-surface-raised: var(--bg-raised);
+  /*
+   * Surfaces follow the host design system:
+   *   app background -> --base-bg-main   (workspace main bg)
+   *   raised boxes   -> --base-bg-menu   (workspace elevated/menu bg)
+   * Literals are the fallback when running outside the Hub. Buttons already
+   * follow --base-primary via --privos-blue above.
+   */
+  --ma-bg-canvas: var(--base-bg-main, #f4f6f8);
+  --ma-surface: var(--base-bg-menu, #ffffff);
+  --ma-surface-raised: var(--base-bg-menu, var(--bg-raised));
   --ma-border-1: #eceef1;
   --ma-border-2: var(--border-2);
   --ma-fg-1: #001930;
@@ -176,9 +180,9 @@
 }
 
 [data-theme='dark'] {
-  --ma-bg-canvas: var(--navy-500);
-  --ma-surface: var(--navy-surface);
-  --ma-surface-raised: var(--navy-raised);
+  --ma-bg-canvas: var(--base-bg-main, var(--navy-500));
+  --ma-surface: var(--base-bg-menu, var(--navy-surface));
+  --ma-surface-raised: var(--base-bg-menu, var(--navy-raised));
   --ma-border-1: rgba(255, 255, 255, 0.1);
   --ma-border-2: rgba(255, 255, 255, 0.18);
   --ma-fg-1: #ffffff;
