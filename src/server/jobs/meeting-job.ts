@@ -44,6 +44,7 @@ import {
   replaceActionItems,
   upsertMeeting,
   upsertMeetingSpeakers,
+  type LiveIdentity,
   type SpeakerUpsertInput,
 } from './meeting-repository.js';
 
@@ -116,7 +117,7 @@ export function computeAsyncToLiveMap(segments: readonly Segment[], liveTurns: r
  */
 function deriveUserIdentities(
   mapping: ReadonlyMap<string, AsyncToLiveMapping>,
-  liveIdentities: ReadonlyMap<string, { displayName?: string; privosUserId?: string; profileId?: string; nameSource?: string }>,
+  liveIdentities: ReadonlyMap<string, LiveIdentity>,
   createdByUserId: string,
 ): Map<string, UserIdentity> {
   const out = new Map<string, UserIdentity>();
@@ -124,7 +125,7 @@ function deriveUserIdentities(
     if (overlapFraction < USER_IDENTITY_OVERLAP_FRACTION) continue;
     const identity = liveIdentities.get(sessionSpeakerId);
     if (identity?.nameSource === 'user' && identity.displayName) {
-      out.set(speakerId, { displayName: identity.displayName, privosUserId: identity.privosUserId, profileId: identity.profileId, createdByUserId });
+      out.set(speakerId, { displayName: identity.displayName, privosUserId: identity.privosUserId, profileId: identity.profileId, createdByUserId, sessionSpeakerId });
     }
   }
   return out;
@@ -138,12 +139,42 @@ function deriveUserIdentities(
  * then deletes live-only rows that never mapped to an async speaker (noise),
  * EXCEPT a `nameSource:'user'` one (`deleteUnmappedLiveSpeakers`'s own
  * guard) — nothing a human confirmed live is ever silently dropped.
+ *
+ * A `nameSource:'user'` live row is the ONE case `computeAsyncToLiveMap`'s
+ * plain max-overlap winner is not good enough for on its own: below
+ * {@link USER_IDENTITY_OVERLAP_FRACTION} of the async speaker's own time,
+ * folding it in would move that person's name/profile onto a cluster it
+ * mostly does NOT belong to (`mergeLiveIntoAsyncSpeaker`'s `user`-outranks-
+ * everything name priority would make that stick). So a below-floor
+ * `nameSource:'user'` mapping is skipped here entirely — no merge, no
+ * `displayName`/`nameSource`/`profileId` moves onto the async row — leaving
+ * the live row standalone; `deleteUnmappedLiveSpeakers` already never
+ * deletes a `nameSource:'user'` row regardless of the mapped set, so it
+ * survives for the post-meeting resolve screen. Every OTHER (non-`user`)
+ * live row keeps today's unconditional max-overlap folding — the floor is
+ * specifically about human-confirmed identity, not live guesses.
+ *
+ * Returns the mappings that were ACTUALLY merged (a subset of `mapping`),
+ * so the caller's `liveSessionSpeakerId` bookkeeping never claims a merge
+ * that was skipped.
  */
-async function applyLiveReconciliation(db: AppDbBotClient, meetingId: string, mapping: ReadonlyMap<string, AsyncToLiveMapping>): Promise<void> {
-  for (const [speakerId, { sessionSpeakerId }] of mapping) {
+async function applyLiveReconciliation(
+  db: AppDbBotClient,
+  meetingId: string,
+  mapping: ReadonlyMap<string, AsyncToLiveMapping>,
+  liveIdentities: ReadonlyMap<string, LiveIdentity>,
+): Promise<Map<string, string>> {
+  const merged = new Map<string, string>();
+  for (const [speakerId, { sessionSpeakerId, overlapFraction }] of mapping) {
+    const identity = liveIdentities.get(sessionSpeakerId);
+    if (identity?.nameSource === 'user' && overlapFraction < USER_IDENTITY_OVERLAP_FRACTION) {
+      continue; // below the floor — never fold a human-confirmed identity onto the wrong cluster.
+    }
     await mergeLiveIntoAsyncSpeaker(db, meetingId, speakerId, sessionSpeakerId);
+    merged.set(speakerId, sessionSpeakerId);
   }
-  await deleteUnmappedLiveSpeakers(db, meetingId, new Set([...mapping.values()].map((m) => m.sessionSpeakerId)));
+  await deleteUnmappedLiveSpeakers(db, meetingId, new Set(merged.values()));
+  return merged;
 }
 
 /** Best-effort parse of the model's free-text `due` into an ISO date App DB's `date` field accepts; unparseable text is dropped rather than sent as an invalid date (the task text itself still carries any human phrasing like "this weekend"). */
@@ -335,8 +366,7 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       resolved: s.resolved,
       sampleRange: s.sampleRange,
     }));
-    await applyLiveReconciliation(db, job.meetingId, asyncToLiveMap);
-    const liveSessionSpeakerIds = new Map([...asyncToLiveMap].map(([speakerId, m]) => [speakerId, m.sessionSpeakerId]));
+    const liveSessionSpeakerIds = await applyLiveReconciliation(db, job.meetingId, asyncToLiveMap, liveIdentities);
     for (const speaker of speakers) {
       const sessionSpeakerId = liveSessionSpeakerIds.get(speaker.speakerId);
       if (sessionSpeakerId) speaker.liveSessionSpeakerId = sessionSpeakerId;

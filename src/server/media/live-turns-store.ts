@@ -3,8 +3,8 @@
  * chunk worker (`live-speakers/chunk-worker.ts`) calls `appendLiveTurns`
  * after every chunk with the turns it just settled — `speakerKey` there
  * carries the LIVE `sessionSpeakerId`, not a Soniox label, so P3/P6's
- * `reconcileWithLiveSpeakers` (`jobs/meeting-job.ts`) can align it against the
- * async pass's own spans via `caption-aligner.alignByMaxOverlap`. Reading
+ * `computeAsyncToLiveMap`/`applyLiveReconciliation` (`jobs/meeting-job.ts`) can
+ * align it against the async pass's own spans via `caption-aligner.alignByMaxOverlap`. Reading
  * happens BOTH ways: the reconcile hook reads the finished file, and
  * `appendLiveTurns` itself reads-then-writes since there is no server-side
  * "append to file" primitive on Files — safe here because App DB's

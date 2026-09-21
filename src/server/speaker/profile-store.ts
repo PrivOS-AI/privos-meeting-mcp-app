@@ -244,6 +244,16 @@ export interface EnrolInput {
   source: EnrolSource;
   /** Identifies which meeting SPEAKER this vector is for (`sessionSpeakerId` for a live enrol, `speakerId` for a post-meeting one) — enables the idempotent-enrol replace-not-append rule below. */
   speakerKey: string;
+  /**
+   * Other `speakerKey`s (same `meetingId`) that identify the SAME real person
+   * under a DIFFERENT key — e.g. a post-meeting `user-post` enrol also
+   * purges the live `sessionSpeakerId` key a prior one-shot `user-live` enrol
+   * used, so live-then-post never leaves two vectors for one person in one
+   * meeting (the one-vector-per-(profileId,meetingId,person) invariant,
+   * which the primary `speakerKey`-only dedupe below cannot see on its own
+   * since the two enrol sites key by different ids for the same person).
+   */
+  alsoReplaceSpeakerKeys?: readonly string[];
 }
 
 /**
@@ -267,8 +277,8 @@ export async function enrolEmbedding(db: AppDbBotClient, profileId: string, inpu
     const current = rowToProfile(row);
     const createdAt = new Date().toISOString();
 
-    const sourceKey = `${input.meetingId}:${input.speakerKey}`;
-    const withoutSameSource = current.embeddings.filter((e) => `${e.meetingId}:${e.speakerKey}` !== sourceKey);
+    const purgeKeys = new Set<string>([input.speakerKey, ...(input.alsoReplaceSpeakerKeys ?? [])]);
+    const withoutSameSource = current.embeddings.filter((e) => !(e.meetingId === input.meetingId && purgeKeys.has(e.speakerKey)));
     const nextEmbeddings = [
       ...withoutSameSource,
       { vector: input.vector, meetingId: input.meetingId, durationSec: input.durationSec, createdAt, speakerKey: input.speakerKey, source: input.source },
@@ -349,7 +359,7 @@ export async function findOrCreateProfileAndEnrol(
   db: AppDbBotClient,
   identity: EnrolIdentity,
   vector: Float32Array,
-  meta: { meetingId: string; durationSec: number; source: EnrolSource; speakerKey: string },
+  meta: { meetingId: string; durationSec: number; source: EnrolSource; speakerKey: string; alsoReplaceSpeakerKeys?: readonly string[] },
 ): Promise<{ profile: SpeakerProfile; vectorCountAfter: number } | null> {
   let profile: SpeakerProfile | null = null;
   if (identity.profileId) {
@@ -376,6 +386,7 @@ export async function findOrCreateProfileAndEnrol(
     durationSec: meta.durationSec,
     source: meta.source,
     speakerKey: meta.speakerKey,
+    alsoReplaceSpeakerKeys: meta.alsoReplaceSpeakerKeys,
   });
   return { profile, vectorCountAfter };
 }

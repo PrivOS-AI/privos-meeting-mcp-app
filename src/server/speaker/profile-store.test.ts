@@ -82,6 +82,24 @@ describe('profile-store', () => {
     expect(reloaded?.sampleCount).toBe(10);
   });
 
+  it('enrolEmbedding with alsoReplaceSpeakerKeys purges a DIFFERENT speakerKey for the same meeting (live-then-post one-vector-per-person invariant)', async () => {
+    const profile = await createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
+    await enrolEmbedding(db(), profile.id, { vector: vec(1), meetingId: 'm1', durationSec: 21, source: 'user-live', speakerKey: 'ss-1' });
+    expect((await getProfile(db(), profile.id))?.embeddings).toHaveLength(1);
+
+    await enrolEmbedding(db(), profile.id, { vector: vec(2), meetingId: 'm1', durationSec: 30, source: 'user-post', speakerKey: 'spkA', alsoReplaceSpeakerKeys: ['ss-1'] });
+
+    const reloaded = await getProfile(db(), profile.id);
+    expect(reloaded?.embeddings).toHaveLength(1); // the old `ss-1` vector was purged, not kept alongside the new `spkA` one
+    expect(reloaded?.embeddings[0].meetingId).toBe('m1');
+
+    // A DIFFERENT meeting's embedding under the same alternate key is untouched — the purge is meetingId-scoped.
+    await enrolEmbedding(db(), profile.id, { vector: vec(3), meetingId: 'm2', durationSec: 10, source: 'user-live', speakerKey: 'ss-1' });
+    await enrolEmbedding(db(), profile.id, { vector: vec(4), meetingId: 'm3', durationSec: 10, source: 'user-post', speakerKey: 'spkB', alsoReplaceSpeakerKeys: ['ss-1'] });
+    const final = await getProfile(db(), profile.id);
+    expect(final?.embeddings.map((e) => e.meetingId).sort()).toEqual(['m1', 'm2', 'm3']);
+  });
+
   it('removeEmbeddingsOfMeeting drops only the targeted meeting and recomputes centroid', async () => {
     const profile = await createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
     await enrolEmbedding(db(), profile.id, { vector: vec(1), meetingId: 'm1', durationSec: 10, source: 'auto-post', speakerKey: 'm1' });

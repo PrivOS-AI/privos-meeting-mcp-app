@@ -77,8 +77,8 @@ const DIGEST = MEETING_ID.slice(0, 8);
 const ROOM_ID = 'room-1';
 const FOLDER_ID = 'folder-1';
 
-/** Composite hub: `mcp-apps.tool-call` (App DB, via `installFakeHub`) + the Files REST endpoints `meeting-job.ts` calls directly (upload/download/delete/list). */
-function buildJobHub(fixtureBytes: Buffer): RoomBoundHubClient {
+/** Composite hub: `mcp-apps.tool-call` (App DB, via `installFakeHub`) + the Files REST endpoints `meeting-job.ts` calls directly (upload/download/delete/list). `liveTurns`, when given, serves a real `live-turns.json` so `computeAsyncToLiveMap`/`applyLiveReconciliation` have something to reconcile against — omitted, the meeting behaves as if it never went live. */
+function buildJobHub(fixtureBytes: Buffer, liveTurns?: { fileId: string; json: string }): RoomBoundHubClient {
   return {
     authorizedFetch: vi.fn(async (requestPath: string, init: RoomBoundHubFetchInit) => {
       if (requestPath === '/api/v1/file-management.files.upload') {
@@ -91,6 +91,15 @@ function buildJobHub(fixtureBytes: Buffer): RoomBoundHubClient {
         deletedFileIds.push(fileId);
         return { ok: true, status: 200, json: async () => ({ success: true }) } as unknown as Response;
       }
+      if (liveTurns && requestPath === `/api/v1/file-management.files/${encodeURIComponent(liveTurns.fileId)}/download`) {
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(liveTurns.json));
+            controller.close();
+          },
+        });
+        return { ok: true, status: 200, body: stream } as unknown as Response;
+      }
       if (requestPath.includes('/download')) {
         const stream = new ReadableStream({
           start(controller) {
@@ -101,6 +110,13 @@ function buildJobHub(fixtureBytes: Buffer): RoomBoundHubClient {
         return { ok: true, status: 200, body: stream } as unknown as Response;
       }
       if (requestPath.startsWith('/api/v1/file-management.files.channel/')) {
+        if (liveTurns) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ success: true, files: [{ _id: liveTurns.fileId, name: 'live-turns.json', channel_id: ROOM_ID, folder_id: FOLDER_ID }] }),
+          } as unknown as Response;
+        }
         // No live-turns.json in this test — computeAsyncToLiveMap short-circuits to an empty map.
         return { ok: true, status: 200, json: async () => ({ success: true, files: [] }) } as unknown as Response;
       }
@@ -195,6 +211,48 @@ describe('runMeetingJob — integration (real ffmpeg decode)', () => {
     expect(meetingRow?.status).toBe('failed');
     // transcript/summary artifacts never got a chance to upload.
     expect(uploadedFiles.length).toBe(1); // only audio.webm, uploaded BEFORE transcribe runs
+  });
+
+  it('H1: a user-named live speaker overlapping an async cluster BELOW the 0.6 floor is never folded onto it — the live row survives standalone, the async speaker stays unnamed', async () => {
+    // One async speaker, s1, with one CONTIGUOUS 10s segment (0-10000ms).
+    const tokens = Array.from({ length: 10 }, (_, i) => ({ text: `w${i}`, startMs: i * 1000, endMs: (i + 1) * 1000, speaker: 's1', isFinal: true }));
+    fakeAsyncProvider.transcribeFile.mockResolvedValueOnce({ tokens, segments: [], language: 'vi' });
+
+    // The live speaker only overlaps the FIRST 3s of s1's 10s segment -> 0.3 overlap fraction, well below the 0.6 floor.
+    const liveTurns = { fileId: 'live-turns-file-1', json: JSON.stringify({ turns: [{ id: 't1', speakerKey: 'ss-user', startMs: 0, endMs: 3000, text: '', sessionIndex: 0 }] }) };
+    store.meeting_speakers.push({
+      _id: 'live-user-1',
+      meeting: MEETING_ID,
+      sessionSpeakerId: 'ss-user',
+      nameSource: 'user',
+      displayName: 'Thanh',
+      privosUserId: 'user-thanh',
+      resolved: true,
+    });
+
+    const hub = buildJobHub(fixtureBytes, liveTurns);
+    const parts = [{ fileId: 'part-0', seq: 0, name: `audio.part-0000-${DIGEST}.webm` }];
+    const job = freshJob();
+
+    await runMeetingJob({ job, roomId: ROOM_ID, folderId: FOLDER_ID, parts, agentBotHub: hub, signal: new AbortController().signal });
+
+    const jobRow = store.processing_jobs.find((r) => r._id === 'job-row-1');
+    expect(jobRow?.status).toBe('completed');
+
+    // The live row survives standalone — never merged, never deleted, identity untouched.
+    const liveRow = store.meeting_speakers.find((r) => r.sessionSpeakerId === 'ss-user')!;
+    expect(liveRow).toBeDefined();
+    expect(liveRow.nameSource).toBe('user');
+    expect(liveRow.displayName).toBe('Thanh');
+    expect(liveRow.speakerId).toBeFalsy(); // never absorbed into the async row
+
+    // The async speaker never received the live identity: no merge, no name, no profile.
+    const asyncRow = store.meeting_speakers.find((r) => r.speakerId === 's1')!;
+    expect(asyncRow).toBeDefined();
+    expect(asyncRow.sessionSpeakerId).toBeFalsy();
+    expect(asyncRow.nameSource).not.toBe('user');
+    expect(asyncRow.displayName).not.toBe('Thanh');
+    expect(asyncRow.profileId).toBeFalsy();
   });
 });
 

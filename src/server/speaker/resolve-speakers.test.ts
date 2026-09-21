@@ -155,6 +155,26 @@ describe('resolveSpeakers', () => {
     expect(created?.embeddings).toHaveLength(1);
   });
 
+  it('M2: a post-meeting user-post enrol replaces a prior one-shot user-live vector for the SAME person, never leaving two', async () => {
+    const profile = await profileStore.createProfile(db(), { displayName: 'Binh', createdByUserId: 'owner-1', privosUserId: 'user-binh' });
+    // Simulate the earlier live one-shot enrol — keyed by the LIVE sessionSpeakerId, not the async speakerId.
+    await profileStore.enrolEmbedding(db(), profile.id, { vector: new Float32Array([0, 1, 0, 0]), meetingId: 'meeting-1', durationSec: 21, source: 'user-live', speakerKey: 'ss-1' });
+    expect((await profileStore.getProfile(db(), profile.id))?.embeddings).toHaveLength(1);
+
+    const segments = [seg('spkA', 0, 3), seg('spkA', 5, 8)];
+    for (const s of segments) rangeMarkers.set(`${s.startSec}:${s.endSec}`, VOICE_A);
+
+    // The job carries `sessionSpeakerId: 'ss-1'` on the identity — the same live speaker that already enrolled once.
+    const userIdentityBySpeakerId = new Map([['spkA', { displayName: 'Binh', privosUserId: 'user-binh', createdByUserId: 'owner-1', sessionSpeakerId: 'ss-1' }]]);
+    const [result] = await resolveSpeakers(db(), '/fake/wav.wav', segments, 'meeting-1', userIdentityBySpeakerId);
+
+    expect(result.resolved).toBe(true);
+    expect(result.profileId).toBe(profile.id);
+
+    const reloaded = await profileStore.getProfile(db(), profile.id);
+    expect(reloaded?.embeddings).toHaveLength(1); // replaced the user-live vector — never two for one person in one meeting
+  });
+
   it('reports "too little data" (no pendingEmbedding) when a speaker has no segment long/wordy enough to pick', async () => {
     const segments = [{ id: 's1', speakerId: 'spkShort', startSec: 0, endSec: 0.5, text: 'um', lang: 'vi', tokenCount: 1 }];
     const [result] = await resolveSpeakers(db(), '/fake/wav.wav', segments, 'meeting-1');

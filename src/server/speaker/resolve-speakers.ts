@@ -39,6 +39,8 @@ export interface UserIdentity {
   profileId?: string;
   createdByUserId: string;
   createdInRoomId?: string;
+  /** The live `sessionSpeakerId` this identity came from, when known — passed through as `alsoReplaceSpeakerKeys` on the `user-post` enrol so a prior one-shot `user-live` vector for the SAME person (keyed by `sessionSpeakerId`) is replaced, never left alongside the new `user-post` one (one vector per person per meeting). */
+  sessionSpeakerId?: string;
 }
 
 export interface ResolvedSpeaker {
@@ -280,6 +282,8 @@ export async function resolveSpeakers(
         durationSec: plan.totalSec,
         source: 'user-post',
         speakerKey: plan.speakerId,
+        // Replaces (never duplicates) a prior one-shot `user-live` vector for the SAME person in this SAME meeting.
+        alsoReplaceSpeakerKeys: userIdentity.sessionSpeakerId ? [userIdentity.sessionSpeakerId] : undefined,
       });
       if (!enrolResult) {
         // The explicit merge target (mode 'merge', carried via `userIdentity.profileId`) vanished mid-job — still named, never silently dropped.
