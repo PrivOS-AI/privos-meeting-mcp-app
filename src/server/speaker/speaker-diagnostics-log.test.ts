@@ -185,6 +185,7 @@ describe('speaker-diagnostics-log', () => {
       scores: [],
       sticky: true,
       action: 'folded',
+      updateAction: 'recent',
     });
 
     let uploadedText = '';

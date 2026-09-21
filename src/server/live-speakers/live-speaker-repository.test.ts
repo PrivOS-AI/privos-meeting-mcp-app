@@ -120,12 +120,16 @@ describe('live-speaker-repository', () => {
     const meetingId = `m-${Math.random()}`;
     const original = new MeetingSessionRegistry(meetingId);
     original.observe('s0:1', new Float32Array([1, 0, 0, 0]), 20, seg('s0:1', 0)); // A: speechSec=20
-    original.observe('s0:2', new Float32Array([0, 1, 0, 0]), 5, seg('s0:2', 30_000)); // B: distinct, speechSec=5
+    original.observe('s0:2', new Float32Array([0, 1, 0, 0]), 5, seg('s0:2', 30_000)); // B: distinct, speechSec=5, brand new
     await upsertAll(db(), meetingId, original); // both rows persisted independently
     expect(store.meeting_speakers).toHaveLength(2);
 
-    // B's centroid converges onto A's — merges in-memory (default streak=1, no identity conflict).
-    original.observe('s0:2', new Float32Array([1, 0, 0, 0]), 5, seg('s0:2', 36_000));
+    // B's centroid converges onto A's in two steps — each clears its own
+    // per-turn fold-verify check (cos to B's best held vector: 0.8, then 0.6;
+    // "verify non-sticky folds too" runs on every turn now, so a single big
+    // jump straight from B's first turn would instead open a fresh instance).
+    original.observe('s0:2', new Float32Array([0.6, 0.8, 0, 0]), 5, seg('s0:2', 36_000));
+    original.observe('s0:2', new Float32Array([1, 0, 0, 0]), 5, seg('s0:2', 42_000)); // merges in-memory (default streak=1, no identity conflict)
     const active = original.snapshot().filter((s) => !s.mergedInto);
     expect(active).toHaveLength(1);
     const winnerId = active[0].sessionSpeakerId;
@@ -133,14 +137,14 @@ describe('live-speaker-repository', () => {
     await upsertAll(db(), meetingId, original);
     expect(store.meeting_speakers).toHaveLength(1); // the loser's row was deleted, not just left stale
     expect(store.meeting_speakers[0].sessionSpeakerId).toBe(winnerId);
-    expect(store.meeting_speakers[0].liveSpeechSec).toBeCloseTo(30);
+    expect(store.meeting_speakers[0].liveSpeechSec).toBeCloseTo(35); // A(20) + B(5+5+5)
 
     // Simulate a restart: nothing in the process-wide store for this meeting yet.
     const rebuilt = await ensureRegistry(db(), meetingId);
     const rebuiltSnap = rebuilt.snapshot();
     expect(rebuiltSnap).toHaveLength(1); // never reloads as two overlapping speakers
     expect(rebuiltSnap[0].sonioxLabels.sort()).toEqual(['s0:1', 's0:2']);
-    expect(rebuiltSnap[0].liveSpeechSec).toBeCloseTo(30);
+    expect(rebuiltSnap[0].liveSpeechSec).toBeCloseTo(35);
   });
 
   it('merges field-by-field: a live write never clobbers fields it does not itself set', async () => {

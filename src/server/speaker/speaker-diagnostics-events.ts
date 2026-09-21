@@ -44,6 +44,8 @@ export interface ObserveEvent extends EventEnvelope {
   scores: { id: string; cosCentroid: number; cosMaxHeld: number }[];
   sticky: boolean;
   action: 'folded' | 'new' | 'reinstanced';
+  /** Whether this embedding touched its target's centroid — `session-speaker-centroid.ts#UpdateAction`. Independent of `action`: a `folded` turn can still be `rejected-short`/`rejected-low-cos` (attributed, never folded into the centroid). */
+  updateAction: 'anchor' | 'recent' | 'rejected-low-cos' | 'rejected-short' | 'provisional';
 }
 
 export interface MergeEvent extends EventEnvelope {
@@ -96,7 +98,7 @@ export const SHARED_FIELDS = ['t', 'meetingId', 'type'] as const;
 export const NODE_ALLOWLISTS: Record<DiagnosticEvent['type'], readonly string[]> = {
   chunk: [...SHARED_FIELDS, 'seq', 'spans', 'clientDurationMs', 'decodedDurationSec', 'uploadLagMs', 'captureDriftMs', 'overlapSec', 'deferredCount', 'skipped', 'ok'],
   gap: [...SHARED_FIELDS, 'fromSeq', 'toSeq'],
-  observe: [...SHARED_FIELDS, 'seq', 'label', 'startMs', 'endMs', 'durSec', 'final', 'targetId', 'decisionScore', 'scores', 'sticky', 'action'],
+  observe: [...SHARED_FIELDS, 'seq', 'label', 'startMs', 'endMs', 'durSec', 'final', 'targetId', 'decisionScore', 'scores', 'sticky', 'action', 'updateAction'],
   merge: [...SHARED_FIELDS, 'winnerId', 'loserId', 'cos', 'winnerSpeechSec', 'loserSpeechSec', 'winnerNamed', 'loserNamed', 'streak', 'blockedBy'],
   centroids: [...SHARED_FIELDS, 'pairs'],
   'profile-match': [...SHARED_FIELDS, 'sessionSpeakerId', 'attempt', 'best', 'second', 'threshold', 'accepted'],

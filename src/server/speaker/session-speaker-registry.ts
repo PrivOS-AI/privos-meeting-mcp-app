@@ -18,12 +18,10 @@
 import { randomUUID } from 'node:crypto';
 
 import { cosineSimilarity } from '../../shared/cosine.js';
-import { env } from '../env.js';
+import { env, type SessionScoreMode } from '../env.js';
 import { canMerge, identityOutranks, isExplicitMergeRequest, mergePairKey, nextMergeStreak, type MergeBlockReason, type MergeCandidate, type MergeStreakEntry } from './session-speaker-merge-policy.js';
-import { matchSpeaker } from './speaker-matcher.js';
-import type { SpeakerProfile } from './profile-store.js';
+import { SessionSpeakerCentroid, type UpdateAction } from './session-speaker-centroid.js';
 
-const EMBEDDING_CAP = 10;
 const PALETTE = ['blue', 'gold', 'green', 'purple', 'coral', 'teal'] as const;
 /** Idle-registry eviction (S2-13) — no chunk processed for this long -> the registry-of-registries drops the meeting entirely. */
 export const REGISTRY_TTL_MS = 30 * 60 * 1000;
@@ -52,7 +50,7 @@ export interface ObserveFact {
   durSec: number;
   final: boolean;
   targetId: string;
-  /** The score the code actually decided on for `targetId` (max over its held embeddings) — 0 for a brand-new speaker with nothing held yet. */
+  /** The score the code actually decided on for `targetId` — the SAME score used for the ASSIGN decision (mode-dependent: max-over-held or cosine-to-centroid, `env.speakerSessionScoreMode`), reused for the UPDATE gate too. 0 for a brand-new speaker with nothing held yet. */
   decisionScore: number;
   scores: { id: string; cosCentroid: number; cosMaxHeld: number }[];
   /** Whether `targetId` is sticky AFTER this turn folded in. */
@@ -66,6 +64,8 @@ export interface ObserveFact {
    * diagnostically interesting moment, whichever way its embedding then lands.
    */
   action: 'folded' | 'new' | 'reinstanced';
+  /** Whether this embedding actually touched `targetId`'s centroid — see `session-speaker-centroid.ts#UpdateAction`. Independent of `action`: a turn can be `folded` (attributed to this speaker) yet `rejected-short`/`rejected-low-cos` (never reaches the centroid). */
+  updateAction: UpdateAction;
 }
 
 /**
@@ -133,8 +133,7 @@ export interface LoadableSpeakerRow {
 interface SessionSpeaker {
   sessionSpeakerId: string;
   sonioxLabels: string[];
-  centroid: Float32Array | null;
-  embeddings: Float32Array[];
+  centroidState: SessionSpeakerCentroid;
   speechSec: number;
   turnCount: number;
   sticky: boolean;
@@ -148,17 +147,6 @@ interface SessionSpeaker {
   mergedInto?: string;
 }
 
-function meanNormalize(vectors: readonly Float32Array[]): Float32Array {
-  const dim = vectors[0].length;
-  const out = new Float32Array(dim);
-  for (const v of vectors) {
-    if (v.length !== dim) continue;
-    for (let i = 0; i < dim; i++) out[i] += v[i];
-  }
-  for (let i = 0; i < dim; i++) out[i] /= vectors.length;
-  return out;
-}
-
 /** `s0:1` -> `s0:1@2` -> `s0:1@3` — next free instance suffix for a label a provider reused on a different voice. */
 function nextInstanceLabel(label: string, alreadyTaken: ReadonlySet<string>): string {
   const base = label.split('@')[0];
@@ -170,6 +158,25 @@ function nextInstanceLabel(label: string, alreadyTaken: ReadonlySet<string>): st
 /** `cosineSimilarity` without its length-mismatch throw — diagnostics scoring compares against every live speaker, including one built from a since-swapped embedding model. */
 function safeCosine(a: Float32Array, b: Float32Array): number {
   return a.length === b.length ? cosineSimilarity(a, b) : 0;
+}
+
+/**
+ * The SAME score `observe` uses both to decide ASSIGN (which session speaker a
+ * turn belongs to) and, when folded, whether it clears UPDATE (may change the
+ * centroid) — session assignment's OWN scoring function, replacing the old
+ * borrow of `speaker-matcher.ts#matchSpeaker` over "pseudo-profiles" so a
+ * future change to real-profile matching cannot silently alter session
+ * assignment (`env.speakerSessionScoreMode`, `SPEAKER_SESSION_SCORE_MODE`).
+ *  - `max` (today): max cosine over `speaker`'s currently held embeddings
+ *    (anchors ∪ recent) — reproduces `matchSpeaker`'s per-vector comparison.
+ *  - `centroid`: cosine to `speaker`'s current centroid — systematically
+ *    lower at the same threshold (mean pulls toward the average voice).
+ * 0 when `speaker` has no centroid yet (nothing held).
+ */
+function scoreAgainstSessionSpeaker(embedding: Float32Array, speaker: SessionSpeaker, mode: SessionScoreMode): number {
+  if (!speaker.centroidState.centroid) return 0;
+  if (mode === 'centroid') return safeCosine(embedding, speaker.centroidState.centroid);
+  return speaker.centroidState.heldVectors().reduce((max, held) => Math.max(max, safeCosine(embedding, held)), 0);
 }
 
 /** The minimum pairwise cosine across a set of held embeddings — 1 (trivially "coherent") when there are fewer than 2, same convention as `resolve-speakers.ts`'s post-meeting coherence score. */
@@ -252,8 +259,7 @@ export class MeetingSessionRegistry {
     const speaker: SessionSpeaker = {
       sessionSpeakerId: randomUUID(),
       sonioxLabels: [],
-      centroid: null,
-      embeddings: [],
+      centroidState: new SessionSpeakerCentroid(env.speakerSessionCentroidMode),
       speechSec: 0,
       turnCount: 0,
       sticky: false,
@@ -443,29 +449,42 @@ export class MeetingSessionRegistry {
     // speaker, taken BEFORE it folds into whichever one wins below.
     const scores = onFact
       ? [...this.byId.values()]
-          .filter((s) => !s.mergedInto && s.centroid)
+          .filter((s) => !s.mergedInto && s.centroidState.centroid)
           .map((s) => ({
             id: s.sessionSpeakerId,
-            cosCentroid: safeCosine(embedding, s.centroid!),
-            cosMaxHeld: s.embeddings.reduce((max, held) => Math.max(max, safeCosine(embedding, held)), 0),
+            cosCentroid: safeCosine(embedding, s.centroidState.centroid!),
+            cosMaxHeld: s.centroidState.heldVectors().reduce((max, held) => Math.max(max, safeCosine(embedding, held)), 0),
           }))
       : [];
 
+    const scoreMode = env.speakerSessionScoreMode;
     let target = this.byLabel.get(label);
     let reinstanced = false;
-    if (target && target.sticky && target.centroid && cosineSimilarity(embedding, target.centroid) < env.speakerSessionMatchThreshold) {
-      // The label was recycled for a different voice — detach it from its old
-      // owner (whose centroid is left untouched) and open a fresh instance.
-      this.byLabel.delete(label);
-      label = nextInstanceLabel(label, new Set(target.sonioxLabels));
-      target = undefined;
-      reinstanced = true;
+    /** The ASSIGN score that actually decided this turn's target — reused below for the UPDATE gate (same score, same comparison, per plan.md: "the code actually decided on"). `undefined` only for a brand-new speaker with nothing to score against. */
+    let assignScore: number | undefined;
+
+    if (target) {
+      // Verify EVERY direct-label fold, sticky or not (today only checked once
+      // sticky — a non-sticky label folded blindly, letting a foreign voice on
+      // a just-recycled label silently contaminate a brand-new speaker).
+      const score = scoreAgainstSessionSpeaker(embedding, target, scoreMode);
+      if (score < env.speakerSessionMatchThreshold) {
+        // The label was recycled for a different voice — detach it from its old
+        // owner (whose centroid is left untouched) and open a fresh instance.
+        this.byLabel.delete(label);
+        label = nextInstanceLabel(label, new Set(target.sonioxLabels));
+        target = undefined;
+        reinstanced = true;
+      } else {
+        assignScore = score;
+      }
     }
 
     let createdNew = false;
     if (!target) {
-      const hit = matchSpeaker(embedding, this.asPseudoProfiles(), env.speakerSessionMatchThreshold);
-      target = hit.profileId ? this.byId.get(hit.profileId) : undefined;
+      const hit = this.bestSessionMatch(embedding, scoreMode);
+      target = hit?.speaker;
+      assignScore = hit?.score;
       if (!target) {
         target = this.createSessionSpeaker();
         createdNew = true;
@@ -474,9 +493,23 @@ export class MeetingSessionRegistry {
       this.byLabel.set(label, target);
     }
 
-    target.embeddings.push(embedding);
-    if (target.embeddings.length > EMBEDDING_CAP) target.embeddings.splice(0, target.embeddings.length - EMBEDDING_CAP);
-    target.centroid = meanNormalize(target.embeddings);
+    // UPDATE gate: a brand-new speaker's first-ever embedding is exempt
+    // (nothing to compare against yet) but marked provisional; otherwise a
+    // turn must clear BOTH the duration floor and the UPDATE threshold
+    // (reusing `assignScore`, the same score that decided ASSIGN above) to
+    // touch the centroid — a turn that fails either is still ATTRIBUTED to
+    // `target` (counts as speech, shows in the UI), just never folds in.
+    let updateAction: UpdateAction;
+    if (target.centroidState.isEmpty) {
+      updateAction = target.centroidState.add(embedding, durSec, { updateThreshold: env.speakerSessionUpdateThreshold });
+    } else if (durSec < env.speakerUpdateMinSegmentSec) {
+      updateAction = 'rejected-short';
+    } else if ((assignScore ?? 0) < env.speakerSessionUpdateThreshold) {
+      updateAction = 'rejected-low-cos';
+    } else {
+      updateAction = target.centroidState.add(embedding, durSec, { updateThreshold: env.speakerSessionUpdateThreshold });
+    }
+
     target.speechSec += durSec;
     target.turnCount += 1;
     target.sticky = target.turnCount >= 2 && target.speechSec >= env.liveMinSpeechSec;
@@ -485,7 +518,6 @@ export class MeetingSessionRegistry {
     this.lastActivityAt = Date.now();
 
     if (onFact) {
-      const decisionScore = scores.find((s) => s.id === target!.sessionSpeakerId)?.cosMaxHeld ?? 0;
       onFact({
         kind: 'observe',
         label,
@@ -494,41 +526,34 @@ export class MeetingSessionRegistry {
         durSec,
         final: seg.final,
         targetId: target.sessionSpeakerId,
-        decisionScore,
+        decisionScore: assignScore ?? 0,
         scores,
         sticky: target.sticky,
         action: reinstanced ? 'reinstanced' : createdNew ? 'new' : 'folded',
+        updateAction,
       });
     }
 
     this.maybeMerge(target, onFact);
   }
 
-  /** This meeting's OWN session speakers, reused as `speaker-matcher.ts` "profiles" (its `id` doubles as `sessionSpeakerId`) — lets `observe` reuse the exact same best-match-above-threshold logic P4 uses against real profiles. */
-  private asPseudoProfiles(): SpeakerProfile[] {
-    const out: SpeakerProfile[] = [];
+  /** Best-scoring OTHER session speaker clearing ASSIGN, or `undefined` — session assignment's OWN match, replacing the old borrow of `speaker-matcher.ts#matchSpeaker` over pseudo-profiles (plan.md: "so phase 7's matcher change cannot silently alter session assignment"). Mirrors `matchSpeaker`'s best-over-candidates behaviour exactly under `scoreMode:'max'`. */
+  private bestSessionMatch(embedding: Float32Array, scoreMode: SessionScoreMode): { speaker: SessionSpeaker; score: number } | undefined {
+    let best: { speaker: SessionSpeaker; score: number } | undefined;
     for (const speaker of this.byId.values()) {
-      if (speaker.mergedInto || !speaker.centroid) continue;
-      out.push({
-        id: speaker.sessionSpeakerId,
-        displayName: speaker.displayName ?? '',
-        colorKey: speaker.colorKey,
-        createdByUserId: '',
-        embeddings: speaker.embeddings.map((vector) => ({ vector, meetingId: this.meetingId, durationSec: 0, createdAt: '', speakerKey: speaker.sessionSpeakerId })),
-        centroid: speaker.centroid,
-        dim: speaker.centroid.length,
-        sampleCount: speaker.embeddings.length,
-      });
+      if (speaker.mergedInto) continue;
+      const score = scoreAgainstSessionSpeaker(embedding, speaker, scoreMode);
+      if (score >= env.speakerSessionMatchThreshold && (!best || score > best.score)) best = { speaker, score };
     }
-    return out;
+    return best;
   }
 
   /** `SessionSpeaker` -> the narrow shape `session-speaker-merge-policy.ts` actually needs — never the full internal object. */
   private toMergeCandidate(speaker: SessionSpeaker): MergeCandidate {
     return {
-      centroid: speaker.centroid!,
+      centroid: speaker.centroidState.centroid!,
       speechSec: speaker.speechSec,
-      embeddingCount: speaker.embeddings.length,
+      embeddingCount: speaker.centroidState.heldVectors().length,
       displayName: speaker.displayName,
       profileId: speaker.profileId,
       nameSource: speaker.nameSource,
@@ -572,8 +597,7 @@ export class MeetingSessionRegistry {
       if (!winner.sonioxLabels.includes(label)) winner.sonioxLabels.push(label);
       this.byLabel.set(label, winner);
     }
-    winner.embeddings = [...winner.embeddings, ...loser.embeddings].slice(-EMBEDDING_CAP);
-    winner.centroid = meanNormalize(winner.embeddings);
+    winner.centroidState.absorb(loser.centroidState);
     winner.speechSec += loser.speechSec;
     winner.turnCount += loser.turnCount;
     winner.sticky = winner.turnCount >= 2 && winner.speechSec >= env.liveMinSpeechSec;
@@ -612,10 +636,12 @@ export class MeetingSessionRegistry {
    * reproduces today's single-shot-on-first-clear behaviour.
    */
   private maybeMerge(changed: SessionSpeaker, onFact?: SpeakerRegistryFactListener): void {
-    if (!changed.centroid) return;
+    const changedCentroid = changed.centroidState.centroid;
+    if (!changedCentroid) return;
     for (const other of this.byId.values()) {
-      if (other === changed || other.mergedInto || !other.centroid) continue;
-      const cos = cosineSimilarity(changed.centroid, other.centroid);
+      const otherCentroid = other.centroidState.centroid;
+      if (other === changed || other.mergedInto || !otherCentroid) continue;
+      const cos = cosineSimilarity(changedCentroid, otherCentroid);
       const key = mergePairKey(changed.sessionSpeakerId, other.sessionSpeakerId);
       if (cos < env.speakerSessionMergeThreshold) {
         this.mergeStreaks.delete(key);
@@ -633,10 +659,10 @@ export class MeetingSessionRegistry {
 
       const streakResult = isExplicitMergeRequest(a, b)
         ? { count: Math.max(1, env.speakerSessionMergeStreak), satisfied: true }
-        : nextMergeStreak(this.mergeStreaks.get(key), cos, env.speakerSessionMergeThreshold, changed.centroid, other.centroid, env.speakerSessionMergeStreak);
+        : nextMergeStreak(this.mergeStreaks.get(key), cos, env.speakerSessionMergeThreshold, changedCentroid, otherCentroid, env.speakerSessionMergeStreak);
 
       if (!streakResult.satisfied) {
-        this.mergeStreaks.set(key, { count: streakResult.count, lastCentroidA: changed.centroid, lastCentroidB: other.centroid });
+        this.mergeStreaks.set(key, { count: streakResult.count, lastCentroidA: changedCentroid, lastCentroidB: otherCentroid });
         onFact?.(this.buildMergeFact(changed, other, cos, streakResult.count, 'streak'));
         continue;
       }
@@ -657,7 +683,7 @@ export class MeetingSessionRegistry {
   }
 
   centroidFor(sessionSpeakerId: string): Float32Array | null {
-    return this.byId.get(sessionSpeakerId)?.centroid ?? null;
+    return this.byId.get(sessionSpeakerId)?.centroidState.centroid ?? null;
   }
 
   /**
@@ -704,18 +730,19 @@ export class MeetingSessionRegistry {
 
   /**
    * Coherence stats over this session speaker's CURRENTLY held embeddings
-   * (capped at `EMBEDDING_CAP`) — feeds `sealPendingEmbedding`'s meta at
-   * `upsertAll` time so a live row's `pendingEmbedding` is a REAL envelope
-   * (root cause 1: production used to seal a plain centroid with no coherence
-   * data at all, so `speaker_resolve` could never enrol it). `null` when the
-   * speaker has no centroid yet (nothing observed).
+   * (anchors ∪ recent) — feeds `sealPendingEmbedding`'s meta at `upsertAll`
+   * time so a live row's `pendingEmbedding` is a REAL envelope (root cause 1:
+   * production used to seal a plain centroid with no coherence data at all,
+   * so `speaker_resolve` could never enrol it). `null` when the speaker has no
+   * centroid yet (nothing observed).
    */
   coherenceFor(sessionSpeakerId: string): { minPairwiseCosine: number; rangeCount: number; durationSec: number } | null {
     const speaker = this.byId.get(sessionSpeakerId);
-    if (!speaker || !speaker.centroid) return null;
+    if (!speaker || !speaker.centroidState.centroid) return null;
+    const held = speaker.centroidState.heldVectors();
     return {
-      minPairwiseCosine: minPairwiseCosineOfHeld(speaker.embeddings),
-      rangeCount: speaker.embeddings.length,
+      minPairwiseCosine: minPairwiseCosineOfHeld(held),
+      rangeCount: held.length,
       durationSec: speaker.speechSec,
     };
   }
@@ -784,8 +811,9 @@ export class MeetingSessionRegistry {
       const speaker: SessionSpeaker = {
         sessionSpeakerId: row.sessionSpeakerId,
         sonioxLabels: [...row.sonioxLabels],
-        centroid: row.centroid,
-        embeddings: row.centroid ? [row.centroid] : [],
+        centroidState: row.centroid
+          ? SessionSpeakerCentroid.fromRestoredCentroid(env.speakerSessionCentroidMode, row.centroid, row.liveSpeechSec)
+          : new SessionSpeakerCentroid(env.speakerSessionCentroidMode),
         speechSec: row.liveSpeechSec,
         turnCount: 2,
         sticky: true,

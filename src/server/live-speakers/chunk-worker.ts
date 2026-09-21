@@ -129,6 +129,7 @@ function toDiagnosticEvent(meetingId: string, seq: number, fact: SpeakerRegistry
       scores: fact.scores,
       sticky: fact.sticky,
       action: fact.action,
+      updateAction: fact.updateAction,
     };
   }
   return {

@@ -11,6 +11,15 @@ function seg(speaker: string, startMs: number, endMs = startMs + 3000, final = t
   return { speaker, startMs, endMs, final };
 }
 
+function collectFacts() {
+  const facts: SpeakerRegistryFact[] = [];
+  return { facts, onFact: (f: SpeakerRegistryFact) => facts.push(f) };
+}
+
+function observeFactsOf(facts: readonly SpeakerRegistryFact[]) {
+  return facts.filter((f): f is Extract<SpeakerRegistryFact, { kind: 'observe' }> => f.kind === 'observe');
+}
+
 describe('MeetingSessionRegistry', () => {
   it('(a) a stable label stays bound to one session speaker across turns', () => {
     const reg = new MeetingSessionRegistry('m1');
@@ -58,10 +67,15 @@ describe('MeetingSessionRegistry', () => {
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // speaker A: speechSec=5
 
-    // speaker B starts distinctly different (cosine 0.3 < match threshold 0.4)...
+    // speaker B starts distinctly different (cosine 0.3 < match threshold 0.4; brand new -> no fold-check yet)...
     reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000));
-    // ...then its second observation (not yet sticky, no recycle check) pulls its centroid toward A's.
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 16000)); // speaker B total speechSec=10 > A's 5
+    // ...then walks toward A in two more turns, each clearing the per-turn
+    // fold-verify check against its OWN best held vector (0.81, then 0.8 —
+    // "verify non-sticky folds too" now runs on every turn, not just once
+    // sticky, so a single blind jump like the old fixture used would instead
+    // open a fresh instance; see the diagnostics test below for that case).
+    reg.observe('s0:2', vec(0.8, 0.6), 5, seg('s0:2', 16000));
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000)); // B's centroid (speechSec=15) now clears the 0.6 merge threshold with A (cos~0.804)
 
     const snap = reg.snapshot();
     const active = snap.filter((s) => !s.mergedInto);
@@ -69,7 +83,7 @@ describe('MeetingSessionRegistry', () => {
     expect(active).toHaveLength(1);
     expect(merged).toHaveLength(1);
     expect(active[0].sonioxLabels.sort()).toEqual(['s0:1', 's0:2']);
-    expect(active[0].liveSpeechSec).toBeCloseTo(15);
+    expect(active[0].liveSpeechSec).toBeCloseTo(20); // A(5) + B(15)
     expect(merged[0].mergedInto).toBe(active[0].sessionSpeakerId);
   });
 
@@ -198,11 +212,6 @@ describe('MeetingSessionRegistry', () => {
 });
 
 describe('diagnostics facts (onFact)', () => {
-  function collectFacts() {
-    const facts: SpeakerRegistryFact[] = [];
-    return { facts, onFact: (f: SpeakerRegistryFact) => facts.push(f) };
-  }
-
   it('replaying a logged decisionScore against the threshold reproduces the fold/new decision the registry actually made', () => {
     const reg = new MeetingSessionRegistry('m1');
     const { facts, onFact } = collectFacts();
@@ -247,14 +256,15 @@ describe('diagnostics facts (onFact)', () => {
     const { facts, onFact } = collectFacts();
 
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0), onFact); // speaker A: speechSec=5
-    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000), onFact); // speaker B starts distinct
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 16000), onFact); // B's centroid converges onto A -> triggers the merge
+    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000), onFact); // speaker B starts distinct, brand new
+    reg.observe('s0:2', vec(0.8, 0.6), 5, seg('s0:2', 16000), onFact); // folds (cos to B's own held vector = 0.81 >= ASSIGN)
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000), onFact); // folds (cos = 0.8 >= ASSIGN) -> B's centroid converges onto A -> triggers the merge
 
     const mergeFact = facts.find((f): f is Extract<SpeakerRegistryFact, { kind: 'merge' }> => f.kind === 'merge');
     expect(mergeFact).toBeDefined();
     const survivor = reg.snapshot().find((s) => !s.mergedInto)!;
     expect(mergeFact!.winnerId).toBe(survivor.sessionSpeakerId);
-    expect(mergeFact!.winnerSpeechSec).toBeCloseTo(10); // B's own total right before absorbing A
+    expect(mergeFact!.winnerSpeechSec).toBeCloseTo(15); // B's own total right before absorbing A
     expect(mergeFact!.loserSpeechSec).toBeCloseTo(5); // A's own total right before being absorbed
     expect(mergeFact!.winnerNamed).toBe(false);
     expect(mergeFact!.loserNamed).toBe(false);
@@ -301,11 +311,18 @@ describe('diagnostics facts (onFact)', () => {
     const id = reg.snapshot()[0].sessionSpeakerId;
     expect(reg.coherenceFor(id)).toEqual({ minPairwiseCosine: 1, rangeCount: 1, durationSec: 5 });
 
-    reg.observe('s0:1', vec(0, 1), 5, seg('s0:1', 6000)); // orthogonal — drags the min down
+    // A THIRD embedding orthogonal to the FIRST but close to the SECOND — each
+    // turn's own per-turn fold-verify check (against the best-scoring held
+    // vector, not necessarily the first) clears ASSIGN, yet the resulting
+    // pairwise min across all three held vectors is still ~0 (verify
+    // non-sticky folds too: a single big jump straight from the first turn
+    // would instead open a fresh instance, see the diagnostics test below).
+    reg.observe('s0:1', vec(0.5, 0.866), 5, seg('s0:1', 6000)); // cos to turn 1 = 0.5 >= ASSIGN
+    reg.observe('s0:1', vec(0, 1), 5, seg('s0:1', 12000)); // cos to turn 2 = 0.866 >= ASSIGN (max mode); cos to turn 1 = 0
     const stats = reg.coherenceFor(id)!;
-    expect(stats.rangeCount).toBe(2);
+    expect(stats.rangeCount).toBe(3);
     expect(stats.minPairwiseCosine).toBeCloseTo(0);
-    expect(stats.durationSec).toBeCloseTo(10);
+    expect(stats.durationSec).toBeCloseTo(15);
 
     expect(reg.coherenceFor('unknown-id')).toBeNull();
   });
@@ -367,8 +384,11 @@ describe('merge hardening', () => {
     const idB = reg.snapshot().find((s) => s.sessionSpeakerId !== idA)!.sessionSpeakerId;
     reg.applyUserIdentity(idB, { displayName: 'Binh' });
 
-    // A second, heavily A-ward embedding pulls B's centroid to cos 0.9 with A's — well above the 0.6 merge threshold.
-    reg.observe('s0:2', vec(3.6, 0.7436), 5, seg('s0:2', 26000), onFact);
+    // Two more A-ward embeddings walk B's centroid toward A's, each clearing
+    // its own per-turn fold-verify check (cos to B's best held vector: 0.8,
+    // then 0.6) — well above the 0.6 merge threshold once folded in.
+    reg.observe('s0:2', vec(0.6, 0.8), 5, seg('s0:2', 26000), onFact);
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 32000), onFact);
 
     const snap = reg.snapshot();
     expect(snap.filter((s) => !s.mergedInto)).toHaveLength(2);
@@ -377,15 +397,16 @@ describe('merge hardening', () => {
 
     const blocked = facts.find((f): f is Extract<SpeakerRegistryFact, { kind: 'merge' }> => f.kind === 'merge' && f.blockedBy === 'identity');
     expect(blocked).toBeDefined();
-    expect(blocked!.cos).toBeCloseTo(0.9, 1);
+    expect(blocked!.cos).toBeGreaterThanOrEqual(env.speakerSessionMergeThreshold);
   });
 
   it('(b) a single spike >= threshold does not merge when SPEAKER_SESSION_MERGE_STREAK > 1', () => {
     env.speakerSessionMergeStreak = 3;
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // A: speechSec=5
-    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000)); // B starts distinct (cos 0.3 < threshold)
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 16000)); // B's centroid crosses the 0.6 merge threshold — but that's only streak=1
+    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000)); // B turn 1: brand new, cos(A,B)=0.3 < threshold
+    reg.observe('s0:2', vec(0.8, 0.6), 5, seg('s0:2', 16000)); // B turn 2: folds (cos to turn 1 = 0.81 >= ASSIGN); mean cos to A ~0.58, still < merge threshold
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000)); // B turn 3: folds (cos to turn 2 = 0.8 >= ASSIGN); mean cos to A ~0.80 crosses the 0.6 merge threshold — but that's only streak=1
 
     expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
   });
@@ -395,14 +416,17 @@ describe('merge hardening', () => {
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // A: speechSec=5, centroid=(1,0)
 
-    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000)); // B turn 1: cos(A,B)=0.3 < threshold — no check counted
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 16000)); // B turn 2: mean cos ~0.81 >= threshold, streak=1 (changed from "no prior")
+    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000)); // B turn 1: brand new, cos(A,B)=0.3 < merge threshold — no check counted
+    reg.observe('s0:2', vec(0.8, 0.6), 5, seg('s0:2', 16000)); // B turn 2 (priming): folds (cos to turn 1 = 0.81 >= ASSIGN); mean cos to A ~0.58 < merge threshold — still no check counted
     expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
 
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000)); // B turn 3: mean changes again, cos ~0.92, streak=2
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000)); // B turn 3: folds (cos to turn 2 = 0.8 >= ASSIGN); mean cos to A ~0.80 >= threshold, streak=1 (changed from "no prior")
     expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
 
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 28000)); // B turn 4: mean changes again, cos ~0.96, streak=3 -> merges
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 28000)); // B turn 4: mean changes again, cos ~0.89, streak=2
+    expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
+
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 34000)); // B turn 5: mean changes again, cos ~0.94, streak=3 -> merges
     const snap = reg.snapshot();
     expect(snap.filter((s) => !s.mergedInto)).toHaveLength(1);
   });
@@ -431,8 +455,11 @@ describe('merge hardening', () => {
     const idSmall = reg.snapshot().find((s) => s.sessionSpeakerId !== idBig)!.sessionSpeakerId;
     reg.applyUserIdentity(idSmall, { displayName: 'An', privosUserId: 'user-1' });
 
-    // Converge the smaller speaker's centroid onto the bigger one's — one side named, no identity conflict.
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 36000));
+    // Walk the smaller speaker's centroid onto the bigger one's in two more
+    // turns, each clearing its own per-turn fold-verify check (cos to its best
+    // held vector: 0.8, then 0.6) — one side named, no identity conflict.
+    reg.observe('s0:2', vec(0.6, 0.8), 5, seg('s0:2', 36000));
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 42000));
 
     const active = reg.snapshot().filter((s) => !s.mergedInto);
     expect(active).toHaveLength(1);
@@ -440,7 +467,7 @@ describe('merge hardening', () => {
     expect(active[0].nameSource).toBe('user');
     expect(active[0].privosUserId).toBe('user-1');
     // The bigger speaker's own speech still dominates the combined total — only the NAME follows precedence, not the survivor id.
-    expect(active[0].liveSpeechSec).toBeCloseTo(30);
+    expect(active[0].liveSpeechSec).toBeCloseTo(35); // A(20) + B(5+5+5)
   });
 
   it('(e) a user-confirmed name outranks an existing live/profile-matched name, even on the speechSec-winning side', () => {
@@ -453,7 +480,9 @@ describe('merge hardening', () => {
     const loserId = reg.snapshot().find((s) => s.sessionSpeakerId !== winnerId)!.sessionSpeakerId;
     reg.applyUserIdentity(loserId, { displayName: 'Confirmed Name' });
 
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 36000));
+    // Two-step ramp — each turn clears its own per-turn fold-verify check.
+    reg.observe('s0:2', vec(0.6, 0.8), 5, seg('s0:2', 36000));
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 42000));
 
     const active = reg.snapshot().filter((s) => !s.mergedInto);
     expect(active).toHaveLength(1);
@@ -465,8 +494,9 @@ describe('merge hardening', () => {
     env.speakerSessionMergeMinSpeechSec = 15;
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // A: speechSec=5 < 15
-    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000));
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 16000)); // B crosses the merge threshold, but A hasn't spoken enough
+    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000)); // B turn 1: brand new
+    reg.observe('s0:2', vec(0.8, 0.6), 5, seg('s0:2', 16000)); // B turn 2: folds (cos to turn 1 = 0.81 >= ASSIGN)
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000)); // B turn 3: folds (cos to turn 2 = 0.8 >= ASSIGN); B crosses the merge threshold, but A hasn't spoken enough
 
     expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
   });
@@ -482,10 +512,147 @@ describe('merge hardening', () => {
     const idB = reg.snapshot().find((s) => s.sessionSpeakerId !== idA)!.sessionSpeakerId;
     reg.applyUserIdentity(idB, { displayName: 'An' }); // SAME name -> explicit merge request
 
-    // A single qualifying check is enough despite streak=5, because it's explicit.
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 16000));
+    // Two-step ramp toward A — each turn clears its own per-turn fold-verify
+    // check (cos to B's best held vector: 0.8, then 0.6). The FIRST check that
+    // clears the merge threshold (turn 3, cos~0.66) is enough despite streak=5,
+    // because it's explicit.
+    reg.observe('s0:2', vec(0.6, 0.8), 5, seg('s0:2', 16000));
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000));
 
     expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(1);
+  });
+});
+
+describe('centroid update gating (UPDATE threshold, duration gate, anchors)', () => {
+  const defaults = {
+    updateThreshold: env.speakerSessionUpdateThreshold,
+    updateMinSegmentSec: env.speakerUpdateMinSegmentSec,
+    scoreMode: env.speakerSessionScoreMode,
+    centroidMode: env.speakerSessionCentroidMode,
+  };
+
+  afterEach(() => {
+    env.speakerSessionUpdateThreshold = defaults.updateThreshold;
+    env.speakerUpdateMinSegmentSec = defaults.updateMinSegmentSec;
+    env.speakerSessionScoreMode = defaults.scoreMode;
+    env.speakerSessionCentroidMode = defaults.centroidMode;
+  });
+
+  it('(a) a run of 0.45-cos intruder turns leaves the centroid unchanged once UPDATE is stricter than ASSIGN', () => {
+    env.speakerSessionUpdateThreshold = 0.5; // ASSIGN stays at the default 0.4
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // brand new -> provisional seed, centroid=(1,0)
+    const id = reg.snapshot()[0].sessionSpeakerId;
+    const before = reg.centroidFor(id);
+
+    const intruder = vec(0.45, 0.893); // cos to (1,0) = 0.45: clears ASSIGN(0.4) but not UPDATE(0.5)
+    const { facts, onFact } = collectFacts();
+    for (let i = 0; i < 5; i++) reg.observe('s0:1', intruder, 5, seg('s0:1', 10_000 + i * 6000), onFact);
+
+    expect(reg.centroidFor(id)).toEqual(before); // untouched
+    const observed = observeFactsOf(facts);
+    expect(observed).toHaveLength(5);
+    expect(observed.every((f) => f.action === 'folded')).toBe(true); // still attributed to the same speaker
+    expect(observed.every((f) => f.updateAction === 'rejected-low-cos')).toBe(true); // never touches the centroid
+  });
+
+  it('(b) turns shorter than SPEAKER_UPDATE_MIN_SEGMENT_SEC never move the centroid, even at cos~1', () => {
+    env.speakerUpdateMinSegmentSec = 3;
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // brand new, 5s >= min -> provisional seed
+    const id = reg.snapshot()[0].sessionSpeakerId;
+    const before = reg.centroidFor(id);
+
+    const { facts, onFact } = collectFacts();
+    reg.observe('s0:1', vec(0.99, 0.14), 2.5, seg('s0:1', 10_000, 12_500), onFact); // near-identical voice, too short
+    reg.observe('s0:1', vec(0.99, 0.14), 2.5, seg('s0:1', 16_000, 18_500), onFact);
+
+    expect(reg.centroidFor(id)).toEqual(before);
+    const observed = observeFactsOf(facts);
+    expect(observed.every((f) => f.action === 'folded' && f.updateAction === 'rejected-short')).toBe(true);
+  });
+
+  it('(c) a non-sticky label bound to a foreign voice re-matches instead of folding blindly (today: folded blindly)', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // only 1 turn -> NOT sticky yet
+    reg.observe('s0:1', vec(0, 1), 5, seg('s0:1', 10_000)); // completely different voice, SAME label
+
+    const active = reg.snapshot().filter((s) => !s.mergedInto);
+    expect(active).toHaveLength(2); // opened a fresh instance instead of contaminating the original
+    const original = active.find((s) => s.sonioxLabels.includes('s0:1'))!;
+    const reused = active.find((s) => s.sonioxLabels.some((l) => l.startsWith('s0:1@')))!;
+    expect(reused).toBeDefined();
+    expect(reg.centroidFor(original.sessionSpeakerId)).toEqual(vec(1, 0)); // original untouched
+  });
+
+  it('(d) 200 alternating turns under SPEAKER_SESSION_CENTROID_MODE=anchors: centroid-to-anchor cosine stays >=0.95 (no drift)', () => {
+    env.speakerSessionCentroidMode = 'anchors';
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // brand new -> provisional seed
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 6000)); // 2nd turn, durSec>=4 -> qualifies as the FIRST pinned anchor
+    const id = reg.snapshot()[0].sessionSpeakerId;
+
+    // Two unit vectors jittered a few degrees off the anchor's own axis — a
+    // realistic mic-noise range, always clearing both ASSIGN/UPDATE and the
+    // anchor-drift check — alternated 200 times to fill (and keep refilling)
+    // the 10-item recent window many times over.
+    const jitterPlus = vec(Math.cos((5 * Math.PI) / 180), Math.sin((5 * Math.PI) / 180));
+    const jitterMinus = vec(Math.cos((-5 * Math.PI) / 180), Math.sin((-5 * Math.PI) / 180));
+    for (let i = 0; i < 200; i++) {
+      const v = i % 2 === 0 ? jitterPlus : jitterMinus;
+      reg.observe('s0:1', v, 5, seg('s0:1', 12_000 + i * 6000));
+    }
+
+    const anchorOnlyCentroid = vec(1, 0); // this speaker's only anchor is exactly (1,0), pinned since turn 2
+    const finalCentroid = reg.centroidFor(id)!;
+    const dot = finalCentroid[0] * anchorOnlyCentroid[0] + finalCentroid[1] * anchorOnlyCentroid[1];
+    const cos = dot / Math.sqrt(finalCentroid[0] ** 2 + finalCentroid[1] ** 2);
+    expect(cos).toBeGreaterThanOrEqual(0.95);
+  });
+
+  it('(e) the provisional seed is replaced by the first anchor-quality embedding', () => {
+    env.speakerSessionCentroidMode = 'anchors';
+    const reg = new MeetingSessionRegistry('m1');
+    const { facts, onFact } = collectFacts();
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0), onFact); // brand new -> provisional seed
+    const id = reg.snapshot()[0].sessionSpeakerId;
+    expect(reg.coherenceFor(id)!.rangeCount).toBe(1); // only the provisional seed held so far
+
+    reg.observe('s0:1', vec(0.99, 0.14), 5, seg('s0:1', 6000), onFact); // durSec>=4 -> qualifies as the first real anchor
+
+    const observed = observeFactsOf(facts);
+    expect(observed.map((f) => f.updateAction)).toEqual(['provisional', 'anchor']);
+    // The provisional seed is GONE, not merely outweighed — only the anchor remains held.
+    expect(reg.coherenceFor(id)!.rangeCount).toBe(1);
+    expect(reg.centroidFor(id)).toEqual(vec(0.99, 0.14));
+  });
+
+  it('a deploy with DEFAULTS (score-mode=max, centroid-mode=fifo, UPDATE=ASSIGN, update-min=SPEAKER_MIN_SEGMENT_SEC) never rejects a normal turn, reproducing today\'s decision behaviour exactly', () => {
+    expect(env.speakerSessionScoreMode).toBe('max');
+    expect(env.speakerSessionCentroidMode).toBe('fifo');
+    expect(env.speakerSessionUpdateThreshold).toBe(env.speakerSessionMatchThreshold);
+    expect(env.speakerUpdateMinSegmentSec).toBe(env.speakerMinSegmentSec);
+
+    const reg = new MeetingSessionRegistry('m1');
+    const { facts, onFact } = collectFacts();
+    // The exact fixture from `MeetingSessionRegistry` tests (a)/(b) above,
+    // replayed with the diagnostics hook attached.
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0), onFact);
+    reg.observe('s0:1', vec(0.95, 0.31), 5, seg('s0:1', 6000), onFact);
+    reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 12_000), onFact);
+    reg.observe('s0:3', vec(0.99, 0.14), 5, seg('s0:3', 18_000), onFact); // matches s0:1's speaker via bestSessionMatch
+
+    // Under neutral defaults, nothing is ever rejected for update — every held
+    // turn is either the brand-new exemption (`provisional`) or folds straight
+    // into the FIFO mean (`recent`), exactly like the pre-phase-6 code that
+    // updated the centroid unconditionally on every fold.
+    expect(observeFactsOf(facts).map((f) => f.updateAction)).toEqual(['provisional', 'recent', 'provisional', 'recent']);
+
+    const speakerA = reg.snapshot().find((s) => s.sonioxLabels.includes('s0:1'))!;
+    const centroidA = reg.centroidFor(speakerA.sessionSpeakerId)!;
+    // Plain (unweighted) FIFO mean of all 3 held embeddings — today's exact formula.
+    expect(centroidA[0]).toBeCloseTo((1 + 0.95 + 0.99) / 3);
+    expect(centroidA[1]).toBeCloseTo((0 + 0.31 + 0.14) / 3);
   });
 });
 

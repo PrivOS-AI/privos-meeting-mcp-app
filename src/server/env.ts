@@ -27,6 +27,19 @@ function vendor(key: string, fallback: SttVendor): SttVendor {
   return v === 'soniox' || v === 'elevenlabs' ? v : fallback;
 }
 
+export type SessionScoreMode = 'max' | 'centroid';
+export type SessionCentroidMode = 'fifo' | 'anchors';
+
+function sessionScoreMode(key: string, fallback: SessionScoreMode): SessionScoreMode {
+  const v = str(key)?.toLowerCase();
+  return v === 'max' || v === 'centroid' ? v : fallback;
+}
+
+function sessionCentroidMode(key: string, fallback: SessionCentroidMode): SessionCentroidMode {
+  const v = str(key)?.toLowerCase();
+  return v === 'fifo' || v === 'anchors' ? v : fallback;
+}
+
 export interface AppEnv {
   port: number;
   realtimeProvider: SttVendor;
@@ -46,6 +59,14 @@ export interface AppEnv {
   speakerMinSegmentSec: number;
   speakerEnrolTargetSec: number;
   speakerSessionMatchThreshold: number;
+  /** UPDATE bar — whether a folded embedding may change its session speaker's centroid at all; neutral default = ASSIGN (`speakerSessionMatchThreshold`), raised after phase-4 calibration. Never gates attribution — a turn scoring between UPDATE and ASSIGN still shows in the UI and counts as speech. */
+  speakerSessionUpdateThreshold: number;
+  /** Minimum turn duration (seconds) allowed to update a centroid; neutral default = `speakerMinSegmentSec` (turns below that never even reach `observe`, so this is a no-op bar today). Shorter turns are attribution-only. The very first embedding of a brand-new session speaker is exempt (nothing to seed with yet). */
+  speakerUpdateMinSegmentSec: number;
+  /** `max` (today): score = max cosine over this speaker's currently held embeddings, reproducing `matchSpeaker`'s per-vector comparison without borrowing that module. `centroid`: score = cosine to the speaker's current centroid (systematically lower at the same threshold) — flipped only after phase-4 calibration. */
+  speakerSessionScoreMode: SessionScoreMode;
+  /** `fifo` (today): centroid = plain mean of the last 10 held embeddings, oldest evicted. `anchors`: up to 5 pinned first-quality embeddings (never evicted) + a rolling window of 10 recent, duration-weighted mean — flipped only after phase-4 calibration. */
+  speakerSessionCentroidMode: SessionCentroidMode;
   speakerSessionMergeThreshold: number;
   /** Consecutive `observe()`-triggered checks a pair must clear `speakerSessionMergeThreshold` on (with a changed centroid each time) before it actually merges. 1 = today's single-shot behaviour; raise after phase-4 calibration. */
   speakerSessionMergeStreak: number;
@@ -71,6 +92,11 @@ export interface AppEnv {
 }
 
 export function loadEnv(): AppEnv {
+  // Computed up front (not inline in the object literal below) so the two new
+  // gates' "neutral default = today's other setting" fallback picks up an
+  // explicit override of THAT setting too, not just its own hardcoded default.
+  const speakerMinSegmentSec = num('SPEAKER_MIN_SEGMENT_SEC', 2);
+  const speakerSessionMatchThreshold = num('SPEAKER_SESSION_MATCH_THRESHOLD', 0.4);
   return {
     port: num('PORT', 3012),
     realtimeProvider: vendor('STT_REALTIME_PROVIDER', 'soniox'),
@@ -87,9 +113,13 @@ export function loadEnv(): AppEnv {
     liveUploadRetryWindowMin: num('LIVE_UPLOAD_RETRY_WINDOW_MIN', 15),
     speakerModelPath: str('SPEAKER_MODEL_PATH') ?? 'models/3dspeaker_speaker-embedding_advanced.onnx',
     speakerMatchThreshold: num('SPEAKER_MATCH_THRESHOLD', 0.5),
-    speakerMinSegmentSec: num('SPEAKER_MIN_SEGMENT_SEC', 2),
+    speakerMinSegmentSec,
     speakerEnrolTargetSec: num('SPEAKER_ENROL_TARGET_SEC', 25),
-    speakerSessionMatchThreshold: num('SPEAKER_SESSION_MATCH_THRESHOLD', 0.4),
+    speakerSessionMatchThreshold,
+    speakerSessionUpdateThreshold: num('SPEAKER_SESSION_UPDATE_THRESHOLD', speakerSessionMatchThreshold),
+    speakerUpdateMinSegmentSec: num('SPEAKER_UPDATE_MIN_SEGMENT_SEC', speakerMinSegmentSec),
+    speakerSessionScoreMode: sessionScoreMode('SPEAKER_SESSION_SCORE_MODE', 'max'),
+    speakerSessionCentroidMode: sessionCentroidMode('SPEAKER_SESSION_CENTROID_MODE', 'fifo'),
     speakerSessionMergeThreshold: num('SPEAKER_SESSION_MERGE_THRESHOLD', 0.6),
     speakerSessionMergeStreak: num('SPEAKER_SESSION_MERGE_STREAK', 1),
     speakerSessionMergeMinSpeechSec: num('SPEAKER_SESSION_MERGE_MIN_SPEECH_SEC', 0),
