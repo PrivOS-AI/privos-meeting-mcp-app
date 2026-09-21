@@ -23,6 +23,7 @@ import { deleteRoomFile } from '../media/hub-file-download.js';
 import { readLiveTurns } from '../media/live-turns-store.js';
 import { dataDir } from '../paths.js';
 import { resolveSpeakers as resolveSpeakersEmbed } from '../speaker/resolve-speakers.js';
+import { uploadRoomCopy } from '../speaker/speaker-diagnostics-log.js';
 import { chunkTranscript } from '../summary/chunker.js';
 import { renderSummaryMarkdown } from '../summary/summary-markdown.js';
 import { summarizeTranscript as runSummarizer, type SummaryPayload } from '../summary/summarizer.js';
@@ -407,6 +408,8 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
     throw error instanceof Error ? error : new AppError(message);
   } finally {
     clearInterval(heartbeat);
+    // Runs on BOTH success and failure — the logs from a job that just failed matter most (plan.md § diagnostics).
+    await uploadRoomCopy(agentBotHub, roomId, folderId, job.meetingId);
     await rm(scratch, { recursive: true, force: true }).catch(() => undefined);
   }
 }

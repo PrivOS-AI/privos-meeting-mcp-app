@@ -19,6 +19,7 @@ import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
 import * as profileStore from '../speaker/profile-store.js';
 import { openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
+import { logEvent } from '../speaker/speaker-diagnostics-log.js';
 import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
 
@@ -76,6 +77,8 @@ export const relabelSpeakerTool: AppTool = {
 
     let movedVector: Float32Array | null = null;
     let movedDurationSec = 0;
+    // No fresh coherence measurement when re-homing an already-enrolled vector (it was already confirmed once) — logged as 1.
+    let movedCoherence = 1;
 
     if (oldProfileId && oldProfileId !== target.id) {
       const oldProfile = await profileStore.getProfile(db, oldProfileId);
@@ -94,12 +97,24 @@ export const relabelSpeakerTool: AppTool = {
         if (coherent) {
           movedVector = pending.vector;
           movedDurationSec = pending.durationSec;
+          movedCoherence = pending.minPairwiseCosine;
         }
       }
     }
 
     if (movedVector) {
-      await profileStore.enrolEmbedding(db, target.id, { vector: movedVector, meetingId, durationSec: movedDurationSec });
+      const vectorCountAfter = await profileStore.enrolEmbedding(db, target.id, { vector: movedVector, meetingId, durationSec: movedDurationSec });
+      // A relabel is always a human correction — `source:'user'` regardless of where the vector came from.
+      await logEvent(meetingId, {
+        t: Date.now(),
+        meetingId,
+        type: 'enrol',
+        profile: target.id,
+        source: 'user',
+        coherence: movedCoherence,
+        durationSec: movedDurationSec,
+        vectorCountAfter,
+      });
     }
 
     await db.update('meeting_speakers', 'room', row._id, {

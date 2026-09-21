@@ -10,12 +10,16 @@ vi.mock('@privos_ai/app-server', async (importOriginal) => {
 vi.mock('../hub/resolve-hub-origin.js', () => ({ resolveHubOrigin: async () => 'https://hub.example' }));
 vi.mock('../hub/resolve-own-mcp-app-id.js', () => ({ resolveOwnMcpAppId: async () => 'app-123' }));
 
+const sweepLocalMock = vi.fn(async () => ({ deletedByAge: 0, deletedByCap: 0, deletedOrphaned: 0 }));
+vi.mock('../speaker/speaker-diagnostics-log.js', () => ({ sweepLocal: () => sweepLocalMock() }));
+vi.mock('./known-rooms-store.js', () => ({ readKnownRooms: vi.fn(async () => []) }));
+
 let store: Store;
 let baseHub: ReturnType<typeof installFakeHub>;
 let deletedFileIds: string[];
 let folderFiles: Record<string, Array<{ _id: string; name: string; channel_id: string; folder_id: string | null }>>;
 
-const { purgeExpiredAudio } = await import('./audio-retention-job.js');
+const { purgeExpiredAudio, sweepAllKnownRooms } = await import('./audio-retention-job.js');
 
 /** Wraps the db-only `installFakeHub` with the file-management REST paths `audio-retention-job.ts` also calls (DELETE one file, list a folder). */
 function buildHub(): RoomBoundHubClient {
@@ -116,5 +120,23 @@ describe('purgeExpiredAudio', () => {
     const result = await purgeExpiredAudio(hub, 'room-1');
     expect(result.pendingEmbeddingsCleared).toBe(0);
     expect(store.meeting_speakers[0].pendingEmbedding).toBe('sealed-ciphertext');
+  });
+});
+
+describe('sweepAllKnownRooms', () => {
+  beforeEach(() => {
+    sweepLocalMock.mockClear();
+  });
+
+  it('sweeps the node-local diagnostics directory once per cycle, independent of knownRooms', async () => {
+    const hub = buildHub();
+    await sweepAllKnownRooms(hub);
+    expect(sweepLocalMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a local-sweep failure does not abort the room sweep loop (never throws)', async () => {
+    sweepLocalMock.mockRejectedValueOnce(new Error('disk full'));
+    const hub = buildHub();
+    await expect(sweepAllKnownRooms(hub)).resolves.toBeUndefined();
   });
 });

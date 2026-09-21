@@ -27,8 +27,20 @@ import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, extractDbRecords, type DbRow } from '../hub/app-db-bot-client.js';
 import * as profileStore from '../speaker/profile-store.js';
 import { openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
+import { logEvent } from '../speaker/speaker-diagnostics-log.js';
 import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
+
+/**
+ * Logs one `enrol` event for a `speaker_resolve` confirmation — every mode
+ * here is a human-confirmed identity, so `source` is always `'user'`.
+ * Awaited (not fire-and-forget) so the event is durably on disk before this
+ * tool call returns; `logEvent` itself never throws (see
+ * `speaker-diagnostics-log.ts`), so awaiting it adds no failure mode here.
+ */
+async function logResolveEnrol(meetingId: string, profileId: string, coherence: number, durationSec: number, vectorCountAfter: number): Promise<void> {
+  await logEvent(meetingId, { t: Date.now(), meetingId, type: 'enrol', profile: profileId, source: 'user', coherence, durationSec, vectorCountAfter });
+}
 
 type Mode = 'user' | 'name' | 'merge' | 'skip';
 
@@ -158,7 +170,8 @@ export const speakerResolveTool: AppTool = {
         if (pending && coherent) {
           let profile = await profileStore.findProfileByName(db, displayName);
           if (!profile) profile = await profileStore.createProfile(db, { displayName, createdByUserId: actor.userId, createdInRoomId: roomId });
-          await profileStore.enrolEmbedding(db, profile.id, { vector: pending.vector, meetingId, durationSec: pending.durationSec });
+          const vectorCountAfter = await profileStore.enrolEmbedding(db, profile.id, { vector: pending.vector, meetingId, durationSec: pending.durationSec });
+          await logResolveEnrol(meetingId, profile.id, pending.minPairwiseCosine, pending.durationSec, vectorCountAfter);
           await db.update('meeting_speakers', 'room', row._id, { profileId: profile.id, displayName, nameSource: 'user', resolved: true });
           resolved.push({ speakerId: assignment.speakerId, enrolled: true, profileId: profile.id, displayName });
         } else {
@@ -196,7 +209,8 @@ export const speakerResolveTool: AppTool = {
         } else {
           await profileStore.linkPrivosUser(db, profile.id, assignment.privosUserId);
         }
-        await profileStore.enrolEmbedding(db, profile.id, { vector: pending.vector, meetingId, durationSec: pending.durationSec });
+        const vectorCountAfter = await profileStore.enrolEmbedding(db, profile.id, { vector: pending.vector, meetingId, durationSec: pending.durationSec });
+        await logResolveEnrol(meetingId, profile.id, pending.minPairwiseCosine, pending.durationSec, vectorCountAfter);
         await db.update('meeting_speakers', 'room', row._id, {
           profileId: profile.id,
           displayName: profile.displayName || displayName,
@@ -218,7 +232,8 @@ export const speakerResolveTool: AppTool = {
         resolved.push({ speakerId: assignment.speakerId, enrolled: false, reason: 'profile_not_found' });
         continue;
       }
-      await profileStore.enrolEmbedding(db, target.id, { vector: pending.vector, meetingId, durationSec: pending.durationSec });
+      const vectorCountAfter = await profileStore.enrolEmbedding(db, target.id, { vector: pending.vector, meetingId, durationSec: pending.durationSec });
+      await logResolveEnrol(meetingId, target.id, pending.minPairwiseCosine, pending.durationSec, vectorCountAfter);
       await db.update('meeting_speakers', 'room', row._id, { profileId: target.id, displayName: target.displayName, nameSource: 'user', resolved: true });
       resolved.push({ speakerId: assignment.speakerId, enrolled: true, profileId: target.id, displayName: target.displayName });
     }

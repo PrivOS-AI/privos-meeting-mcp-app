@@ -22,6 +22,7 @@ import path from 'node:path';
 import type { RoomBoundHubClient } from '@privos_ai/app-server';
 
 import { AppError } from '../../shared/app-error.js';
+import { cosineSimilarity } from '../../shared/cosine.js';
 import type { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { env } from '../env.js';
 import { decodeToWav16k, readWavPcm } from '../media/decode-audio.js';
@@ -32,7 +33,8 @@ import { concatPcm } from '../speaker/pcm-utils.js';
 import * as profileStore from '../speaker/profile-store.js';
 import type { SpeakerProfile } from '../speaker/profile-store.js';
 import { readMatchThreshold } from '../speaker/resolve-speakers.js';
-import { sessionRegistries, type MeetingSessionRegistry } from '../speaker/session-speaker-registry.js';
+import { sessionRegistries, type MeetingSessionRegistry, type SpeakerRegistryFact } from '../speaker/session-speaker-registry.js';
+import { append, flush, type DiagnosticEvent } from '../speaker/speaker-diagnostics-log.js';
 import { matchSpeaker } from '../speaker/speaker-matcher.js';
 import { KeyedSerialQueue } from '../jobs/keyed-serial-queue.js';
 import { ensureRegistry, upsertAll } from './live-speaker-repository.js';
@@ -84,8 +86,70 @@ async function matchPendingAgainstProfiles(db: AppDbBotClient, registry: Meeting
     const centroid = registry.centroidFor(sessionSpeakerId);
     if (!centroid) continue;
     const match = matchSpeaker(centroid, profiles, threshold);
-    registry.applyProfileMatch(sessionSpeakerId, match);
+    const attempt = registry.applyProfileMatch(sessionSpeakerId, match);
+    append(registry, {
+      t: Date.now(),
+      meetingId: registry.meetingId,
+      type: 'profile-match',
+      sessionSpeakerId,
+      attempt,
+      best: match.bestProfileId ? { profile: match.bestProfileId, cos: match.confidence } : null,
+      second: match.runnerUpProfileId ? { profile: match.runnerUpProfileId, cos: match.runnerUpConfidence } : null,
+      threshold,
+      accepted: Boolean(match.profileId),
+    });
   }
+}
+
+/** `ObserveFact`/`MergeFact` (registry-internal, opaque to diagnostics) -> the full timestamped `DiagnosticEvent` this chunk logs. */
+function toDiagnosticEvent(meetingId: string, seq: number, fact: SpeakerRegistryFact): DiagnosticEvent {
+  const t = Date.now();
+  if (fact.kind === 'observe') {
+    return {
+      t,
+      meetingId,
+      type: 'observe',
+      seq,
+      label: fact.label,
+      startMs: fact.startMs,
+      endMs: fact.endMs,
+      durSec: fact.durSec,
+      final: fact.final,
+      targetId: fact.targetId,
+      decisionScore: fact.decisionScore,
+      scores: fact.scores,
+      sticky: fact.sticky,
+      action: fact.action,
+    };
+  }
+  return {
+    t,
+    meetingId,
+    type: 'merge',
+    winnerId: fact.winnerId,
+    loserId: fact.loserId,
+    cos: fact.cos,
+    winnerSpeechSec: fact.winnerSpeechSec,
+    loserSpeechSec: fact.loserSpeechSec,
+    winnerNamed: fact.winnerNamed,
+    loserNamed: fact.loserNamed,
+  };
+}
+
+/** Pairwise cosine between every active (non-merged) session speaker's centroid — once per chunk, diagnostics only. */
+function buildCentroidsEvent(meetingId: string, registry: MeetingSessionRegistry): DiagnosticEvent {
+  const active = registry.snapshot().filter((s) => !s.mergedInto);
+  const pairs: { aId: string; bId: string; cos: number }[] = [];
+  for (let i = 0; i < active.length; i++) {
+    const a = registry.centroidFor(active[i].sessionSpeakerId);
+    if (!a) continue;
+    for (let j = i + 1; j < active.length; j++) {
+      const b = registry.centroidFor(active[j].sessionSpeakerId);
+      if (!b || a.length !== b.length) continue;
+      pairs.push({ aId: active[i].sessionSpeakerId, bId: active[j].sessionSpeakerId, cos: cosineSimilarity(a, b) });
+    }
+  }
+  return { t: Date.now(), meetingId, type: 'centroids', pairs };
 }
 
 /**
@@ -133,6 +197,20 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
   const registry = await ensureRegistry(ctx.db, req.meetingId);
   const tmpDir = path.join(dataDir, 'tmp', `live-${req.meetingId}-${req.seq}-${randomUUID()}`);
 
+  // A seq the server never saw at all (not a queue-backlog drop, which already
+  // marks `discontinuous` itself — this is a client-side gap) — diagnostics
+  // only, logged before anything below can throw.
+  const expectedSeq = registry.nextExpectedSeq();
+  if (req.seq > expectedSeq) {
+    append(registry, { t: Date.now(), meetingId: req.meetingId, type: 'gap', fromSeq: expectedSeq, toSeq: req.seq });
+  }
+
+  let chunkOk = true;
+  let decodedDurationSec = 0;
+  let overlapSec = 0;
+  let deferredCount = 0;
+  const skipped = { window: 0, silence: 0, short: 0 };
+
   try {
     await mkdir(tmpDir, { recursive: true });
     if (signal.aborted) throw new AppError('Chunk was cancelled before downloading the recording part.');
@@ -143,10 +221,12 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
 
     const wavPath = path.join(tmpDir, 'chunk.wav');
     const decoded = await decodeToWav16k(decodeInput, wavPath, signal);
+    decodedDurationSec = decoded.durationSec;
     if (signal.aborted) throw new AppError('Chunk was cancelled during decode.');
 
     const chunkPcm = await readWavPcm(wavPath, 0, decoded.durationSec);
     const overlap = registry.ringTake();
+    overlapSec = overlap.length / 16000;
     const pcm = concatPcm([overlap, chunkPcm]);
     const chunkStartSec = registry.decodedSecBefore(req.seq) - overlap.length / 16000;
     const partStartMs = registry.decodedSecBefore(req.seq) * 1000;
@@ -170,6 +250,7 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
           speaker: seg.speaker,
           startMs: seg.startMs,
         });
+        skipped.window++;
         return;
       }
 
@@ -177,20 +258,25 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
       const toSec = seg.endMs / 1000 - chunkStartSec;
       if (toSec > pcm.length / 16000) {
         registry.defer(seg); // turn straddling a part boundary (S2-03) — retried against the next chunk's extended window.
+        deferredCount++;
         return;
       }
-      if (fromSec < 0 || toSec - fromSec < env.speakerMinSegmentSec) return;
+      if (fromSec < 0 || toSec - fromSec < env.speakerMinSegmentSec) {
+        skipped.short++;
+        return;
+      }
 
       const fromSample = Math.max(0, Math.round(fromSec * 16000));
       const toSample = Math.min(pcm.length, Math.round(toSec * 16000));
       const slice = pcm.subarray(fromSample, toSample);
       if (!hasRealEnergy(slice)) {
         console.warn('[chunk-worker] span points into silence — skipping (security event).', { meetingId: req.meetingId, seq: req.seq, speaker: seg.speaker });
+        skipped.silence++;
         return;
       }
 
       const embedding = await computeEmbedding(slice);
-      registry.observe(seg.speaker, embedding, toSec - fromSec, seg);
+      registry.observe(seg.speaker, embedding, toSec - fromSec, seg, (fact) => append(registry, toDiagnosticEvent(req.meetingId, req.seq, fact)));
     }
 
     for (const seg of registry.takeDeferred()) await handleSegment(seg, false);
@@ -200,6 +286,7 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
     registry.ringSet(pcm.subarray(tailStart));
 
     await matchPendingAgainstProfiles(ctx.db, registry);
+    append(registry, buildCentroidsEvent(req.meetingId, registry));
 
     const settled = registry.settledTurns();
     if (settled.length > 0) {
@@ -224,11 +311,34 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
       error: error instanceof Error ? error.message : String(error),
     });
     registry.markDiscontinuity(req.seq);
+    chunkOk = false;
   } finally {
     // ALWAYS runs — the clock advances by the client-measured durationMs no
     // matter what happened above, so a single bad chunk never skews every
     // chunk after it (S2-08).
     registry.noteDecoded(req.seq, req.durationMs / 1000);
+
+    // `uploadLagMs`/`captureDriftMs` both reduce to the same "client-declared
+    // duration minus what actually decoded" quantity until phase 2 lands an
+    // absolute wall-clock emit stamp — see plan.md's diagnostics decision.
+    const durationGapMs = req.durationMs - decodedDurationSec * 1000;
+    append(registry, {
+      t: Date.now(),
+      meetingId: req.meetingId,
+      type: 'chunk',
+      seq: req.seq,
+      spans: req.segments.map((s) => ({ label: s.speaker, startMs: s.startMs, endMs: s.endMs, final: s.final })),
+      clientDurationMs: req.durationMs,
+      decodedDurationSec,
+      uploadLagMs: durationGapMs,
+      captureDriftMs: durationGapMs,
+      overlapSec,
+      deferredCount,
+      skipped,
+      ok: chunkOk,
+    });
+    await flush(registry);
+
     await rm(tmpDir, { recursive: true, force: true }).catch(() => undefined);
   }
 }

@@ -16,6 +16,7 @@ import { readKnownRooms } from './known-rooms-store.js';
 import { env } from '../env.js';
 import type { PartRef } from '../media/concat-parts.js';
 import { listRoomFolderFiles } from '../media/hub-file-download.js';
+import { uploadRoomCopy } from '../speaker/speaker-diagnostics-log.js';
 import { JobRepository, type JobRecord } from './job-repository.js';
 import { runMeetingJob } from './meeting-job.js';
 import { JOB_TIMEOUT_MS, meetingQueue } from './meeting-queue.js';
@@ -120,6 +121,18 @@ export async function sweepRoom(hub: RoomBoundHubClient, roomId: string): Promis
   });
   for (const meeting of extractDbRecords(abandoned)) {
     await db.update('meetings', 'room', meeting._id, { status: 'interrupted' }).catch(() => undefined);
+  }
+
+  // `interrupted` meetings are the ones whose diagnostics matter most (plan.md
+  // § diagnostics) — swept every boot, not just the ones just-abandoned above,
+  // so a prior crash between marking `interrupted` and uploading still recovers.
+  // `uploadRoomCopy` is upload-replace, so re-running this for an already-
+  // uploaded meeting is a harmless no-op.
+  const interrupted = await db.query('meetings', 'room', { where: [{ field: 'status', op: '==', value: 'interrupted' }], limit: 1000 });
+  for (const meeting of extractDbRecords(interrupted)) {
+    const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
+    if (!folderId) continue;
+    await uploadRoomCopy(hub, roomId, folderId, meeting._id);
   }
 
   // Jobs that were ALREADY `failed` before this boot (e.g. a hard crash before

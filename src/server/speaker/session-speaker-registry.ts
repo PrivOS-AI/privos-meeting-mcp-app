@@ -36,6 +36,55 @@ export interface ChunkSegment {
   final: boolean;
 }
 
+/**
+ * Diagnostics fact emitted by `observe()` for the caller to timestamp/wrap
+ * into a `speaker-diagnostics-log.ts` event and persist — the registry itself
+ * never imports the diagnostics module (stays pure/I/O-free). `scores` is
+ * every OTHER live-session-speaker candidate compared against, computed
+ * BEFORE this embedding folds in.
+ */
+export interface ObserveFact {
+  kind: 'observe';
+  label: string;
+  startMs: number;
+  endMs: number;
+  durSec: number;
+  final: boolean;
+  targetId: string;
+  /** The score the code actually decided on for `targetId` (max over its held embeddings) — 0 for a brand-new speaker with nothing held yet. */
+  decisionScore: number;
+  scores: { id: string; cosCentroid: number; cosMaxHeld: number }[];
+  /** Whether `targetId` is sticky AFTER this turn folded in. */
+  sticky: boolean;
+  /**
+   * `folded`: this turn joined an existing session speaker (via direct label
+   * ownership or matching). `new`: no existing speaker matched, one was
+   * created. `reinstanced`: the label was just detected as recycled for a
+   * different voice and re-pointed at a fresh instance suffix (`label@2`, …) —
+   * takes priority over `new`/`folded` because the recycle event itself is the
+   * diagnostically interesting moment, whichever way its embedding then lands.
+   */
+  action: 'folded' | 'new' | 'reinstanced';
+}
+
+/** Diagnostics fact emitted by `maybeMerge` when it actually merges two session speakers. */
+export interface MergeFact {
+  kind: 'merge';
+  winnerId: string;
+  loserId: string;
+  cos: number;
+  /** Each side's OWN accumulated speech, just before the merge combined them. */
+  winnerSpeechSec: number;
+  loserSpeechSec: number;
+  winnerNamed: boolean;
+  loserNamed: boolean;
+}
+
+export type SpeakerRegistryFact = ObserveFact | MergeFact;
+
+/** Callback the registry invokes with a raw fact — never persists/imports anything itself (see `ObserveFact`). */
+export type SpeakerRegistryFactListener = (fact: SpeakerRegistryFact) => void;
+
 export interface SessionSpeakerSnapshot {
   sessionSpeakerId: string;
   sonioxLabels: string[];
@@ -106,6 +155,11 @@ function nextInstanceLabel(label: string, alreadyTaken: ReadonlySet<string>): st
   return `${base}@${n}`;
 }
 
+/** `cosineSimilarity` without its length-mismatch throw — diagnostics scoring compares against every live speaker, including one built from a since-swapped embedding model. */
+function safeCosine(a: Float32Array, b: Float32Array): number {
+  return a.length === b.length ? cosineSimilarity(a, b) : 0;
+}
+
 function fnv1aHex(input: string): string {
   let hash = 0x811c9dc5;
   for (let i = 0; i < input.length; i++) {
@@ -129,6 +183,18 @@ export class MeetingSessionRegistry {
   private degradedFlag = false;
   private lastPersistedHash = '';
   private webmInitSegment: Buffer | null = null;
+
+  /**
+   * Diagnostics write buffer (`speaker-diagnostics-log.ts`'s `append`/`flush`)
+   * — hangs off THIS registry instance, never a module-level map, so it dies
+   * with the registry on TTL/LRU eviction (S2-13) instead of leaking. Kept as
+   * an opaque bag here on purpose: this module never imports the diagnostics
+   * event types, so it stays pure/I/O-free (plan.md's "the registry stays
+   * pure" requirement).
+   */
+  private readonly diagnosticEvents: Record<string, unknown>[] = [];
+  /** Per-meeting `profileId -> alias` (`p1`, `p2`, …) for the room-audience diagnostics copy — real `profileId`s never leave the node. */
+  private readonly profileAliases = new Map<string, string>();
 
   /** Last time a chunk was processed (or the registry was created) — the TTL clock (S2-13). */
   lastActivityAt = Date.now();
@@ -263,6 +329,33 @@ export class MeetingSessionRegistry {
     return this.degradedFlag;
   }
 
+  /** The `seq` the next chunk is expected to carry (`lastProcessedSeq + 1`, `0` before any chunk ever ran) — diagnostics-only (`gap` event); never gates or rejects a chunk. */
+  nextExpectedSeq(): number {
+    return this.lastProcessedSeq + 1;
+  }
+
+  // ------------------------------------------------------- diagnostics
+
+  /** Buffers one diagnostics event (opaque to this module — see the field comment). Never throws. */
+  pushDiagnosticEvent(event: Record<string, unknown>): void {
+    this.diagnosticEvents.push(event);
+  }
+
+  /** Drains every buffered diagnostics event since the last drain. */
+  drainDiagnosticEvents(): Record<string, unknown>[] {
+    return this.diagnosticEvents.splice(0, this.diagnosticEvents.length);
+  }
+
+  /** Stable per-meeting `p1`/`p2`/… alias for a real `profileId`, assigned on first use — the room-audience diagnostics copy never carries the real id. */
+  aliasForProfile(profileId: string): string {
+    let alias = this.profileAliases.get(profileId);
+    if (!alias) {
+      alias = `p${this.profileAliases.size + 1}`;
+      this.profileAliases.set(profileId, alias);
+    }
+    return alias;
+  }
+
   // ------------------------------------------------------------- observe
 
   /**
@@ -271,24 +364,47 @@ export class MeetingSessionRegistry {
    * trusted purely because the label matches (D-16). Deduplicates by
    * `(speaker, startMs)`: a turn already embedded (draft, then resent as
    * final) is a silent no-op.
+   *
+   * `onFact`, when given, is called with a diagnostics-only `ObserveFact`
+   * (and, if a merge happens as a result, a `MergeFact` too) — purely
+   * observational, computed from state this method already touches; it never
+   * feeds back into any decision above.
    */
-  observe(label: string, embedding: Float32Array, durSec: number, seg: ChunkSegment): void {
+  observe(label: string, embedding: Float32Array, durSec: number, seg: ChunkSegment, onFact?: SpeakerRegistryFactListener): void {
     if (this.alreadyProcessed(seg)) return;
     this.markProcessed(seg);
 
+    // Diagnostics-only: this embedding's score against every OTHER live
+    // speaker, taken BEFORE it folds into whichever one wins below.
+    const scores = onFact
+      ? [...this.byId.values()]
+          .filter((s) => !s.mergedInto && s.centroid)
+          .map((s) => ({
+            id: s.sessionSpeakerId,
+            cosCentroid: safeCosine(embedding, s.centroid!),
+            cosMaxHeld: s.embeddings.reduce((max, held) => Math.max(max, safeCosine(embedding, held)), 0),
+          }))
+      : [];
+
     let target = this.byLabel.get(label);
+    let reinstanced = false;
     if (target && target.sticky && target.centroid && cosineSimilarity(embedding, target.centroid) < env.speakerSessionMatchThreshold) {
       // The label was recycled for a different voice — detach it from its old
       // owner (whose centroid is left untouched) and open a fresh instance.
       this.byLabel.delete(label);
       label = nextInstanceLabel(label, new Set(target.sonioxLabels));
       target = undefined;
+      reinstanced = true;
     }
 
+    let createdNew = false;
     if (!target) {
       const hit = matchSpeaker(embedding, this.asPseudoProfiles(), env.speakerSessionMatchThreshold);
       target = hit.profileId ? this.byId.get(hit.profileId) : undefined;
-      if (!target) target = this.createSessionSpeaker();
+      if (!target) {
+        target = this.createSessionSpeaker();
+        createdNew = true;
+      }
       if (!target.sonioxLabels.includes(label)) target.sonioxLabels.push(label);
       this.byLabel.set(label, target);
     }
@@ -302,7 +418,25 @@ export class MeetingSessionRegistry {
 
     this.pendingSettled.push({ sessionSpeakerId: target.sessionSpeakerId, startMs: seg.startMs, endMs: seg.endMs, sonioxLabel: label });
     this.lastActivityAt = Date.now();
-    this.maybeMerge(target);
+
+    if (onFact) {
+      const decisionScore = scores.find((s) => s.id === target!.sessionSpeakerId)?.cosMaxHeld ?? 0;
+      onFact({
+        kind: 'observe',
+        label,
+        startMs: seg.startMs,
+        endMs: seg.endMs,
+        durSec,
+        final: seg.final,
+        targetId: target.sessionSpeakerId,
+        decisionScore,
+        scores,
+        sticky: target.sticky,
+        action: reinstanced ? 'reinstanced' : createdNew ? 'new' : 'folded',
+      });
+    }
+
+    this.maybeMerge(target, onFact);
   }
 
   /** This meeting's OWN session speakers, reused as `speaker-matcher.ts` "profiles" (its `id` doubles as `sessionSpeakerId`) — lets `observe` reuse the exact same best-match-above-threshold logic P4 uses against real profiles. */
@@ -325,13 +459,20 @@ export class MeetingSessionRegistry {
   }
 
   /** After every centroid update, checks for convergence with another session speaker; merges at most one pair per `observe()` call (the next call re-checks, so a chain of merges resolves over a few turns rather than needing recursion here). */
-  private maybeMerge(changed: SessionSpeaker): void {
+  private maybeMerge(changed: SessionSpeaker, onFact?: SpeakerRegistryFactListener): void {
     if (!changed.centroid) return;
     for (const other of this.byId.values()) {
       if (other === changed || other.mergedInto || !other.centroid) continue;
-      if (cosineSimilarity(changed.centroid, other.centroid) < env.speakerSessionMergeThreshold) continue;
+      const cos = cosineSimilarity(changed.centroid, other.centroid);
+      if (cos < env.speakerSessionMergeThreshold) continue;
 
       const [winner, loser] = changed.speechSec >= other.speechSec ? [changed, other] : [other, changed];
+      // Captured BEFORE combining — the diagnostics event records what each side brought to the merge, not the post-merge total.
+      const winnerSpeechSecBeforeMerge = winner.speechSec;
+      const loserSpeechSecBeforeMerge = loser.speechSec;
+      const winnerNamed = Boolean(winner.displayName || winner.profileId);
+      const loserNamed = Boolean(loser.displayName || loser.profileId);
+
       for (const label of loser.sonioxLabels) {
         if (!winner.sonioxLabels.includes(label)) winner.sonioxLabels.push(label);
         this.byLabel.set(label, winner);
@@ -348,6 +489,17 @@ export class MeetingSessionRegistry {
         winner.liveConfidence = loser.liveConfidence;
       }
       loser.mergedInto = winner.sessionSpeakerId;
+
+      onFact?.({
+        kind: 'merge',
+        winnerId: winner.sessionSpeakerId,
+        loserId: loser.sessionSpeakerId,
+        cos,
+        winnerSpeechSec: winnerSpeechSecBeforeMerge,
+        loserSpeechSec: loserSpeechSecBeforeMerge,
+        winnerNamed,
+        loserNamed,
+      });
       return;
     }
   }
@@ -365,9 +517,10 @@ export class MeetingSessionRegistry {
     return this.byId.get(sessionSpeakerId)?.centroid ?? null;
   }
 
-  applyProfileMatch(sessionSpeakerId: string, match: { profileId?: string; displayName?: string; confidence: number }): void {
+  /** Returns the speaker's `profileAttempts` count AFTER this attempt (0 if `sessionSpeakerId` is unknown) — lets the caller stamp a `profile-match` diagnostics event without a separate lookup. */
+  applyProfileMatch(sessionSpeakerId: string, match: { profileId?: string; displayName?: string; confidence: number }): number {
     const speaker = this.byId.get(sessionSpeakerId);
-    if (!speaker) return;
+    if (!speaker) return 0;
     speaker.profileAttempts += 1;
     if (match.profileId) {
       speaker.profileId = match.profileId;
@@ -375,6 +528,7 @@ export class MeetingSessionRegistry {
       speaker.nameSource = 'live';
       speaker.liveConfidence = match.confidence;
     }
+    return speaker.profileAttempts;
   }
 
   // -------------------------------------------------------- persistence

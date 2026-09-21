@@ -233,8 +233,9 @@ export interface EnrolInput {
  * changes dimensionality naturally "wins" going forward; `speaker-matcher.ts`
  * already skips stored embeddings whose length differs from the query vector.
  */
-export async function enrolEmbedding(db: AppDbBotClient, profileId: string, input: EnrolInput): Promise<void> {
-  await withProfileLock(profileId, async () => {
+/** Returns the profile's `sampleCount` AFTER this enrolment — diagnostics-only convenience so a caller does not need a second read just to log `vectorCountAfter`. */
+export async function enrolEmbedding(db: AppDbBotClient, profileId: string, input: EnrolInput): Promise<number> {
+  return withProfileLock(profileId, async () => {
     const row = await db.getById(COLLECTION, SCOPE, profileId);
     if (!row) throw new Error(`enrolEmbedding: profile ${profileId} no longer exists.`);
     const current = rowToProfile(row);
@@ -257,6 +258,7 @@ export async function enrolEmbedding(db: AppDbBotClient, profileId: string, inpu
       sampleCount: nextEmbeddings.length,
       lastSeenAt: createdAt,
     });
+    return nextEmbeddings.length;
   });
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { MeetingSessionRegistry, SessionRegistryStore } from './session-speaker-registry.js';
+import { env } from '../env.js';
+import { MeetingSessionRegistry, SessionRegistryStore, type SpeakerRegistryFact } from './session-speaker-registry.js';
 
 function vec(...values: number[]): Float32Array {
   return new Float32Array(values);
@@ -172,6 +173,112 @@ describe('MeetingSessionRegistry', () => {
       },
     ]);
     expect(reg.snapshotChanged()).toBe(false); // restored state is considered already-persisted
+  });
+});
+
+describe('diagnostics facts (onFact)', () => {
+  function collectFacts() {
+    const facts: SpeakerRegistryFact[] = [];
+    return { facts, onFact: (f: SpeakerRegistryFact) => facts.push(f) };
+  }
+
+  it('replaying a logged decisionScore against the threshold reproduces the fold/new decision the registry actually made', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    const { facts, onFact } = collectFacts();
+
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0), onFact); // no candidates yet -> new
+    // Different (never-before-seen) label, near-identical embedding -> matched via matchSpeaker, not direct label ownership.
+    reg.observe('s0:3', vec(0.99, 0.14), 5, seg('s0:3', 8000), onFact);
+    // A genuinely different voice on another brand-new label -> no candidate clears the threshold.
+    reg.observe('s0:9', vec(0, 1), 5, seg('s0:9', 20000), onFact);
+
+    const observeFacts = facts.filter((f): f is Extract<SpeakerRegistryFact, { kind: 'observe' }> => f.kind === 'observe');
+    expect(observeFacts).toHaveLength(3);
+    const [first, matched, brandNew] = observeFacts;
+
+    expect(first.action).toBe('new');
+    expect(first.decisionScore).toBe(0);
+
+    // The logged score alone, replayed against the SAME threshold the registry used, reproduces its 'folded' call.
+    expect(matched.action).toBe('folded');
+    expect(matched.decisionScore).toBeGreaterThanOrEqual(env.speakerSessionMatchThreshold);
+
+    expect(brandNew.action).toBe('new');
+    expect(brandNew.decisionScore).toBe(0);
+    // The 'new' decision is reproducible from the logged per-candidate scores, not asserted blind.
+    expect(brandNew.scores.every((s) => s.cosMaxHeld < env.speakerSessionMatchThreshold)).toBe(true);
+  });
+
+  it('flags the specific turn where a recycled label opens a fresh instance as action:"reinstanced"', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    const { facts, onFact } = collectFacts();
+
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0), onFact);
+    reg.observe('s0:1', vec(0.98, 0.2), 5, seg('s0:1', 6000), onFact); // sticky now
+    reg.observe('s0:1', vec(0, 1), 5, seg('s0:1', 20000), onFact); // recycled for a different voice
+
+    const observeFacts = facts.filter((f): f is Extract<SpeakerRegistryFact, { kind: 'observe' }> => f.kind === 'observe');
+    expect(observeFacts.map((f) => f.action)).toEqual(['new', 'folded', 'reinstanced']);
+  });
+
+  it('maybeMerge emits a MergeFact with each side\'s speech total captured BEFORE the merge combined them', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    const { facts, onFact } = collectFacts();
+
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0), onFact); // speaker A: speechSec=5
+    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000), onFact); // speaker B starts distinct
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 16000), onFact); // B's centroid converges onto A -> triggers the merge
+
+    const mergeFact = facts.find((f): f is Extract<SpeakerRegistryFact, { kind: 'merge' }> => f.kind === 'merge');
+    expect(mergeFact).toBeDefined();
+    const survivor = reg.snapshot().find((s) => !s.mergedInto)!;
+    expect(mergeFact!.winnerId).toBe(survivor.sessionSpeakerId);
+    expect(mergeFact!.winnerSpeechSec).toBeCloseTo(10); // B's own total right before absorbing A
+    expect(mergeFact!.loserSpeechSec).toBeCloseTo(5); // A's own total right before being absorbed
+    expect(mergeFact!.winnerNamed).toBe(false);
+    expect(mergeFact!.loserNamed).toBe(false);
+  });
+
+  it('applyProfileMatch returns the post-increment attempt count (0 for an unknown id)', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 9, seg('s0:1', 0));
+    reg.observe('s0:1', vec(0.99, 0.14), 1, seg('s0:1', 12000));
+    const id = reg.snapshot()[0].sessionSpeakerId;
+
+    expect(reg.applyProfileMatch(id, { confidence: 0.2 })).toBe(1);
+    expect(reg.applyProfileMatch(id, { confidence: 0.3 })).toBe(2);
+    expect(reg.applyProfileMatch('unknown-id', { confidence: 0 })).toBe(0);
+  });
+});
+
+describe('diagnostics buffer', () => {
+  it('push/drain round-trips events and drain empties the buffer', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    reg.pushDiagnosticEvent({ type: 'chunk', seq: 0 });
+    reg.pushDiagnosticEvent({ type: 'gap', fromSeq: 0, toSeq: 2 });
+    expect(reg.drainDiagnosticEvents()).toEqual([
+      { type: 'chunk', seq: 0 },
+      { type: 'gap', fromSeq: 0, toSeq: 2 },
+    ]);
+    expect(reg.drainDiagnosticEvents()).toEqual([]);
+  });
+
+  it('aliasForProfile assigns stable, sequential per-meeting aliases', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    expect(reg.aliasForProfile('profile-a')).toBe('p1');
+    expect(reg.aliasForProfile('profile-b')).toBe('p2');
+    expect(reg.aliasForProfile('profile-a')).toBe('p1'); // stable on repeat
+  });
+
+  it('the diagnostics buffer is dropped with the registry on LRU eviction', () => {
+    const store = new SessionRegistryStore(1);
+    const reg = store.get('m1');
+    reg.pushDiagnosticEvent({ type: 'chunk', seq: 0 });
+    store.get('m2'); // cap=1 -> evicts m1
+
+    expect(store.has('m1')).toBe(false);
+    const fresh = store.get('m1'); // a brand-new registry — never touched by the pushDiagnosticEvent call above
+    expect(fresh.drainDiagnosticEvents()).toEqual([]);
   });
 });
 

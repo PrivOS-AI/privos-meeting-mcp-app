@@ -27,6 +27,7 @@ import { computeEmbedding } from './embedding-extractor.js';
 import { hasSpeechEnergy } from './pcm-utils.js';
 import * as profileStore from './profile-store.js';
 import { planEnrolment, type EnrolRange } from './segment-picker.js';
+import { logEvent } from './speaker-diagnostics-log.js';
 import { matchSpeaker } from './speaker-matcher.js';
 import { openEmbedding, sealEmbedding, type SealedEmbedding } from './voiceprint-crypto.js';
 import type { Segment } from '../transcript/segment-builder.js';
@@ -183,8 +184,29 @@ export async function resolveSpeakers(db: AppDbBotClient, wavPath: string, segme
     }
 
     const match = matchSpeaker(representative, profiles, threshold);
+    await logEvent(meetingId, {
+      t: Date.now(),
+      meetingId,
+      type: 'profile-match',
+      sessionSpeakerId: plan.speakerId,
+      attempt: 1,
+      best: match.bestProfileId ? { profile: match.bestProfileId, cos: match.confidence } : null,
+      second: match.runnerUpProfileId ? { profile: match.runnerUpProfileId, cos: match.runnerUpConfidence } : null,
+      threshold,
+      accepted: Boolean(match.profileId),
+    });
     if (match.profileId) {
-      await profileStore.enrolEmbedding(db, match.profileId, { vector: representative, meetingId, durationSec: plan.totalSec });
+      const vectorCountAfter = await profileStore.enrolEmbedding(db, match.profileId, { vector: representative, meetingId, durationSec: plan.totalSec });
+      await logEvent(meetingId, {
+        t: Date.now(),
+        meetingId,
+        type: 'enrol',
+        profile: match.profileId,
+        source: 'async',
+        coherence,
+        durationSec: plan.totalSec,
+        vectorCountAfter,
+      });
       out.push({
         speakerId: plan.speakerId,
         totalSpeakSec: plan.totalSpeakSec,

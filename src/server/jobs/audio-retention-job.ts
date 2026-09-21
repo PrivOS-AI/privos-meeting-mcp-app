@@ -28,6 +28,7 @@ import { DEFAULT_WORKSPACE_SETTINGS } from '../../shared/app-settings.js';
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
 import { getSetting } from '../hub/app-settings.js';
 import { deleteRoomFile, listRoomFolderFiles } from '../media/hub-file-download.js';
+import { sweepLocal } from '../speaker/speaker-diagnostics-log.js';
 import { readKnownRooms } from './known-rooms-store.js';
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
@@ -140,13 +141,18 @@ export async function purgeExpiredAudio(hub: RoomBoundHubClient, roomId: string)
   return { audioDeleted, orphanPartsDeleted, pendingEmbeddingsCleared };
 }
 
-async function sweepAllKnownRooms(hub: RoomBoundHubClient): Promise<void> {
+/** Exported for tests — the boot + 6h interval both go through this. */
+export async function sweepAllKnownRooms(hub: RoomBoundHubClient): Promise<void> {
   const knownRooms = await readKnownRooms();
   for (const roomId of knownRooms) {
     await purgeExpiredAudio(hub, roomId).catch((error) => {
       console.warn('[audio-retention-job] room sweep failed:', roomId, error instanceof Error ? error.message : error);
     });
   }
+  // Node-local (`data/diagnostics`), not per-room — one sweep per cycle regardless of `knownRooms.length`.
+  await sweepLocal().catch((error) => {
+    console.warn('[audio-retention-job] local diagnostics sweep failed:', error instanceof Error ? error.message : error);
+  });
 }
 
 /** Runs the sweep immediately (boot) then every 6h across `knownRooms`. Returns a stop function for graceful shutdown. */
