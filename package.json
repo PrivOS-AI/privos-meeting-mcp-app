@@ -5,6 +5,7 @@
   "type": "module",
   "title": "Meeting Agent",
   "description": "Ứng dụng MCP PrivOS ghi âm cuộc họp offline: live caption song ngữ kèm nhãn người nói, nhận diện người nói bằng voiceprint, tóm tắt bằng Hub AI và lưu transcript vào PrivOS Files.",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/techcomthanh/meeting-agent"
