@@ -25,6 +25,17 @@ import { SessionSpeakerCentroid, type UpdateAction } from './session-speaker-cen
 const PALETTE = ['blue', 'gold', 'green', 'purple', 'coral', 'teal'] as const;
 /** Idle-registry eviction (S2-13) — no chunk processed for this long -> the registry-of-registries drops the meeting entirely. */
 export const REGISTRY_TTL_MS = 30 * 60 * 1000;
+/**
+ * Profile-match retry backoff (plan.md: "replace the hard attempt cap with
+ * backoff by NEW speech; no cap") — a sticky, unresolved speaker becomes (or
+ * again becomes) a profile-match candidate once it has gained this much
+ * UPDATE-QUALITY speech (speech that actually cleared the centroid UPDATE
+ * gate, `session-speaker-centroid.ts#UpdateAction` — never
+ * `rejected-short`/`rejected-low-cos`) since its last attempt. No upper bound
+ * on the number of attempts — a person who talks long enough eventually gets
+ * re-checked against every profile named since.
+ */
+export const PROFILE_MATCH_RETRY_SPEECH_SEC = 15;
 
 export type NameSource = 'user' | 'async' | 'live';
 
@@ -142,7 +153,12 @@ interface SessionSpeaker {
   nameSource?: NameSource;
   privosUserId?: string;
   liveConfidence?: number;
+  /** Diagnostics-only count of every `applyProfileMatch` call — no longer used to cap retries (see `PROFILE_MATCH_RETRY_SPEECH_SEC`). */
   profileAttempts: number;
+  /** Update-quality speech accumulated so far (see `PROFILE_MATCH_RETRY_SPEECH_SEC`'s doc comment) — a strict subset of `speechSec`. */
+  qualitySpeechSec: number;
+  /** `qualitySpeechSec`'s value as of the last `applyProfileMatch` call — `0` before the first attempt. */
+  qualitySpeechSecAtLastAttempt: number;
   colorKey: string;
   mergedInto?: string;
 }
@@ -264,6 +280,8 @@ export class MeetingSessionRegistry {
       turnCount: 0,
       sticky: false,
       profileAttempts: 0,
+      qualitySpeechSec: 0,
+      qualitySpeechSecAtLastAttempt: 0,
       colorKey: this.nextColor(),
     };
     this.byId.set(speaker.sessionSpeakerId, speaker);
@@ -511,6 +529,7 @@ export class MeetingSessionRegistry {
     }
 
     target.speechSec += durSec;
+    if (updateAction !== 'rejected-short' && updateAction !== 'rejected-low-cos') target.qualitySpeechSec += durSec;
     target.turnCount += 1;
     target.sticky = target.turnCount >= 2 && target.speechSec >= env.liveMinSpeechSec;
 
@@ -599,6 +618,7 @@ export class MeetingSessionRegistry {
     }
     winner.centroidState.absorb(loser.centroidState);
     winner.speechSec += loser.speechSec;
+    winner.qualitySpeechSec += loser.qualitySpeechSec;
     winner.turnCount += loser.turnCount;
     winner.sticky = winner.turnCount >= 2 && winner.speechSec >= env.liveMinSpeechSec;
     if (identityOutranks(loser, winner)) {
@@ -675,10 +695,16 @@ export class MeetingSessionRegistry {
 
   // ------------------------------------------------------- profile match
 
-  /** `sessionSpeakerId`s eligible to try `speaker_profiles` matching this pass: sticky, unresolved, under the retry cap, not merged away. */
+  /**
+   * `sessionSpeakerId`s eligible to try `speaker_profiles` matching this
+   * pass: sticky, unresolved, not merged away, and has gained
+   * `PROFILE_MATCH_RETRY_SPEECH_SEC` of update-quality speech since its last
+   * attempt (or never attempted at all) — replaces the old hard "stop after 5
+   * attempts" cap with backoff-by-new-speech and NO cap (plan.md).
+   */
   candidatesForProfileMatch(): string[] {
     return [...this.byId.values()]
-      .filter((s) => s.sticky && !s.profileId && s.profileAttempts < 5 && !s.mergedInto)
+      .filter((s) => s.sticky && !s.profileId && !s.mergedInto && s.qualitySpeechSec - s.qualitySpeechSecAtLastAttempt >= PROFILE_MATCH_RETRY_SPEECH_SEC)
       .map((s) => s.sessionSpeakerId);
   }
 
@@ -699,6 +725,11 @@ export class MeetingSessionRegistry {
     const speaker = this.byId.get(sessionSpeakerId);
     if (!speaker) return 0;
     speaker.profileAttempts += 1;
+    // Snapshot NOW regardless of outcome — backoff resumes counting from this
+    // attempt's speech total whether it matched, missed, or was a no-op
+    // (`nameSource:'user'`), so a name-carrying speaker parked here forever
+    // never re-accumulates a stale, pre-user-identity backoff window.
+    speaker.qualitySpeechSecAtLastAttempt = speaker.qualitySpeechSec;
     if (speaker.nameSource === 'user') return speaker.profileAttempts;
     if (match.profileId) {
       speaker.profileId = match.profileId;
@@ -823,6 +854,12 @@ export class MeetingSessionRegistry {
         privosUserId: row.privosUserId,
         liveConfidence: row.liveConfidence,
         profileAttempts: row.profileId ? 5 : 0,
+        // Restored speech is all we know about this speaker's history — treat
+        // it as already-quality so an unresolved restored speaker is
+        // immediately eligible again (not stuck waiting out a fresh
+        // PROFILE_MATCH_RETRY_SPEECH_SEC window it never actually needed).
+        qualitySpeechSec: row.liveSpeechSec,
+        qualitySpeechSecAtLastAttempt: row.profileId ? row.liveSpeechSec : 0,
         colorKey: row.colorKey || this.nextColor(),
       };
       this.byId.set(speaker.sessionSpeakerId, speaker);

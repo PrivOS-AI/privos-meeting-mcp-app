@@ -306,3 +306,20 @@
   font-size: var(--caption-size);
   flex-basis: 100%;
 }
+
+.ma-speaker-settings__health {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--caption-size);
+  color: var(--ma-fg-3);
+}
+
+.ma-speaker-settings__health-outliers {
+  color: var(--ma-status-warning);
+  font-weight: var(--weight-semibold);
+}
+
+.ma-speaker-settings__health-none {
+  color: var(--ma-fg-3);
+}

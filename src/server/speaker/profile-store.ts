@@ -13,6 +13,7 @@
  * defaults to 1), so it is a correctness net for same-process races, not a
  * distributed lock.
  */
+import { cosineSimilarity } from '../../shared/cosine.js';
 import { AppDbBotClient, extractDbRecords, type DbRow } from '../hub/app-db-bot-client.js';
 import { openEmbedding, parseSealedEmbedding, sealEmbedding, type SealedEmbedding } from './voiceprint-crypto.js';
 
@@ -159,6 +160,35 @@ export async function listProfiles(db: AppDbBotClient): Promise<SpeakerProfile[]
   return extractDbRecords(result).map(rowToProfile);
 }
 
+// ---- workspace-global speaker_profiles cache (shared across meetings/callers, TTL 10min) ----
+// Lives here (not in the live chunk worker) because EVERY embedding-mutating
+// function below (`enrolEmbedding`, `removeEmbeddingsOfMeeting`,
+// `pruneOutlierEmbeddings`, `deleteProfile`) is this module's own choke point
+// for changing what a match can see — invalidating from inside those
+// functions is the only way "any enrol happens in this process" (plan.md)
+// covers every enrol site (live one-shot, post-meeting auto/user, relabel,
+// prune) without every call site remembering to do it itself.
+const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
+let profileCache: { at: number; profiles: SpeakerProfile[] } | null = null;
+
+/** `listProfiles`, cached for up to `PROFILE_CACHE_TTL_MS` — the live chunk worker's per-chunk profile-match pass uses this instead of `listProfiles` directly so it never re-queries App DB on every chunk. */
+export async function cachedProfiles(db: AppDbBotClient): Promise<SpeakerProfile[]> {
+  if (profileCache && Date.now() - profileCache.at < PROFILE_CACHE_TTL_MS) return profileCache.profiles;
+  const profiles = await listProfiles(db);
+  profileCache = { at: Date.now(), profiles };
+  return profiles;
+}
+
+/** Drops the cached `speaker_profiles` list — called by every function in this module that changes a profile's embeddings, so the very next `cachedProfiles` call sees the change instead of waiting up to `PROFILE_CACHE_TTL_MS`. */
+export function invalidateProfileCache(): void {
+  profileCache = null;
+}
+
+/** Test-only: forces the next `cachedProfiles` call to re-query. */
+export function resetProfileCacheForTests(): void {
+  invalidateProfileCache();
+}
+
 export async function getProfile(db: AppDbBotClient, profileId: string): Promise<SpeakerProfile | null> {
   const row = await db.getById(COLLECTION, SCOPE, profileId);
   return row ? rowToProfile(row) : null;
@@ -223,6 +253,52 @@ export async function withProfileLock<T>(profileId: string, fn: () => Promise<T>
   }
 }
 
+/** `user-post` vectors get their OWN sub-cap, enforced only by other `user-post` vectors (never by cap pressure from another source — see `evictForCap`). */
+const USER_POST_SUBCAP = 10;
+
+/**
+ * Enforces `EMBEDDING_CAP` (20) WITHOUT plain FIFO across sources (plan.md:
+ * "never FIFO across sources") — a human-confirmed vector must never be
+ * silently displaced by an automatic guess just because it happens to be
+ * older. Two passes, both oldest-first (array order is chronological
+ * insertion order throughout a profile's life — see the module header):
+ *
+ *  1. `user-post` sub-cap: only OTHER `user-post` vectors evict a `user-post`
+ *     vector, once there are more than `USER_POST_SUBCAP`.
+ *  2. Global cap: while still over `EMBEDDING_CAP`, evict the oldest
+ *     `auto-post` vector; once none remain, the oldest `legacy` (no
+ *     `source` — sealed before this field existed) vector; once none of
+ *     those remain either, the oldest `user-live` vector. `user-post`
+ *     vectors are NEVER touched here — they are protected from cap pressure
+ *     coming from any other source, by design.
+ */
+function evictForCap(embeddings: readonly StoredEmbedding[]): StoredEmbedding[] {
+  let result = [...embeddings];
+
+  const userPostIndices = result.reduce<number[]>((acc, e, i) => {
+    if (e.source === 'user-post') acc.push(i);
+    return acc;
+  }, []);
+  if (userPostIndices.length > USER_POST_SUBCAP) {
+    const evictCount = userPostIndices.length - USER_POST_SUBCAP;
+    const evictIndices = new Set(userPostIndices.slice(0, evictCount));
+    result = result.filter((_, i) => !evictIndices.has(i));
+  }
+
+  const evictionPriority: readonly (EnrolSource | undefined)[] = ['auto-post', undefined, 'user-live'];
+  while (result.length > EMBEDDING_CAP) {
+    let removeAt = -1;
+    for (const source of evictionPriority) {
+      removeAt = result.findIndex((e) => e.source === source);
+      if (removeAt !== -1) break;
+    }
+    if (removeAt === -1) break; // only `user-post` left — protected, cap left unenforced rather than touching it
+    result.splice(removeAt, 1);
+  }
+
+  return result;
+}
+
 function computeCentroid(vectors: readonly Float32Array[]): Float32Array | null {
   if (vectors.length === 0) return null;
   const dim = vectors[0].length;
@@ -279,10 +355,10 @@ export async function enrolEmbedding(db: AppDbBotClient, profileId: string, inpu
 
     const purgeKeys = new Set<string>([input.speakerKey, ...(input.alsoReplaceSpeakerKeys ?? [])]);
     const withoutSameSource = current.embeddings.filter((e) => !(e.meetingId === input.meetingId && purgeKeys.has(e.speakerKey)));
-    const nextEmbeddings = [
+    const nextEmbeddings = evictForCap([
       ...withoutSameSource,
       { vector: input.vector, meetingId: input.meetingId, durationSec: input.durationSec, createdAt, speakerKey: input.speakerKey, source: input.source },
-    ].slice(-EMBEDDING_CAP);
+    ]);
     const centroid = computeCentroid(nextEmbeddings.map((e) => e.vector));
 
     const embeddingsJson = nextEmbeddings.map((e) =>
@@ -297,6 +373,7 @@ export async function enrolEmbedding(db: AppDbBotClient, profileId: string, inpu
       sampleCount: nextEmbeddings.length,
       lastSeenAt: createdAt,
     });
+    invalidateProfileCache();
     return nextEmbeddings.length;
   });
 }
@@ -322,6 +399,7 @@ export async function removeEmbeddingsOfMeeting(db: AppDbBotClient, profileId: s
       centroid: centroidJson,
       sampleCount: remaining.length,
     });
+    invalidateProfileCache();
   });
 }
 
@@ -417,4 +495,126 @@ export async function deleteProfile(db: AppDbBotClient, profileId: string, known
     }
   }
   await db.delete(COLLECTION, SCOPE, profileId);
+  invalidateProfileCache();
+}
+
+// ---------------------------------------------------------------- hygiene
+
+/** `cosineSimilarity` without its length-mismatch throw — a model swap can leave same-profile vectors at different dims. */
+function safeCosine(a: Float32Array, b: Float32Array): number {
+  return a.length === b.length ? cosineSimilarity(a, b) : 0;
+}
+
+export interface ProfileHealth {
+  /** Vector counts by enrolment source — `legacy` = sealed before `source` existed (`StoredEmbedding.source` absent). Scalars only, never a vector. */
+  vectorCounts: { userLive: number; userPost: number; autoPost: number; legacy: number };
+  /** Lowest pairwise cosine across every stored vector — `1` (trivially "coherent") with fewer than 2 vectors. */
+  minPairwiseCosine: number;
+  /** Mean pairwise cosine across every stored vector pair — `1` with fewer than 2 vectors. */
+  meanPairwiseCosine: number;
+  /** Count of vectors whose OWN mean cosine to every other vector in the profile falls below `matchThreshold` — a vector out of step with the rest of the profile. */
+  outlierCount: number;
+}
+
+/** Every vector's mean cosine to every OTHER vector in the same profile — `1` for a lone vector (nothing to compare against). Shared by `profileHealth` and `pruneOutlierEmbeddings` so "outlier" means the exact same thing in both. */
+function meanCosineToOthers(vectors: readonly Float32Array[], index: number): number {
+  if (vectors.length < 2) return 1;
+  let sum = 0;
+  for (let j = 0; j < vectors.length; j++) {
+    if (j === index) continue;
+    sum += safeCosine(vectors[index], vectors[j]);
+  }
+  return sum / (vectors.length - 1);
+}
+
+/**
+ * Pure scalar summary of a profile's stored vectors — never returns a vector,
+ * only counts and cosine numbers (plan.md: "vectors never leave the server;
+ * health numbers are scalars"). `matchThreshold` is the SAME bar
+ * `resolve-speakers.ts#readMatchThreshold` returns, so "outlier" here means
+ * exactly what would fail to match this profile's own other vectors.
+ */
+export function profileHealth(profile: SpeakerProfile, matchThreshold: number): ProfileHealth {
+  const vectorCounts = { userLive: 0, userPost: 0, autoPost: 0, legacy: 0 };
+  for (const e of profile.embeddings) {
+    if (e.source === 'user-live') vectorCounts.userLive++;
+    else if (e.source === 'user-post') vectorCounts.userPost++;
+    else if (e.source === 'auto-post') vectorCounts.autoPost++;
+    else vectorCounts.legacy++;
+  }
+
+  const vectors = profile.embeddings.map((e) => e.vector);
+  if (vectors.length < 2) {
+    return { vectorCounts, minPairwiseCosine: 1, meanPairwiseCosine: 1, outlierCount: 0 };
+  }
+
+  let min = 1;
+  let sum = 0;
+  let pairCount = 0;
+  for (let i = 0; i < vectors.length; i++) {
+    for (let j = i + 1; j < vectors.length; j++) {
+      const cos = safeCosine(vectors[i], vectors[j]);
+      min = Math.min(min, cos);
+      sum += cos;
+      pairCount++;
+    }
+  }
+
+  let outlierCount = 0;
+  for (let i = 0; i < vectors.length; i++) {
+    if (meanCosineToOthers(vectors, i) < matchThreshold) outlierCount++;
+  }
+
+  return { vectorCounts, minPairwiseCosine: min, meanPairwiseCosine: pairCount > 0 ? sum / pairCount : 1, outlierCount };
+}
+
+export interface PruneResult {
+  removed: number;
+  remaining: number;
+}
+
+/**
+ * Removes vectors flagged as outliers by {@link profileHealth}'s exact rule
+ * (mean cosine to every other vector < `matchThreshold`) — `user-live`/
+ * `user-post` vectors are NEVER candidates, however low their score (plan.md:
+ * "never touches user-*"); a full reset of a human-confirmed vector is
+ * `speaker_profile_delete` + re-enrol, not this. Refuses to drop the profile
+ * below 1 vector: if flagged outliers would empty it, the WORST ones are
+ * removed first, up to `count - 1`, leaving at least one.
+ */
+export async function pruneOutlierEmbeddings(db: AppDbBotClient, profileId: string, matchThreshold: number): Promise<PruneResult> {
+  return withProfileLock(profileId, async () => {
+    const row = await db.getById(COLLECTION, SCOPE, profileId);
+    if (!row) throw new Error(`pruneOutlierEmbeddings: profile ${profileId} no longer exists.`);
+    const current = rowToProfile(row);
+    const vectors = current.embeddings.map((e) => e.vector);
+
+    if (vectors.length < 2) return { removed: 0, remaining: vectors.length };
+
+    const prunable = current.embeddings
+      .map((e, i) => ({ index: i, source: e.source, meanCosine: meanCosineToOthers(vectors, i) }))
+      .filter((x) => x.source !== 'user-live' && x.source !== 'user-post' && x.meanCosine < matchThreshold)
+      .sort((a, b) => a.meanCosine - b.meanCosine); // worst first
+
+    if (prunable.length === 0) return { removed: 0, remaining: current.embeddings.length };
+
+    const maxRemovable = Math.max(0, current.embeddings.length - 1);
+    const toRemove = new Set(prunable.slice(0, maxRemovable).map((x) => x.index));
+    const remaining = current.embeddings.filter((_, i) => !toRemove.has(i));
+
+    const createdAt = new Date().toISOString();
+    const centroid = computeCentroid(remaining.map((e) => e.vector));
+    const embeddingsJson = remaining.map((e) =>
+      sealStoredEmbedding(e.vector, { profileId, meetingId: e.meetingId, durationSec: e.durationSec, createdAt: e.createdAt, speakerKey: e.speakerKey, source: e.source }),
+    );
+    const centroidJson = centroid ? JSON.stringify(sealEmbedding(centroid, { profileId, createdAt })) : '';
+
+    await db.update(COLLECTION, SCOPE, profileId, {
+      embeddings: embeddingsJson,
+      centroid: centroidJson,
+      sampleCount: remaining.length,
+    });
+    invalidateProfileCache();
+    return { removed: toRemove.size, remaining: remaining.length };
+  });
 }

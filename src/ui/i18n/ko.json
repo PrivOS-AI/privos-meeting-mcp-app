@@ -165,6 +165,12 @@
   "speaker.settingsPanel.thresholdWarning": "임계값 변경은 이후에 처리되는 회의에만 적용됩니다.",
   "speaker.settingsPanel.thresholdSaved": "임계값이 저장되었습니다.",
   "speaker.settingsPanel.thresholdUnavailable": "이 설정은 현재 버전에서 아직 사용할 수 없습니다.",
+  "speaker.settingsPanel.colHealth": "상태",
+  "speaker.settingsPanel.healthMeanCosine": "평균 유사도: {value}",
+  "speaker.settingsPanel.healthOutliers": "이상치 샘플 {count}개",
+  "speaker.settingsPanel.healthUnavailable": "—",
+  "speaker.settingsPanel.actionPrune": "이상치 정리",
+  "speaker.settingsPanel.pruneConfirm": "이 프로필에서 표시된 저품질 음성 샘플을 제거하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
 
   "recording.speakerChips.label": "누가 말하고 있나요?",
   "recording.speakerChips.identifying": "식별 중…",

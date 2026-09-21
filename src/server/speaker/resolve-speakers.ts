@@ -28,9 +28,18 @@ import { hasSpeechEnergy } from './pcm-utils.js';
 import * as profileStore from './profile-store.js';
 import { planEnrolment, type EnrolRange } from './segment-picker.js';
 import { logEvent } from './speaker-diagnostics-log.js';
-import { matchSpeaker } from './speaker-matcher.js';
+import { acceptMatch, matchSpeaker } from './speaker-matcher.js';
 import { openEmbeddingWithMeta, sealEmbeddingWithMeta, openEmbedding, type SealedEmbedding } from './voiceprint-crypto.js';
 import type { Segment } from '../transcript/segment-builder.js';
+
+/**
+ * Minimum picked-range duration (seconds) before a NAMED-but-not-yet-known
+ * cluster is trusted enough to write a vector into `speaker_profiles`
+ * (`auto-post` only) — a match on threshold+margin alone still NAMES the
+ * speaker, but a short cluster does not get to shape a profile others will be
+ * matched against later.
+ */
+const AUTO_ENROL_MIN_DURATION_SEC = 15;
 
 /** A user identity carried into this pass from a live-named speaker (`meeting-job.ts`'s `computeAsyncToLiveMap`) — skips matching/auto-enrol entirely; the identified speaker's coherent representative enrols straight into this profile as `user-post`. */
 export interface UserIdentity {
@@ -181,7 +190,17 @@ function averageVectors(vectors: readonly Float32Array[]): Float32Array {
   return out;
 }
 
-/** `app_settings.speakerMatchThreshold` (admin-tunable) with the env default as fallback — shared by the automatic embed pass and `speaker_resolve`'s manual coherence check, so both use the SAME bar. */
+/**
+ * `app_settings.speakerMatchThreshold` (admin-tunable) with the env default as
+ * fallback — shared by the automatic embed pass and `speaker_resolve`'s
+ * manual coherence check, so both use the SAME bar.
+ *
+ * The stored value is not yet clamped to a server-side floor — any room
+ * member can currently set it arbitrarily low via `app_settings` even though
+ * `speaker_profiles` is workspace-global. A floor clamp lands with threshold
+ * calibration; this function intentionally leaves that seam open rather than
+ * guessing at a number now.
+ */
 export async function readMatchThreshold(db: AppDbBotClient): Promise<number> {
   const stored = await getSetting<number>(db, 'speakerMatchThreshold');
   return typeof stored === 'number' && stored > 0 && stored < 1 ? stored : env.speakerMatchThreshold;
@@ -330,50 +349,57 @@ export async function resolveSpeakers(
       continue;
     }
 
-    const match = matchSpeaker(representative, profiles, threshold);
+    const match = matchSpeaker(representative, profiles);
+    const accepted = acceptMatch(match, { threshold, margin: env.speakerMatchMargin });
     await logEvent(meetingId, {
       t: Date.now(),
       meetingId,
       type: 'profile-match',
       sessionSpeakerId: plan.speakerId,
       attempt: 1,
-      best: match.bestProfileId ? { profile: match.bestProfileId, cos: match.confidence } : null,
-      second: match.runnerUpProfileId ? { profile: match.runnerUpProfileId, cos: match.runnerUpConfidence } : null,
+      best: match.best ? { profile: match.best.profileId, cos: match.best.score } : null,
+      second: match.second ? { profile: match.second.profileId, cos: match.second.score } : null,
       threshold,
-      accepted: Boolean(match.profileId),
+      accepted: Boolean(accepted),
     });
-    if (match.profileId) {
-      const vectorCountAfter = await profileStore.enrolEmbedding(db, match.profileId, {
-        vector: representative,
-        meetingId,
-        durationSec: plan.totalSec,
-        source: 'auto-post',
-        speakerKey: plan.speakerId,
-      });
-      await logEvent(meetingId, {
-        t: Date.now(),
-        meetingId,
-        type: 'enrol',
-        profile: match.profileId,
-        source: 'auto-post',
-        coherence,
-        durationSec: plan.totalSec,
-        vectorCountAfter,
-      });
+    if (accepted) {
+      // A match between `threshold` and `SPEAKER_AUTO_ENROL_THRESHOLD` still
+      // NAMES the speaker but adds no vector — only a stronger, longer-sample
+      // match gets to shape the profile others are matched against later.
+      const meetsAutoEnrolBar = accepted.confidence >= env.speakerAutoEnrolThreshold && plan.totalSec >= AUTO_ENROL_MIN_DURATION_SEC;
+      if (meetsAutoEnrolBar) {
+        const vectorCountAfter = await profileStore.enrolEmbedding(db, accepted.profileId, {
+          vector: representative,
+          meetingId,
+          durationSec: plan.totalSec,
+          source: 'auto-post',
+          speakerKey: plan.speakerId,
+        });
+        await logEvent(meetingId, {
+          t: Date.now(),
+          meetingId,
+          type: 'enrol',
+          profile: accepted.profileId,
+          source: 'auto-post',
+          coherence,
+          durationSec: plan.totalSec,
+          vectorCountAfter,
+        });
+      }
       out.push({
         speakerId: plan.speakerId,
         totalSpeakSec: plan.totalSpeakSec,
         sampleSec: plan.totalSec,
         sampleRange,
-        profileId: match.profileId,
-        displayName: match.displayName,
-        confidence: match.confidence,
+        profileId: accepted.profileId,
+        displayName: accepted.displayName,
+        confidence: accepted.confidence,
         resolved: true,
       });
       continue;
     }
 
-    // Coherent cluster, no profile match — park for `speaker_resolve` (no `cluster_not_coherent` flag; coherence itself is fine, it just doesn't match anyone yet).
+    // Coherent cluster, no accepted profile match — park for `speaker_resolve` (no `cluster_not_coherent` flag; coherence itself is fine, it just doesn't match anyone yet).
     const pendingEmbeddingJson = sealPendingEmbedding(representative, {
       profileId: `pending:${meetingId}:${plan.speakerId}`,
       minPairwiseCosine: coherence,
@@ -385,7 +411,7 @@ export async function resolveSpeakers(
       totalSpeakSec: plan.totalSpeakSec,
       sampleSec: plan.totalSec,
       sampleRange,
-      confidence: match.confidence,
+      confidence: match.best?.score,
       resolved: false,
       pendingEmbeddingJson,
     });

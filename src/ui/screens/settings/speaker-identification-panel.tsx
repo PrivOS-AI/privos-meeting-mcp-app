@@ -77,6 +77,20 @@ export function SpeakerIdentificationPanel() {
     }
   }
 
+  async function pruneOutliers(profileId: string): Promise<void> {
+    if (!window.confirm(t('speaker.settingsPanel.pruneConfirm'))) return;
+    setBusyId(profileId);
+    setRowError((prev) => ({ ...prev, [profileId]: '' }));
+    try {
+      await speakerProfileUpdate(app, { profileId, action: 'pruneOutliers' });
+      reload();
+    } catch (err) {
+      setRowError((prev) => ({ ...prev, [profileId]: err instanceof Error ? err.message : String(err) }));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function remove(profileId: string): Promise<void> {
     if (!window.confirm(t('speaker.settingsPanel.deleteConfirm'))) return;
     setBusyId(profileId);
@@ -137,6 +151,7 @@ export function SpeakerIdentificationPanel() {
               <th>{t('speaker.settingsPanel.colName')}</th>
               <th>{t('speaker.settingsPanel.colSamples')}</th>
               <th>{t('speaker.settingsPanel.colMeetings')}</th>
+              <th>{t('speaker.settingsPanel.colHealth')}</th>
               <th>{t('speaker.settingsPanel.colActions')}</th>
             </tr>
           </thead>
@@ -153,6 +168,18 @@ export function SpeakerIdentificationPanel() {
                 </td>
                 <td>{p.sampleCount}</td>
                 <td>{p.meetingCount}</td>
+                <td>
+                  {p.health ? (
+                    <div className="ma-speaker-settings__health">
+                      <span>{t('speaker.settingsPanel.healthMeanCosine', { value: p.health.meanPairwiseCosine.toFixed(2) })}</span>
+                      <span className={p.health.outlierCount > 0 ? 'ma-speaker-settings__health-outliers' : 'ma-speaker-settings__health-none'}>
+                        {t('speaker.settingsPanel.healthOutliers', { count: p.health.outlierCount })}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="ma-speaker-settings__health-none">{t('speaker.settingsPanel.healthUnavailable')}</span>
+                  )}
+                </td>
                 <td className="ma-speaker-settings__actions-cell">
                   <button type="button" disabled={busyId === p.id} onClick={() => void rename(p.id)}>
                     {t('speaker.settingsPanel.actionRename')}
@@ -160,6 +187,11 @@ export function SpeakerIdentificationPanel() {
                   <button type="button" disabled={busyId === p.id} onClick={() => void reenrol(p.id)}>
                     {t('speaker.settingsPanel.actionReenrol')}
                   </button>
+                  {p.health && p.health.outlierCount > 0 ? (
+                    <button type="button" disabled={busyId === p.id} onClick={() => void pruneOutliers(p.id)}>
+                      {t('speaker.settingsPanel.actionPrune')}
+                    </button>
+                  ) : null}
                   <button type="button" disabled={busyId === p.id} onClick={() => void remove(p.id)}>
                     {t('speaker.settingsPanel.actionDelete')}
                   </button>
@@ -173,7 +205,7 @@ export function SpeakerIdentificationPanel() {
             ))}
             {profiles.length === 0 ? (
               <tr>
-                <td colSpan={4}>{t('speaker.settingsPanel.empty')}</td>
+                <td colSpan={5}>{t('speaker.settingsPanel.empty')}</td>
               </tr>
             ) : null}
           </tbody>

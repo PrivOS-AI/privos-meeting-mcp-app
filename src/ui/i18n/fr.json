@@ -165,6 +165,12 @@
   "speaker.settingsPanel.thresholdWarning": "La modification du seuil n'affecte que les réunions traitées par la suite.",
   "speaker.settingsPanel.thresholdSaved": "Seuil enregistré.",
   "speaker.settingsPanel.thresholdUnavailable": "Ce paramètre n'est pas encore disponible dans cette version.",
+  "speaker.settingsPanel.colHealth": "Qualité",
+  "speaker.settingsPanel.healthMeanCosine": "Similarité moy. : {value}",
+  "speaker.settingsPanel.healthOutliers": "{count} échantillon(s) aberrant(s)",
+  "speaker.settingsPanel.healthUnavailable": "—",
+  "speaker.settingsPanel.actionPrune": "Nettoyer les aberrants",
+  "speaker.settingsPanel.pruneConfirm": "Supprimer les échantillons vocaux de mauvaise qualité signalés pour ce profil ? Cette action est irréversible.",
 
   "recording.speakerChips.label": "Qui parle ?",
   "recording.speakerChips.identifying": "Identification…",

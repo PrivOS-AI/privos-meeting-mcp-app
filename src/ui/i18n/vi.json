@@ -165,6 +165,12 @@
   "speaker.settingsPanel.thresholdWarning": "Thay đổi ngưỡng chỉ ảnh hưởng cuộc họp xử lý sau.",
   "speaker.settingsPanel.thresholdSaved": "Đã lưu ngưỡng.",
   "speaker.settingsPanel.thresholdUnavailable": "Tính năng này chưa khả dụng ở phiên bản hiện tại.",
+  "speaker.settingsPanel.colHealth": "Chất lượng",
+  "speaker.settingsPanel.healthMeanCosine": "Độ tương đồng TB: {value}",
+  "speaker.settingsPanel.healthOutliers": "{count} mẫu lệch",
+  "speaker.settingsPanel.healthUnavailable": "—",
+  "speaker.settingsPanel.actionPrune": "Dọn mẫu lệch",
+  "speaker.settingsPanel.pruneConfirm": "Xoá các mẫu giọng chất lượng thấp bị gắn cờ khỏi hồ sơ này? Không thể hoàn tác.",
 
   "recording.speakerChips.label": "Ai đang nói?",
   "recording.speakerChips.identifying": "Đang nhận diện…",

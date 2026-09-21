@@ -165,6 +165,12 @@
   "speaker.settingsPanel.thresholdWarning": "Changing the threshold only affects meetings processed afterwards.",
   "speaker.settingsPanel.thresholdSaved": "Threshold saved.",
   "speaker.settingsPanel.thresholdUnavailable": "This setting is not available in this version yet.",
+  "speaker.settingsPanel.colHealth": "Health",
+  "speaker.settingsPanel.healthMeanCosine": "Avg. similarity: {value}",
+  "speaker.settingsPanel.healthOutliers": "{count} outlier sample(s)",
+  "speaker.settingsPanel.healthUnavailable": "—",
+  "speaker.settingsPanel.actionPrune": "Prune outliers",
+  "speaker.settingsPanel.pruneConfirm": "Remove the flagged low-quality voice samples from this profile? This cannot be undone.",
 
   "recording.speakerChips.label": "Who's speaking?",
   "recording.speakerChips.identifying": "Identifying…",

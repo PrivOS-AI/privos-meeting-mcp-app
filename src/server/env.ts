@@ -56,6 +56,10 @@ export interface AppEnv {
   liveUploadRetryWindowMin: number;
   speakerModelPath: string;
   speakerMatchThreshold: number;
+  /** Minimum gap `matchSpeaker`'s best score must keep over the runner-up profile before a match is trusted (`SPEAKER_MATCH_MARGIN`) — neutral default 0 reproduces "accept on threshold alone". */
+  speakerMatchMargin: number;
+  /** Post-meeting AUTO-enrol bar (`auto-post` vectors only) — stricter than `speakerMatchThreshold` (which only gates NAMING). Neutral default = `speakerMatchThreshold`. */
+  speakerAutoEnrolThreshold: number;
   speakerMinSegmentSec: number;
   speakerEnrolTargetSec: number;
   speakerSessionMatchThreshold: number;
@@ -97,6 +101,7 @@ export function loadEnv(): AppEnv {
   // explicit override of THAT setting too, not just its own hardcoded default.
   const speakerMinSegmentSec = num('SPEAKER_MIN_SEGMENT_SEC', 2);
   const speakerSessionMatchThreshold = num('SPEAKER_SESSION_MATCH_THRESHOLD', 0.4);
+  const speakerMatchThreshold = num('SPEAKER_MATCH_THRESHOLD', 0.5);
   return {
     port: num('PORT', 3012),
     realtimeProvider: vendor('STT_REALTIME_PROVIDER', 'soniox'),
@@ -112,7 +117,9 @@ export function loadEnv(): AppEnv {
     liveMaxConcurrentRecordings: num('LIVE_MAX_CONCURRENT_RECORDINGS', 8),
     liveUploadRetryWindowMin: num('LIVE_UPLOAD_RETRY_WINDOW_MIN', 15),
     speakerModelPath: str('SPEAKER_MODEL_PATH') ?? 'models/3dspeaker_speaker-embedding_advanced.onnx',
-    speakerMatchThreshold: num('SPEAKER_MATCH_THRESHOLD', 0.5),
+    speakerMatchThreshold,
+    speakerMatchMargin: num('SPEAKER_MATCH_MARGIN', 0),
+    speakerAutoEnrolThreshold: num('SPEAKER_AUTO_ENROL_THRESHOLD', speakerMatchThreshold),
     speakerMinSegmentSec,
     speakerEnrolTargetSec: num('SPEAKER_ENROL_TARGET_SEC', 25),
     speakerSessionMatchThreshold,

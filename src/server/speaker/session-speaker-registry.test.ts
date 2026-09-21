@@ -95,13 +95,32 @@ describe('MeetingSessionRegistry', () => {
     expect(snap.filter((s) => !s.mergedInto)).toHaveLength(2);
   });
 
-  it('(f) sticky only turns on after >=2 turns AND >= LIVE_MIN_SPEECH_SEC of speech', () => {
+  it('(f) sticky only turns on after >=2 turns AND >= LIVE_MIN_SPEECH_SEC of speech; a profile-match candidate additionally needs >=15s of quality speech before its first attempt', () => {
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 9, seg('s0:1', 0)); // enough speech, but only 1 turn
     expect(reg.candidatesForProfileMatch()).toHaveLength(0);
 
-    reg.observe('s0:1', vec(0.99, 0.14), 1, seg('s0:1', 12000)); // 2nd turn -> now sticky
+    reg.observe('s0:1', vec(0.99, 0.14), 1, seg('s0:1', 12000)); // 2nd turn -> now sticky (10s total), but this short turn (<SPEAKER_UPDATE_MIN_SEGMENT_SEC) never clears UPDATE, so quality speech is still just 9s (<15s)
+    expect(reg.candidatesForProfileMatch()).toHaveLength(0);
+
+    reg.observe('s0:1', vec(0.99, 0.14), 6, seg('s0:1', 20000)); // +6s of quality speech -> 15s total -> now a candidate
     expect(reg.candidatesForProfileMatch()).toHaveLength(1);
+  });
+
+  it('candidatesForProfileMatch retries after another >=15s of quality speech since the last attempt, with NO cap on the number of attempts', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 9, seg('s0:1', 0));
+    reg.observe('s0:1', vec(0.99, 0.14), 1, seg('s0:1', 12000)); // rejected-short, no quality contribution
+    reg.observe('s0:1', vec(0.99, 0.14), 6, seg('s0:1', 20000)); // 15s quality speech -> a candidate
+    const id = reg.snapshot()[0].sessionSpeakerId;
+    expect(reg.candidatesForProfileMatch()).toEqual([id]);
+
+    // The old code stopped retrying after 5 attempts — this must keep going.
+    for (let i = 0; i < 10; i++) reg.applyProfileMatch(id, { confidence: 0.1 });
+    expect(reg.candidatesForProfileMatch()).toHaveLength(0); // backed off right after the last attempt
+
+    reg.observe('s0:1', vec(0.99, 0.14), 15, seg('s0:1', 30000)); // +15s of quality speech since the last attempt
+    expect(reg.candidatesForProfileMatch()).toEqual([id]);
   });
 
   it('(g) alreadyProcessed blocks a duplicate turn inside the overlap window', () => {

@@ -62,9 +62,12 @@ describe('resolveSpeakers', () => {
   beforeEach(() => {
     env.voiceprintEncKey = randomBytes(32).toString('base64');
     env.speakerMatchThreshold = 0.5;
+    env.speakerMatchMargin = 0; // neutral default
+    env.speakerAutoEnrolThreshold = 0.5; // neutral default = match threshold
     env.speakerMinSegmentSec = 2;
     env.speakerEnrolTargetSec = 5;
     resetVoiceprintKeyCacheForTests();
+    profileStore.resetProfileCacheForTests();
     rangeMarkers = new Map();
     store = { speaker_profiles: [], app_settings: [] };
     fakeHub = installFakeHub({ store });
@@ -74,11 +77,13 @@ describe('resolveSpeakers', () => {
     return new AppDbBotClient();
   }
 
-  it('auto-enrols a coherent cluster that matches an existing profile', async () => {
+  it('auto-enrols a coherent cluster (>=15s picked) that matches an existing profile', async () => {
     const profile = await profileStore.createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
     await profileStore.enrolEmbedding(db(), profile.id, { vector: new Float32Array([1, 0, 0, 0]), meetingId: 'm0', durationSec: 10, source: 'auto-post', speakerKey: 'seed' });
 
-    const segments = [seg('spkA', 0, 3), seg('spkA', 5, 8)];
+    // A larger targetSec so BOTH 10s ranges are picked (>= the 15s auto-enrol duration bar) — planEnrolment stops greedily once its running total clears targetSec.
+    env.speakerEnrolTargetSec = 30;
+    const segments = [seg('spkA', 0, 10), seg('spkA', 12, 22)];
     for (const s of segments) rangeMarkers.set(`${s.startSec}:${s.endSec}`, VOICE_A);
 
     const [result] = await resolveSpeakers(db(), '/fake/wav.wav', segments, 'meeting-1');
@@ -89,6 +94,67 @@ describe('resolveSpeakers', () => {
 
     const reloaded = await profileStore.getProfile(db(), profile.id);
     expect(reloaded?.embeddings).toHaveLength(2); // the pre-seeded one + the new auto-enrolment
+  });
+
+  it('names the speaker on a match but does NOT enrol a vector when the picked sample is shorter than the auto-enrol duration bar (15s)', async () => {
+    const profile = await profileStore.createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
+    await profileStore.enrolEmbedding(db(), profile.id, { vector: new Float32Array([1, 0, 0, 0]), meetingId: 'm0', durationSec: 10, source: 'auto-post', speakerKey: 'seed' });
+
+    // Same short fixture as before phase-07: two 3s ranges = 6s picked, well under 15s.
+    const segments = [seg('spkA', 0, 3), seg('spkA', 5, 8)];
+    for (const s of segments) rangeMarkers.set(`${s.startSec}:${s.endSec}`, VOICE_A);
+
+    const [result] = await resolveSpeakers(db(), '/fake/wav.wav', segments, 'meeting-1');
+    expect(result.resolved).toBe(true);
+    expect(result.profileId).toBe(profile.id);
+    expect(result.displayName).toBe('An');
+    expect(result.pendingEmbeddingJson).toBeUndefined();
+
+    const reloaded = await profileStore.getProfile(db(), profile.id);
+    expect(reloaded?.embeddings).toHaveLength(1); // still just the pre-seeded vector — no auto-post vector added
+  });
+
+  it('does not auto-enrol below SPEAKER_AUTO_ENROL_THRESHOLD even though the (lower) match threshold is cleared and duration is long enough', async () => {
+    const profile = await profileStore.createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
+    // A near-but-not-identical seed vector so the query's top-3-mean score lands between the two thresholds.
+    await profileStore.enrolEmbedding(db(), profile.id, { vector: new Float32Array([0.75, 0.6614, 0, 0]), meetingId: 'm0', durationSec: 10, source: 'auto-post', speakerKey: 'seed' });
+    env.speakerMatchThreshold = 0.5;
+    env.speakerAutoEnrolThreshold = 0.9; // stricter than the match/naming bar
+    env.speakerEnrolTargetSec = 30;
+
+    const segments = [seg('spkA', 0, 10), seg('spkA', 12, 22)];
+    for (const s of segments) rangeMarkers.set(`${s.startSec}:${s.endSec}`, VOICE_A); // query direction (1,0,0,0)
+
+    const [result] = await resolveSpeakers(db(), '/fake/wav.wav', segments, 'meeting-1');
+    expect(result.confidence).toBeGreaterThanOrEqual(0.5);
+    expect(result.confidence).toBeLessThan(0.9);
+    expect(result.resolved).toBe(true);
+    expect(result.profileId).toBe(profile.id); // still named
+
+    const reloaded = await profileStore.getProfile(db(), profile.id);
+    expect(reloaded?.embeddings).toHaveLength(1); // no vector added — below the auto-enrol bar
+  });
+
+  it('parks (does not name) a match whose margin over the runner-up profile is too small', async () => {
+    const p1 = await profileStore.createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
+    const p2 = await profileStore.createProfile(db(), { displayName: 'Binh', createdByUserId: 'user-1' });
+    // Both profiles score close to the query (A) — a genuinely ambiguous voice.
+    await profileStore.enrolEmbedding(db(), p1.id, { vector: new Float32Array([1, 0, 0, 0]), meetingId: 'm0', durationSec: 10, source: 'auto-post', speakerKey: 'seed1' });
+    await profileStore.enrolEmbedding(db(), p2.id, { vector: new Float32Array([0.99, 0.14, 0, 0]), meetingId: 'm0', durationSec: 10, source: 'auto-post', speakerKey: 'seed2' });
+    env.speakerMatchMargin = 0.05;
+
+    const segments = [seg('spkA', 0, 3), seg('spkA', 5, 8)];
+    for (const s of segments) rangeMarkers.set(`${s.startSec}:${s.endSec}`, VOICE_A);
+
+    const [result] = await resolveSpeakers(db(), '/fake/wav.wav', segments, 'meeting-1');
+    expect(result.resolved).toBe(false);
+    expect(result.profileId).toBeUndefined();
+    expect(result.pendingEmbeddingJson).toBeDefined(); // parked, not guessed wrong
+
+    const reloadedP1 = await profileStore.getProfile(db(), p1.id);
+    const reloadedP2 = await profileStore.getProfile(db(), p2.id);
+    expect(reloadedP1?.embeddings).toHaveLength(1); // untouched
+    expect(reloadedP2?.embeddings).toHaveLength(1); // untouched
   });
 
   it('parks a coherent-but-unmatched cluster as pendingEmbedding, does not touch any profile', async () => {

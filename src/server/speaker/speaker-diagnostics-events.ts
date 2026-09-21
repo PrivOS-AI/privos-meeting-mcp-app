@@ -89,7 +89,21 @@ export interface EnrolEvent extends EventEnvelope {
   vectorCountAfter: number;
 }
 
-export type DiagnosticEvent = ChunkEvent | GapEvent | ObserveEvent | MergeEvent | CentroidsEvent | ProfileMatchEvent | EnrolEvent;
+/**
+ * Voiceprint-hygiene prune (`speaker_profile_update` action `pruneOutliers`)
+ * — same enrol-family taxonomy as `EnrolEvent`, counts only. Not tied to any
+ * one meeting (a workspace-level profile action), so the caller stamps a
+ * sentinel `meetingId` rather than a real one.
+ */
+export interface PruneEvent extends EventEnvelope {
+  type: 'prune';
+  /** Real `profileId` — see `NODE_ALLOWLISTS` comment: intentionally NEVER reaches a room copy (same cross-room biometric concern as `profile-match`). */
+  profile: string;
+  removedCount: number;
+  remainingCount: number;
+}
+
+export type DiagnosticEvent = ChunkEvent | GapEvent | ObserveEvent | MergeEvent | CentroidsEvent | ProfileMatchEvent | EnrolEvent | PruneEvent;
 
 /** Every event carries at least these — also the fallback allowlist for a malformed/unrecognized `type`. */
 export const SHARED_FIELDS = ['t', 'meetingId', 'type'] as const;
@@ -103,9 +117,10 @@ export const NODE_ALLOWLISTS: Record<DiagnosticEvent['type'], readonly string[]>
   centroids: [...SHARED_FIELDS, 'pairs'],
   'profile-match': [...SHARED_FIELDS, 'sessionSpeakerId', 'attempt', 'best', 'second', 'threshold', 'accepted'],
   enrol: [...SHARED_FIELDS, 'profile', 'source', 'coherence', 'durationSec', 'vectorCountAfter'],
+  prune: [...SHARED_FIELDS, 'profile', 'removedCount', 'remainingCount'],
 };
 
-/** Room-audience allowlist — `profile-match` is intentionally ABSENT (omitted outright, see `speaker-diagnostics-log.ts`), every other type reuses the node list verbatim (no field in those carries a vector, text, or a workspace-global id). */
+/** Room-audience allowlist — `profile-match` and `prune` are intentionally ABSENT (omitted outright, see `speaker-diagnostics-log.ts`): both carry a real, workspace-global `profileId` with no per-meeting alias, which would be a cross-room biometric oracle in a room folder. Every other type reuses the node list verbatim (no field in those carries a vector, text, or a workspace-global id). */
 export const ROOM_ALLOWLISTS: Partial<Record<DiagnosticEvent['type'], readonly string[]>> = {
   chunk: NODE_ALLOWLISTS.chunk,
   gap: NODE_ALLOWLISTS.gap,

@@ -165,6 +165,12 @@
   "speaker.settingsPanel.thresholdWarning": "更改阈值仅影响之后处理的会议。",
   "speaker.settingsPanel.thresholdSaved": "阈值已保存。",
   "speaker.settingsPanel.thresholdUnavailable": "此版本尚不支持此设置。",
+  "speaker.settingsPanel.colHealth": "质量",
+  "speaker.settingsPanel.healthMeanCosine": "平均相似度: {value}",
+  "speaker.settingsPanel.healthOutliers": "{count} 个异常样本",
+  "speaker.settingsPanel.healthUnavailable": "—",
+  "speaker.settingsPanel.actionPrune": "清理异常样本",
+  "speaker.settingsPanel.pruneConfirm": "是否从此档案中移除被标记的低质量语音样本?此操作无法撤销。",
 
   "recording.speakerChips.label": "谁在发言？",
   "recording.speakerChips.identifying": "正在识别…",

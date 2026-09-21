@@ -16,15 +16,29 @@ import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { readKnownRooms } from '../jobs/known-rooms-store.js';
 import * as profileStore from '../speaker/profile-store.js';
+import { readMatchThreshold } from '../speaker/resolve-speakers.js';
+import { logEvent } from '../speaker/speaker-diagnostics-log.js';
 import { isWorkspaceAdmin, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
+import type { VerifiedActor } from '@privos_ai/app-server';
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-/** Display-only projection of a profile — no `embeddings`/`centroid` ever leave this module. */
-function toListItem(profile: profileStore.SpeakerProfile) {
+/** The exact rule for `_update`/`_delete` AND for whether `_list` includes health — never diverge (a profile you cannot edit must not leak biometric-adjacent health numbers either). */
+function canEditProfile(profile: profileStore.SpeakerProfile, actor: VerifiedActor): boolean {
+  return profile.createdByUserId === actor.userId || isWorkspaceAdmin(actor);
+}
+
+/**
+ * Display-only projection of a profile — no `embeddings`/`centroid` ever
+ * leave this module. `health` (vector-count/coherence SCALARS only, never a
+ * vector) is attached ONLY when the caller may edit this profile — `_list`
+ * itself stays readable by any verified user, but per-profile hygiene numbers
+ * are biometric-adjacent and gated the same as `_update`/`_delete`.
+ */
+function toListItem(profile: profileStore.SpeakerProfile, health?: profileStore.ProfileHealth) {
   return {
     id: profile.id,
     displayName: profile.displayName,
@@ -35,6 +49,7 @@ function toListItem(profile: profileStore.SpeakerProfile) {
     lastSeenAt: profile.lastSeenAt,
     createdByUserId: profile.createdByUserId,
     meetingCount: new Set(profile.embeddings.map((e) => e.meetingId).filter(Boolean)).size,
+    ...(health ? { health } : {}),
   };
 }
 
@@ -46,15 +61,23 @@ export const speakerProfileListTool: AppTool = {
   async execute(_args, context) {
     const actor = requireVerifiedActor(context);
     const db = new AppDbBotClient(actor.roomId ?? context.roomId);
-    const profiles = await profileStore.listProfiles(db);
-    return { profiles: profiles.map(toListItem) };
+    const [profiles, threshold] = await Promise.all([profileStore.listProfiles(db), readMatchThreshold(db)]);
+    return { profiles: profiles.map((p) => toListItem(p, canEditProfile(p, actor) ? profileStore.profileHealth(p, threshold) : undefined)) };
   },
 };
+
+/**
+ * Sentinel `meetingId` for diagnostics events that are NOT tied to any one
+ * meeting (a workspace-level profile hygiene action) — reuses the existing
+ * per-key JSONL diagnostics store as a small operator-only audit log rather
+ * than inventing a second logging path. Must pass `isSafeMeetingId`.
+ */
+const PROFILE_AUDIT_LOG_KEY = 'profile-audit';
 
 export const speakerProfileUpdateTool: AppTool = {
   name: 'speaker_profile_update',
   title: 'Update voiceprint profile',
-  description: 'Rename, link a PrivOS user, or re-enrol the voice for a profile — only the profile creator or a workspace admin.',
+  description: 'Rename, link a PrivOS user, re-enrol, or prune bad voice samples for a profile — only the profile creator or a workspace admin.',
   inputSchema: {
     type: 'object',
     required: ['profileId'],
@@ -63,7 +86,7 @@ export const speakerProfileUpdateTool: AppTool = {
       displayName: { type: 'string', maxLength: 80 },
       privosUserId: { type: 'string' },
       privosUsername: { type: 'string' },
-      action: { type: 'string', enum: ['reenrol'] },
+      action: { type: 'string', enum: ['reenrol', 'pruneOutliers'] },
     },
   },
   async execute(args, context) {
@@ -74,7 +97,7 @@ export const speakerProfileUpdateTool: AppTool = {
     const db = new AppDbBotClient();
     const profile = await profileStore.getProfile(db, profileId);
     if (!profile) throw new AppError('Voiceprint profile not found.');
-    if (profile.createdByUserId !== actor.userId && !isWorkspaceAdmin(actor)) {
+    if (!canEditProfile(profile, actor)) {
       throw new AppError('Only the profile creator or a workspace admin can edit this profile.');
     }
 
@@ -84,6 +107,22 @@ export const speakerProfileUpdateTool: AppTool = {
       // plan.md keeps `speaker_profile_*` room-less). Surfacing this clearly
       // beats silently accepting a request that does nothing.
       throw new AppError('Re-enrolling voice from stored audio is not supported in this version.');
+    }
+
+    let pruned: number | undefined;
+    if (args.action === 'pruneOutliers') {
+      const threshold = await readMatchThreshold(db);
+      const result = await profileStore.pruneOutlierEmbeddings(db, profileId, threshold);
+      pruned = result.removed;
+      // Counts only — never a vector, never which meeting a pruned sample came from.
+      await logEvent(PROFILE_AUDIT_LOG_KEY, {
+        t: Date.now(),
+        meetingId: PROFILE_AUDIT_LOG_KEY,
+        type: 'prune',
+        profile: profileId,
+        removedCount: result.removed,
+        remainingCount: result.remaining,
+      });
     }
 
     if (typeof args.displayName === 'string') {
@@ -96,7 +135,11 @@ export const speakerProfileUpdateTool: AppTool = {
     }
 
     const updated = await profileStore.getProfile(db, profileId);
-    return { profile: updated ? toListItem(updated) : null };
+    const threshold = await readMatchThreshold(db);
+    return {
+      profile: updated ? toListItem(updated, profileStore.profileHealth(updated, threshold)) : null,
+      ...(pruned !== undefined ? { pruned } : {}),
+    };
   },
 };
 
@@ -113,7 +156,7 @@ export const speakerProfileDeleteTool: AppTool = {
     const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     const profile = await profileStore.getProfile(db, profileId);
     if (!profile) throw new AppError('Voiceprint profile not found.');
-    if (profile.createdByUserId !== actor.userId && !isWorkspaceAdmin(actor)) {
+    if (!canEditProfile(profile, actor)) {
       throw new AppError('Only the profile creator or a workspace admin can delete this profile.');
     }
 

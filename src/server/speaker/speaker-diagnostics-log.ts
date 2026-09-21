@@ -43,6 +43,7 @@ export type {
   CentroidsEvent,
   ProfileMatchEvent,
   EnrolEvent,
+  PruneEvent,
   DiagnosticEvent,
 } from './speaker-diagnostics-events.js';
 // Re-exported so callers only need one import path for the whole diagnostics API.

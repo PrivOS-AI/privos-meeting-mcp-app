@@ -37,6 +37,14 @@ export interface SpeakerResolveResult {
   reason?: string;
 }
 
+/** Voiceprint hygiene scalars — attached only when the caller may edit this profile. Never a vector; counts and cosine numbers only. */
+export interface SpeakerProfileHealth {
+  vectorCounts: { userLive: number; userPost: number; autoPost: number; legacy: number };
+  minPairwiseCosine: number;
+  meanPairwiseCosine: number;
+  outlierCount: number;
+}
+
 export interface SpeakerProfileListItem {
   id: string;
   displayName: string;
@@ -47,6 +55,8 @@ export interface SpeakerProfileListItem {
   lastSeenAt?: string;
   createdByUserId: string;
   meetingCount: number;
+  /** Present only for a profile the caller may edit (same gate as rename/delete). */
+  health?: SpeakerProfileHealth;
 }
 
 async function callTool<T>(app: McpApp, name: string, args: Record<string, unknown>): Promise<T> {
@@ -64,12 +74,17 @@ export async function speakerProfileList(app: McpApp): Promise<SpeakerProfileLis
   return result.profiles;
 }
 
+export interface SpeakerProfileUpdateResult {
+  profile: SpeakerProfileListItem | null;
+  /** Only present after `action: 'pruneOutliers'` — how many flagged vectors were actually removed. */
+  pruned?: number;
+}
+
 export async function speakerProfileUpdate(
   app: McpApp,
-  input: { profileId: string; displayName?: string; privosUserId?: string; privosUsername?: string; action?: 'reenrol' },
-): Promise<SpeakerProfileListItem | null> {
-  const result = await callTool<{ profile: SpeakerProfileListItem | null }>(app, 'speaker_profile_update', input);
-  return result.profile;
+  input: { profileId: string; displayName?: string; privosUserId?: string; privosUsername?: string; action?: 'reenrol' | 'pruneOutliers' },
+): Promise<SpeakerProfileUpdateResult> {
+  return callTool<SpeakerProfileUpdateResult>(app, 'speaker_profile_update', input);
 }
 
 export async function speakerProfileDelete(app: McpApp, profileId: string): Promise<boolean> {

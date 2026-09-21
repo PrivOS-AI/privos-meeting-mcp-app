@@ -39,6 +39,22 @@ function profileRow(overrides: Record<string, unknown>) {
   };
 }
 
+/** A raw sealed-embedding-envelope JSON string for directly seeding `store.speaker_profiles[i].embeddings` with a specific vector/source, the same on-disk shape `profile-store.ts` writes. */
+function embJson(profileId: string, vector: Float32Array, meta: { meetingId: string; speakerKey: string; source?: 'user-live' | 'user-post' | 'auto-post' }): string {
+  const sealed = sealEmbedding(vector, { profileId, createdAt: new Date().toISOString() });
+  return JSON.stringify({ ...sealed, meetingId: meta.meetingId, durationSec: 10, speakerKey: meta.speakerKey, ...(meta.source ? { source: meta.source } : {}) });
+}
+
+/** A coherent 3-vector core plus one orthogonal outlier — exactly 1 outlier under `profileHealth`'s rule at threshold 0.5 (see `profile-store.test.ts`'s equivalent fixture for the worked cosine math). */
+function fourVectorsWithOneOutlier(profileId: string, outlierSource: 'auto-post' | 'user-post' = 'auto-post'): string[] {
+  return [
+    embJson(profileId, new Float32Array([1, 0, 0, 0]), { meetingId: 'm1', speakerKey: 'k1', source: 'auto-post' }),
+    embJson(profileId, new Float32Array([0.99, 0.01, 0, 0]), { meetingId: 'm2', speakerKey: 'k2', source: 'auto-post' }),
+    embJson(profileId, new Float32Array([0.98, 0.02, 0, 0]), { meetingId: 'm3', speakerKey: 'k3', source: 'auto-post' }),
+    embJson(profileId, new Float32Array([0, 1, 0, 0]), { meetingId: 'm4', speakerKey: 'k4', source: outlierSource }),
+  ];
+}
+
 describe('speaker_profile_list/_update/_delete', () => {
   beforeEach(() => {
     env.voiceprintEncKey = randomBytes(32).toString('base64');
@@ -78,6 +94,48 @@ describe('speaker_profile_list/_update/_delete', () => {
 
   it('update rejects action:"reenrol" with a clear not-yet-supported error', async () => {
     await expect(speakerProfileUpdateTool.execute({ profileId: 'profile-1', action: 'reenrol' }, ctx('owner-1'), {} as never)).rejects.toThrow(/not supported/);
+  });
+
+  it('list includes health scalars only for a profile the caller may edit — never for one they may not', async () => {
+    store.speaker_profiles[0].embeddings = fourVectorsWithOneOutlier('profile-1');
+    store.speaker_profiles[0].sampleCount = 4;
+
+    const asOwner = (await speakerProfileListTool.execute({}, ctx('owner-1'), {} as never)) as { profiles: Array<Record<string, unknown>> };
+    const ownerHealth = asOwner.profiles[0].health as { outlierCount: number; vectorCounts: { autoPost: number } } | undefined;
+    expect(ownerHealth).toBeDefined();
+    expect(ownerHealth?.outlierCount).toBe(1);
+    expect(ownerHealth?.vectorCounts.autoPost).toBe(4);
+
+    const asOther = (await speakerProfileListTool.execute({}, ctx('someone-else'), {} as never)) as { profiles: Array<Record<string, unknown>> };
+    expect(asOther.profiles[0].health).toBeUndefined(); // same gate as _update/_delete — health is biometric-adjacent
+  });
+
+  it('update action:"pruneOutliers" removes the flagged vector and returns the pruned count', async () => {
+    store.speaker_profiles[0].embeddings = fourVectorsWithOneOutlier('profile-1');
+    store.speaker_profiles[0].sampleCount = 4;
+
+    const result = (await speakerProfileUpdateTool.execute({ profileId: 'profile-1', action: 'pruneOutliers' }, ctx('owner-1'), {} as never)) as {
+      profile: { health?: { outlierCount: number } } | null;
+      pruned?: number;
+    };
+    expect(result.pruned).toBe(1);
+    expect(result.profile?.health?.outlierCount).toBe(0);
+    expect(store.speaker_profiles[0].sampleCount).toBe(3);
+  });
+
+  it('update action:"pruneOutliers" never removes a user-post vector, even when it is the flagged outlier', async () => {
+    store.speaker_profiles[0].embeddings = fourVectorsWithOneOutlier('profile-1', 'user-post');
+    store.speaker_profiles[0].sampleCount = 4;
+
+    const result = (await speakerProfileUpdateTool.execute({ profileId: 'profile-1', action: 'pruneOutliers' }, ctx('owner-1'), {} as never)) as { pruned?: number };
+    expect(result.pruned).toBe(0);
+    expect(store.speaker_profiles[0].sampleCount).toBe(4);
+  });
+
+  it('update action:"pruneOutliers" rejects a non-creator, non-admin caller — same gate as rename/delete', async () => {
+    await expect(
+      speakerProfileUpdateTool.execute({ profileId: 'profile-1', action: 'pruneOutliers' }, ctx('someone-else'), {} as never),
+    ).rejects.toThrow(/workspace admin/);
   });
 
   it('delete rejects a non-creator, non-admin caller', async () => {

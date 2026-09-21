@@ -554,7 +554,7 @@
     {
       "name": "speaker_profile_update",
       "title": "Update voiceprint profile",
-      "description": "Rename, link a PrivOS user, or re-enrol the voice for a profile — only the profile creator or a workspace admin.",
+      "description": "Rename, link a PrivOS user, re-enrol, or prune bad voice samples for a profile — only the profile creator or a workspace admin.",
       "inputSchema": {
         "type": "object",
         "required": [
@@ -577,7 +577,8 @@
           "action": {
             "type": "string",
             "enum": [
-              "reenrol"
+              "reenrol",
+              "pruneOutliers"
             ]
           }
         }

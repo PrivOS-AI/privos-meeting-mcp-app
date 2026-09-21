@@ -50,7 +50,17 @@ vi.mock('./live-speaker-repository.js', async () => {
 });
 
 vi.mock('../speaker/resolve-speakers.js', () => ({ readMatchThreshold: vi.fn(async () => 0.5) }));
-vi.mock('../speaker/profile-store.js', () => ({ listProfiles: vi.fn(async () => []) }));
+
+/** Profiles the (unmocked, real) `matchSpeaker`/`acceptMatch` pass sees on the next `cachedProfiles` call — empty by default, set per-test. */
+let profilesForMatch: import('../speaker/profile-store.js').SpeakerProfile[] = [];
+const cachedProfilesMock = vi.fn(async () => profilesForMatch);
+const invalidateProfileCacheMock = vi.fn(() => undefined);
+vi.mock('../speaker/profile-store.js', () => ({
+  listProfiles: vi.fn(async () => profilesForMatch),
+  cachedProfiles: (...args: unknown[]) => cachedProfilesMock(...(args as [])),
+  invalidateProfileCache: () => invalidateProfileCacheMock(),
+  resetProfileCacheForTests: () => invalidateProfileCacheMock(),
+}));
 
 let embeddingCallCount = 0;
 /** The first sample value of every PCM slice actually embedded, in call order — used with `indexTaggedChunk` to prove WHERE a slice was cut from. */
@@ -100,6 +110,9 @@ describe('chunk-worker processChunk', () => {
     decodedDurationSec = 60;
     appendLiveTurns.mockClear();
     upsertAll.mockClear();
+    cachedProfilesMock.mockClear();
+    invalidateProfileCacheMock.mockClear();
+    profilesForMatch = [];
     env.speakerMinSegmentSec = 2;
     env.liveChunkOverlapSec = 8;
   });
@@ -210,6 +223,9 @@ describe('chunk-worker processChunk — client-stamped partStartMs', () => {
     decodedDurationSec = 60;
     appendLiveTurns.mockClear();
     upsertAll.mockClear();
+    cachedProfilesMock.mockClear();
+    invalidateProfileCacheMock.mockClear();
+    profilesForMatch = [];
     env.speakerMinSegmentSec = 2;
     env.liveChunkOverlapSec = 8;
   });
@@ -343,5 +359,57 @@ describe('chunk-worker processChunk — client-stamped partStartMs', () => {
     expect(embeddingCallCount).toBe(1);
     expect(registry.decodedSecBefore(1)).toBe(60); // still governed by noteDecoded, exactly as before this stamp existed
     expect(registry.lastPartStampForValidation()).toBeNull(); // the new tracking is never touched for an old client
+  });
+});
+
+describe('chunk-worker processChunk — profile-match retry backoff (no cap, gated by NEW quality speech)', () => {
+  beforeEach(() => {
+    embeddingCallCount = 0;
+    embeddingInputFirstSamples.length = 0;
+    decodeShouldThrow = false;
+    decodedDurationSec = 60;
+    appendLiveTurns.mockClear();
+    upsertAll.mockClear();
+    cachedProfilesMock.mockClear();
+    invalidateProfileCacheMock.mockClear();
+    profilesForMatch = [];
+    env.speakerMinSegmentSec = 2;
+    env.liveChunkOverlapSec = 8;
+    env.liveMinSpeechSec = 8;
+    env.speakerMatchThreshold = 0.5;
+    env.speakerMatchMargin = 0;
+  });
+
+  it('waits for >=15s of quality speech before the FIRST attempt, then backs off until another 15s before retrying — with no cap on attempts', async () => {
+    const meetingId = `m-${Math.random()}`;
+    // `computeEmbedding` is mocked to always return the SAME vector, so every
+    // turn that reaches the registry at all (>= SPEAKER_MIN_SEGMENT_SEC, the
+    // chunk-level floor) always clears ASSIGN/UPDATE too — every embedded
+    // second counts as quality speech here, no `rejected-*` turns to account for.
+
+    // Part 0 [0,60000): turn 1, 9s — enough speech but only 1 turn, not sticky yet.
+    currentChunkPcm = toneChunk(60);
+    await processChunk(ctx(), { roomId: 'room-1', meetingId, seq: 0, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 0, endMs: 9_000, final: true }] }, new AbortController().signal);
+    expect(cachedProfilesMock).not.toHaveBeenCalled();
+
+    // Part 1 [60000,120000): turn 2, +2s -> sticky (11s, 2 turns) but only 11s quality speech, still < 15s.
+    currentChunkPcm = toneChunk(60);
+    await processChunk(ctx(), { roomId: 'room-1', meetingId, seq: 1, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 60_000, endMs: 62_000, final: true }] }, new AbortController().signal);
+    expect(cachedProfilesMock).not.toHaveBeenCalled();
+
+    // Part 2 [120000,180000): turn 3, +4s -> 15s quality speech total — first attempt fires this chunk.
+    currentChunkPcm = toneChunk(60);
+    await processChunk(ctx(), { roomId: 'room-1', meetingId, seq: 2, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 120_000, endMs: 124_000, final: true }] }, new AbortController().signal);
+    expect(cachedProfilesMock).toHaveBeenCalledTimes(1);
+
+    // Part 3 [180000,240000): turn 4, +2s only -> backed off right after the last attempt (2s < 15s), no new call.
+    currentChunkPcm = toneChunk(60);
+    await processChunk(ctx(), { roomId: 'room-1', meetingId, seq: 3, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 180_000, endMs: 182_000, final: true }] }, new AbortController().signal);
+    expect(cachedProfilesMock).toHaveBeenCalledTimes(1);
+
+    // Part 4 [240000,300000): turn 5, +15s more quality speech since the last attempt -> retries, no cap on the number of attempts.
+    currentChunkPcm = toneChunk(60);
+    await processChunk(ctx(), { roomId: 'room-1', meetingId, seq: 4, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 240_000, endMs: 255_000, final: true }] }, new AbortController().signal);
+    expect(cachedProfilesMock).toHaveBeenCalledTimes(2);
   });
 });

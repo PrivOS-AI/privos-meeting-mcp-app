@@ -165,6 +165,12 @@
   "speaker.settingsPanel.thresholdWarning": "Eine Änderung der Schwelle wirkt sich nur auf danach verarbeitete Besprechungen aus.",
   "speaker.settingsPanel.thresholdSaved": "Schwelle gespeichert.",
   "speaker.settingsPanel.thresholdUnavailable": "Diese Einstellung ist in dieser Version noch nicht verfügbar.",
+  "speaker.settingsPanel.colHealth": "Qualität",
+  "speaker.settingsPanel.healthMeanCosine": "Ø Ähnlichkeit: {value}",
+  "speaker.settingsPanel.healthOutliers": "{count} Ausreißer-Sample(s)",
+  "speaker.settingsPanel.healthUnavailable": "—",
+  "speaker.settingsPanel.actionPrune": "Ausreißer bereinigen",
+  "speaker.settingsPanel.pruneConfirm": "Die markierten Stimmproben mit geringer Qualität aus diesem Profil entfernen? Dies kann nicht rückgängig gemacht werden.",
 
   "recording.speakerChips.label": "Wer spricht?",
   "recording.speakerChips.identifying": "Wird identifiziert…",

@@ -165,6 +165,12 @@
   "speaker.settingsPanel.thresholdWarning": "しきい値の変更は、以降に処理される会議にのみ影響します。",
   "speaker.settingsPanel.thresholdSaved": "しきい値を保存しました。",
   "speaker.settingsPanel.thresholdUnavailable": "この設定は現在のバージョンではまだ利用できません。",
+  "speaker.settingsPanel.colHealth": "品質",
+  "speaker.settingsPanel.healthMeanCosine": "平均類似度: {value}",
+  "speaker.settingsPanel.healthOutliers": "外れ値サンプル {count} 件",
+  "speaker.settingsPanel.healthUnavailable": "—",
+  "speaker.settingsPanel.actionPrune": "外れ値を削除",
+  "speaker.settingsPanel.pruneConfirm": "このプロファイルからフラグ付きの低品質な音声サンプルを削除しますか? この操作は元に戻せません。",
 
   "recording.speakerChips.label": "話しているのは誰ですか？",
   "recording.speakerChips.identifying": "識別中…",

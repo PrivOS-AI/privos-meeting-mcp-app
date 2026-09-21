@@ -31,11 +31,10 @@ import { dataDir } from '../paths.js';
 import { computeEmbedding } from '../speaker/embedding-extractor.js';
 import { concatPcm } from '../speaker/pcm-utils.js';
 import * as profileStore from '../speaker/profile-store.js';
-import type { SpeakerProfile } from '../speaker/profile-store.js';
 import { readMatchThreshold } from '../speaker/resolve-speakers.js';
 import { sessionRegistries, type MeetingSessionRegistry, type SpeakerRegistryFact } from '../speaker/session-speaker-registry.js';
 import { append, flush, type DiagnosticEvent } from '../speaker/speaker-diagnostics-log.js';
-import { matchSpeaker } from '../speaker/speaker-matcher.js';
+import { acceptMatch, matchSpeaker } from '../speaker/speaker-matcher.js';
 import { KeyedSerialQueue } from '../jobs/keyed-serial-queue.js';
 import { ensureRegistry, upsertAll } from './live-speaker-repository.js';
 import { downloadPartBySeq } from './part-window.js';
@@ -66,46 +65,37 @@ function sessionIndexFromLabel(label: string): number {
   return match ? Number(match[1]) : 0;
 }
 
-// ---- workspace-global speaker_profiles cache (shared across meetings, TTL 10min — risk table) ----
-const PROFILE_CACHE_TTL_MS = 10 * 60 * 1000;
-let profileCache: { at: number; profiles: SpeakerProfile[] } | null = null;
-
-async function cachedProfiles(db: AppDbBotClient): Promise<SpeakerProfile[]> {
-  if (profileCache && Date.now() - profileCache.at < PROFILE_CACHE_TTL_MS) return profileCache.profiles;
-  const profiles = await profileStore.listProfiles(db);
-  profileCache = { at: Date.now(), profiles };
-  return profiles;
-}
-
-/** Drops the cached `speaker_profiles` list — call after any enrolment (e.g. a live one-shot `user-live` enrol) so the very next live match sees the new vector instead of waiting up to `PROFILE_CACHE_TTL_MS`. */
-export function invalidateProfileCache(): void {
-  profileCache = null;
-}
-
-/** Test-only: forces the next `cachedProfiles` call to re-query. */
-export function resetProfileCacheForTests(): void {
-  invalidateProfileCache();
-}
+/**
+ * Re-exported for backward compatibility — the actual cache now lives in
+ * `profile-store.ts` (its own choke point for every embedding-mutating
+ * function, so ANY enrol/prune/relabel invalidates it, not just a live
+ * one-shot enrol — plan.md: "invalidate the cache when any enrol happens in
+ * this process").
+ */
+export const invalidateProfileCache = profileStore.invalidateProfileCache;
+export const resetProfileCacheForTests = profileStore.resetProfileCacheForTests;
 
 async function matchPendingAgainstProfiles(db: AppDbBotClient, registry: MeetingSessionRegistry): Promise<void> {
   const candidateIds = registry.candidatesForProfileMatch();
   if (candidateIds.length === 0) return;
-  const [threshold, profiles] = await Promise.all([readMatchThreshold(db), cachedProfiles(db)]);
+  const [threshold, profiles] = await Promise.all([readMatchThreshold(db), profileStore.cachedProfiles(db)]);
   for (const sessionSpeakerId of candidateIds) {
     const centroid = registry.centroidFor(sessionSpeakerId);
     if (!centroid) continue;
-    const match = matchSpeaker(centroid, profiles, threshold);
-    const attempt = registry.applyProfileMatch(sessionSpeakerId, match);
+    const match = matchSpeaker(centroid, profiles);
+    const accepted = acceptMatch(match, { threshold, margin: env.speakerMatchMargin });
+    // Live match NEVER enrols (plan.md) — only naming/diagnostics happen here, never `profileStore.enrolEmbedding`.
+    const attempt = registry.applyProfileMatch(sessionSpeakerId, accepted ?? { confidence: 0 });
     append(registry, {
       t: Date.now(),
       meetingId: registry.meetingId,
       type: 'profile-match',
       sessionSpeakerId,
       attempt,
-      best: match.bestProfileId ? { profile: match.bestProfileId, cos: match.confidence } : null,
-      second: match.runnerUpProfileId ? { profile: match.runnerUpProfileId, cos: match.runnerUpConfidence } : null,
+      best: match.best ? { profile: match.best.profileId, cos: match.best.score } : null,
+      second: match.second ? { profile: match.second.profileId, cos: match.second.score } : null,
       threshold,
-      accepted: Boolean(match.profileId),
+      accepted: Boolean(accepted),
     });
   }
 }
