@@ -21,6 +21,7 @@ import { cosineSimilarity } from '../../shared/cosine.js';
 import { env, type SessionScoreMode } from '../env.js';
 import { canMerge, identityOutranks, isExplicitMergeRequest, mergePairKey, nextMergeStreak, type MergeBlockReason, type MergeCandidate, type MergeStreakEntry } from './session-speaker-merge-policy.js';
 import { SessionSpeakerCentroid, type UpdateAction } from './session-speaker-centroid.js';
+import { configFromEnv, type SpeakerThresholds } from './speaker-thresholds.js';
 
 const PALETTE = ['blue', 'gold', 'green', 'purple', 'coral', 'teal'] as const;
 /** Idle-registry eviction (S2-13) — no chunk processed for this long -> the registry-of-registries drops the meeting entirely. */
@@ -249,7 +250,19 @@ export class MeetingSessionRegistry {
   /** Last time a chunk was processed (or the registry was created) — the TTL clock (S2-13). */
   lastActivityAt = Date.now();
 
-  constructor(public readonly meetingId: string) {}
+  /**
+   * `thresholds` defaults to `configFromEnv()` (today's-behaviour, read fresh
+   * on EACH construction — not bound at module load, so a test/tool mutating
+   * `env` before `new MeetingSessionRegistry(id)` still sees its own values)
+   * — the only injection seam this class needs. `scripts/replay-meeting-speakers.ts`
+   * passes an explicit object built from a calibration run's candidate
+   * numbers instead, so one process can replay many configurations against
+   * the same kept audio without touching `env` or restarting.
+   */
+  constructor(
+    public readonly meetingId: string,
+    private readonly thresholds: SpeakerThresholds = configFromEnv(),
+  ) {}
 
   // -------------------------------------------------------- webm header
 
@@ -275,7 +288,7 @@ export class MeetingSessionRegistry {
     const speaker: SessionSpeaker = {
       sessionSpeakerId: randomUUID(),
       sonioxLabels: [],
-      centroidState: new SessionSpeakerCentroid(env.speakerSessionCentroidMode),
+      centroidState: new SessionSpeakerCentroid(this.thresholds.sessionCentroidMode),
       speechSec: 0,
       turnCount: 0,
       sticky: false,
@@ -475,7 +488,7 @@ export class MeetingSessionRegistry {
           }))
       : [];
 
-    const scoreMode = env.speakerSessionScoreMode;
+    const scoreMode = this.thresholds.sessionScoreMode;
     let target = this.byLabel.get(label);
     let reinstanced = false;
     /** The ASSIGN score that actually decided this turn's target — reused below for the UPDATE gate (same score, same comparison, per plan.md: "the code actually decided on"). `undefined` only for a brand-new speaker with nothing to score against. */
@@ -486,7 +499,7 @@ export class MeetingSessionRegistry {
       // sticky — a non-sticky label folded blindly, letting a foreign voice on
       // a just-recycled label silently contaminate a brand-new speaker).
       const score = scoreAgainstSessionSpeaker(embedding, target, scoreMode);
-      if (score < env.speakerSessionMatchThreshold) {
+      if (score < this.thresholds.sessionMatchThreshold) {
         // The label was recycled for a different voice — detach it from its old
         // owner (whose centroid is left untouched) and open a fresh instance.
         this.byLabel.delete(label);
@@ -519,19 +532,19 @@ export class MeetingSessionRegistry {
     // `target` (counts as speech, shows in the UI), just never folds in.
     let updateAction: UpdateAction;
     if (target.centroidState.isEmpty) {
-      updateAction = target.centroidState.add(embedding, durSec, { updateThreshold: env.speakerSessionUpdateThreshold });
-    } else if (durSec < env.speakerUpdateMinSegmentSec) {
+      updateAction = target.centroidState.add(embedding, durSec, { updateThreshold: this.thresholds.sessionUpdateThreshold });
+    } else if (durSec < this.thresholds.updateMinSegmentSec) {
       updateAction = 'rejected-short';
-    } else if ((assignScore ?? 0) < env.speakerSessionUpdateThreshold) {
+    } else if ((assignScore ?? 0) < this.thresholds.sessionUpdateThreshold) {
       updateAction = 'rejected-low-cos';
     } else {
-      updateAction = target.centroidState.add(embedding, durSec, { updateThreshold: env.speakerSessionUpdateThreshold });
+      updateAction = target.centroidState.add(embedding, durSec, { updateThreshold: this.thresholds.sessionUpdateThreshold });
     }
 
     target.speechSec += durSec;
     if (updateAction !== 'rejected-short' && updateAction !== 'rejected-low-cos') target.qualitySpeechSec += durSec;
     target.turnCount += 1;
-    target.sticky = target.turnCount >= 2 && target.speechSec >= env.liveMinSpeechSec;
+    target.sticky = target.turnCount >= 2 && target.speechSec >= this.thresholds.liveMinSpeechSec;
 
     this.pendingSettled.push({ sessionSpeakerId: target.sessionSpeakerId, startMs: seg.startMs, endMs: seg.endMs, sonioxLabel: label });
     this.lastActivityAt = Date.now();
@@ -562,7 +575,7 @@ export class MeetingSessionRegistry {
     for (const speaker of this.byId.values()) {
       if (speaker.mergedInto) continue;
       const score = scoreAgainstSessionSpeaker(embedding, speaker, scoreMode);
-      if (score >= env.speakerSessionMatchThreshold && (!best || score > best.score)) best = { speaker, score };
+      if (score >= this.thresholds.sessionMatchThreshold && (!best || score > best.score)) best = { speaker, score };
     }
     return best;
   }
@@ -620,7 +633,7 @@ export class MeetingSessionRegistry {
     winner.speechSec += loser.speechSec;
     winner.qualitySpeechSec += loser.qualitySpeechSec;
     winner.turnCount += loser.turnCount;
-    winner.sticky = winner.turnCount >= 2 && winner.speechSec >= env.liveMinSpeechSec;
+    winner.sticky = winner.turnCount >= 2 && winner.speechSec >= this.thresholds.liveMinSpeechSec;
     if (identityOutranks(loser, winner)) {
       winner.profileId = loser.profileId;
       winner.displayName = loser.displayName;
@@ -663,14 +676,14 @@ export class MeetingSessionRegistry {
       if (other === changed || other.mergedInto || !otherCentroid) continue;
       const cos = cosineSimilarity(changedCentroid, otherCentroid);
       const key = mergePairKey(changed.sessionSpeakerId, other.sessionSpeakerId);
-      if (cos < env.speakerSessionMergeThreshold) {
+      if (cos < this.thresholds.sessionMergeThreshold) {
         this.mergeStreaks.delete(key);
         continue;
       }
 
       const a = this.toMergeCandidate(changed);
       const b = this.toMergeCandidate(other);
-      const guard = canMerge(a, b, { minSpeechSec: env.speakerSessionMergeMinSpeechSec });
+      const guard = canMerge(a, b, { minSpeechSec: this.thresholds.sessionMergeMinSpeechSec });
       if (!guard.ok) {
         this.mergeStreaks.delete(key);
         onFact?.(this.buildMergeFact(changed, other, cos, 0, guard.blockedBy));
@@ -678,8 +691,8 @@ export class MeetingSessionRegistry {
       }
 
       const streakResult = isExplicitMergeRequest(a, b)
-        ? { count: Math.max(1, env.speakerSessionMergeStreak), satisfied: true }
-        : nextMergeStreak(this.mergeStreaks.get(key), cos, env.speakerSessionMergeThreshold, changedCentroid, otherCentroid, env.speakerSessionMergeStreak);
+        ? { count: Math.max(1, this.thresholds.sessionMergeStreak), satisfied: true }
+        : nextMergeStreak(this.mergeStreaks.get(key), cos, this.thresholds.sessionMergeThreshold, changedCentroid, otherCentroid, this.thresholds.sessionMergeStreak);
 
       if (!streakResult.satisfied) {
         this.mergeStreaks.set(key, { count: streakResult.count, lastCentroidA: changedCentroid, lastCentroidB: otherCentroid });
@@ -843,8 +856,8 @@ export class MeetingSessionRegistry {
         sessionSpeakerId: row.sessionSpeakerId,
         sonioxLabels: [...row.sonioxLabels],
         centroidState: row.centroid
-          ? SessionSpeakerCentroid.fromRestoredCentroid(env.speakerSessionCentroidMode, row.centroid, row.liveSpeechSec)
-          : new SessionSpeakerCentroid(env.speakerSessionCentroidMode),
+          ? SessionSpeakerCentroid.fromRestoredCentroid(this.thresholds.sessionCentroidMode, row.centroid, row.liveSpeechSec)
+          : new SessionSpeakerCentroid(this.thresholds.sessionCentroidMode),
         speechSec: row.liveSpeechSec,
         turnCount: 2,
         sticky: true,

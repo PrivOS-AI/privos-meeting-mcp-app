@@ -21,6 +21,7 @@
  */
 import { readWavPcm } from '../media/decode-audio.js';
 import { getSetting } from '../hub/app-settings.js';
+import { SPEAKER_MATCH_THRESHOLD_FLOOR } from '../../shared/app-settings.js';
 import { env } from '../env.js';
 import type { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { computeEmbedding } from './embedding-extractor.js';
@@ -193,17 +194,18 @@ function averageVectors(vectors: readonly Float32Array[]): Float32Array {
 /**
  * `app_settings.speakerMatchThreshold` (admin-tunable) with the env default as
  * fallback — shared by the automatic embed pass and `speaker_resolve`'s
- * manual coherence check, so both use the SAME bar.
- *
- * The stored value is not yet clamped to a server-side floor — any room
- * member can currently set it arbitrarily low via `app_settings` even though
- * `speaker_profiles` is workspace-global. A floor clamp lands with threshold
- * calibration; this function intentionally leaves that seam open rather than
- * guessing at a number now.
+ * manual coherence check, so both use the SAME bar. Clamped to
+ * {@link SPEAKER_MATCH_THRESHOLD_FLOOR} on the way out: any room member can
+ * write `app_settings` arbitrarily low even though `speaker_profiles` is
+ * workspace-global, so this read-time floor is the only backstop (phase-4's
+ * "reads of the existing `speakerMatchThreshold` setting are clamped to a
+ * server-side floor"). The env default itself is operator-controlled, never
+ * member-writable, so it is not clamped.
  */
 export async function readMatchThreshold(db: AppDbBotClient): Promise<number> {
   const stored = await getSetting<number>(db, 'speakerMatchThreshold');
-  return typeof stored === 'number' && stored > 0 && stored < 1 ? stored : env.speakerMatchThreshold;
+  const candidate = typeof stored === 'number' && stored > 0 && stored < 1 ? stored : env.speakerMatchThreshold;
+  return Math.max(candidate, SPEAKER_MATCH_THRESHOLD_FLOOR);
 }
 
 async function embedRanges(wavPath: string, ranges: readonly EnrolRange[]): Promise<Float32Array[]> {

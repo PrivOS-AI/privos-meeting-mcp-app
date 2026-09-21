@@ -24,6 +24,8 @@
     "test:watch": "vitest",
     "preflight": "tsx scripts/preflight.ts",
     "calibrate:speaker": "tsx scripts/calibrate-speaker-threshold.ts",
+    "calibrate:extract": "tsx scripts/extract-calibration-slices.ts",
+    "calibrate:replay": "tsx scripts/replay-meeting-speakers.ts",
     "package": "bash scripts/package-source.sh",
     "verify:fast-pr": "npm run typecheck && npm run test && npm run build && npm run preflight"
   },

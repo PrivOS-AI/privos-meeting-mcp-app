@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import type { SpeakerProfile, StoredEmbedding } from './profile-store.js';
-import { acceptMatch, matchSpeaker } from './speaker-matcher.js';
+import { acceptMatch, acceptProfileMatch, matchSpeaker } from './speaker-matcher.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -134,5 +134,14 @@ describe('acceptMatch (the ONE shared accept/reject decision)', () => {
     const match = matchSpeaker(A, profiles);
     expect(acceptMatch(match, { threshold: 0.5, margin: 0.05 })).toBeUndefined();
     expect(acceptMatch(match, { threshold: 0.5, margin: 0 })).toBeDefined(); // neutral default still names the closer one
+  });
+});
+
+describe('acceptProfileMatch (the SpeakerThresholds-typed entry point)', () => {
+  it('delegates to acceptMatch with matchThreshold/matchMargin pulled off the config object', () => {
+    const result = { best: { profileId: 'p1', displayName: 'An', score: 0.9 }, second: { profileId: 'p2', displayName: 'Binh', score: 0.6 } };
+    expect(acceptProfileMatch(result, { matchThreshold: 0.5, matchMargin: 0 })).toEqual({ profileId: 'p1', displayName: 'An', confidence: 0.9 });
+    // A stricter injected margin rejects the SAME result acceptMatch({margin:0}) would have accepted.
+    expect(acceptProfileMatch(result, { matchThreshold: 0.5, matchMargin: 0.5 })).toBeUndefined();
   });
 });

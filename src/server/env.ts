@@ -93,6 +93,17 @@ export interface AppEnv {
   meetingJobConcurrency: number;
   meetingJobTimeoutMs: number;
   allowUnverifiedActor: boolean;
+  /**
+   * Calibration-only, ENV-ONLY (never `app_settings` — this is an operator
+   * toggle, not a per-room setting): while `true`, `meeting-job.ts` skips
+   * deleting a meeting's uploaded recording parts after concat, so
+   * `scripts/replay-meeting-speakers.ts` can decode them part-by-part with
+   * the same 8s overlap ring the live chunk worker used, instead of only the
+   * single concatenated file. Default `false` reproduces today's behaviour
+   * (parts deleted right after concat). The operator flips this on, records
+   * a calibration meeting, then flips it back off.
+   */
+  keepPartsForCalibration: boolean;
 }
 
 export function loadEnv(): AppEnv {
@@ -143,6 +154,7 @@ export function loadEnv(): AppEnv {
     meetingJobConcurrency: num('MEETING_JOB_CONCURRENCY', 1),
     meetingJobTimeoutMs: num('MEETING_JOB_TIMEOUT_MS', 3_600_000),
     allowUnverifiedActor: str('ALLOW_UNVERIFIED_ACTOR') === '1',
+    keepPartsForCalibration: str('MEETING_KEEP_PARTS_FOR_CALIBRATION') === '1',
   };
 }
 

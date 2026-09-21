@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { env } from '../env.js';
 import { MeetingSessionRegistry, SessionRegistryStore, type SpeakerRegistryFact } from './session-speaker-registry.js';
+import { configFromEnv } from './speaker-thresholds.js';
 
 function vec(...values: number[]): Float32Array {
   return new Float32Array(values);
@@ -672,6 +673,38 @@ describe('centroid update gating (UPDATE threshold, duration gate, anchors)', ()
     // Plain (unweighted) FIFO mean of all 3 held embeddings — today's exact formula.
     expect(centroidA[0]).toBeCloseTo((1 + 0.95 + 0.99) / 3);
     expect(centroidA[1]).toBeCloseTo((0 + 0.31 + 0.14) / 3);
+  });
+});
+
+describe('injectable thresholds (SpeakerThresholds)', () => {
+  it('an explicit thresholds object built by configFromEnv() reproduces the SAME decisions as the constructor default', () => {
+    const withDefault = new MeetingSessionRegistry('m-default');
+    const withExplicitEnvConfig = new MeetingSessionRegistry('m-explicit', configFromEnv());
+    for (const reg of [withDefault, withExplicitEnvConfig]) {
+      reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
+      reg.observe('s0:3', vec(0.99, 0.14), 5, seg('s0:3', 8000));
+    }
+    expect(withExplicitEnvConfig.snapshot().map((s) => s.sonioxLabels.sort())).toEqual(withDefault.snapshot().map((s) => s.sonioxLabels.sort()));
+  });
+
+  it('an injected config with a stricter sessionMatchThreshold changes the fold/new decision the default config would have made', () => {
+    // Under the default (0.4), a near-identical embedding on a brand-new label
+    // folds into the existing speaker via bestSessionMatch (same fixture as
+    // test (b) above, cos(target, held) = 0.99).
+    const withDefault = new MeetingSessionRegistry('m-default-2');
+    withDefault.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
+    withDefault.observe('s0:3', vec(0.99, 0.14), 5, seg('s0:3', 8000));
+    expect(withDefault.snapshot()).toHaveLength(1);
+
+    // The SAME two turns against an INJECTED config whose sessionMatchThreshold
+    // is stricter than the 0.99 cosine the second turn scores — it no longer
+    // clears ASSIGN, so it opens a brand-new session speaker instead of folding.
+    // Proves the injected object, not `env`, is what the registry actually reads.
+    const stricter = { ...configFromEnv(), sessionMatchThreshold: 0.999 };
+    const withInjected = new MeetingSessionRegistry('m-injected', stricter);
+    withInjected.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
+    withInjected.observe('s0:3', vec(0.99, 0.14), 5, seg('s0:3', 8000));
+    expect(withInjected.snapshot()).toHaveLength(2);
   });
 });
 

@@ -19,6 +19,7 @@
  */
 import { cosineSimilarity } from '../../shared/cosine.js';
 import type { SpeakerProfile } from './profile-store.js';
+import type { SpeakerThresholds } from './speaker-thresholds.js';
 
 /** How many of a profile's best individual-vector scores are averaged into its overall score. */
 const TOP_N_FOR_SCORE = 3;
@@ -104,4 +105,18 @@ export function acceptMatch(result: MatchResult, options: AcceptMatchOptions): A
   if (!result.best || result.best.score < options.threshold) return undefined;
   if (result.second && result.best.score - result.second.score < options.margin) return undefined;
   return { profileId: result.best.profileId, displayName: result.best.displayName, confidence: result.best.score };
+}
+
+/**
+ * `acceptMatch`, reading its `threshold`/`margin` off the SAME injectable
+ * {@link SpeakerThresholds} `MeetingSessionRegistry` takes — the calibration
+ * seam for profile matching (phase-4's "the matcher takes a config object"),
+ * so `scripts/replay-meeting-speakers.ts` and any future consolidation call
+ * ONE function with ONE config, never re-deriving `{threshold, margin}` by
+ * hand. Purely additive: existing call sites keep using `acceptMatch`
+ * directly with their own `{threshold, margin}` (e.g. `readMatchThreshold`'s
+ * per-room `app_settings` override), so nothing here changes their behavior.
+ */
+export function acceptProfileMatch(result: MatchResult, thresholds: Pick<SpeakerThresholds, 'matchThreshold' | 'matchMargin'>): AcceptedMatch | undefined {
+  return acceptMatch(result, { threshold: thresholds.matchThreshold, margin: thresholds.matchMargin });
 }

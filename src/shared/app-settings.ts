@@ -30,6 +30,19 @@ export interface WorkspaceAppSettings {
   interruptedPartsRetentionDays: number;
 }
 
+/**
+ * Server-side safety floor for the workspace-tunable `speakerMatchThreshold`
+ * setting — `meeting_settings_set` only enforces the wide-open `(0, 1)` range
+ * at WRITE time, and ANY room member can write `app_settings` while
+ * `speaker_profiles` is workspace-global (`can-manage-room-settings.ts`), so a
+ * READ-time clamp (`resolve-speakers.ts#readMatchThreshold`) is the only
+ * backstop against a member setting it low enough to make profile matching
+ * meaningless. Conservative, not the calibrated target: it sits well below
+ * the pre-calibration default (`0.5`) so it never masks a deliberately low
+ * calibrated value, while still refusing to trust a near-zero setting.
+ */
+export const SPEAKER_MATCH_THRESHOLD_FLOOR = 0.35;
+
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceAppSettings = {
   sttRealtimeProvider: 'soniox',
   sttAsyncProvider: 'soniox',

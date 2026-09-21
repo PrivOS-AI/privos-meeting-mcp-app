@@ -45,7 +45,8 @@ import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { installFakeHub, type Store } from '../tools/test-support/fake-hub.js';
 import { resetVoiceprintKeyCacheForTests } from './voiceprint-crypto.js';
 import * as profileStore from './profile-store.js';
-import { openPendingEmbedding, resolveSpeakers } from './resolve-speakers.js';
+import { setSetting } from '../hub/app-settings.js';
+import { openPendingEmbedding, readMatchThreshold, resolveSpeakers } from './resolve-speakers.js';
 import type { Segment } from '../transcript/segment-builder.js';
 
 let store: Store;
@@ -247,5 +248,31 @@ describe('resolveSpeakers', () => {
     expect(result.resolved).toBe(false);
     expect(result.sampleSec).toBe(0);
     expect(result.pendingEmbeddingJson).toBeUndefined();
+  });
+});
+
+describe('readMatchThreshold (server-side floor clamp)', () => {
+  beforeEach(() => {
+    env.speakerMatchThreshold = 0.5;
+    store = { speaker_profiles: [], app_settings: [] };
+    fakeHub = installFakeHub({ store });
+  });
+
+  function db(): AppDbBotClient {
+    return new AppDbBotClient();
+  }
+
+  it('clamps a stored app_settings value BELOW the floor up to the floor', async () => {
+    await setSetting(db(), 'speakerMatchThreshold', 0.1); // a room member set it far too low
+    expect(await readMatchThreshold(db())).toBe(0.35);
+  });
+
+  it('leaves a stored value ABOVE the floor unchanged', async () => {
+    await setSetting(db(), 'speakerMatchThreshold', 0.6);
+    expect(await readMatchThreshold(db())).toBe(0.6);
+  });
+
+  it('leaves the env default unchanged when nothing is stored (already above the floor)', async () => {
+    expect(await readMatchThreshold(db())).toBe(0.5);
   });
 });

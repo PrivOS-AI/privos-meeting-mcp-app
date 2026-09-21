@@ -21,34 +21,64 @@
  * Input layout: `<dir>/<person>/<file>.wav` — one subfolder per person, each
  * containing one or more 16kHz mono PCM16 wav clips of ONLY that person
  * speaking (same format `decode-audio.ts` produces: 44-byte canonical
- * header, `pcm_s16le`). Re-encode with
- * `ffmpeg -i in.ext -ac 1 -ar 16000 -c:a pcm_s16le out.wav` first if needed.
+ * header, `pcm_s16le`; also the layout `scripts/extract-calibration-slices.ts`
+ * writes). Re-encode with `ffmpeg -i in.ext -ac 1 -ar 16000 -c:a pcm_s16le
+ * out.wav` first if needed.
  *
- * Default mode: embeds every clip once, then splits all pairwise cosine
- * scores into "genuine" (same person) and "impostor" (different person)
- * sets. Sweeps threshold 0.30 -> 0.80 in steps of 0.01, printing FAR/FRR per
- * step and the threshold closest to EER (FAR == FRR).
+ * Phase-4 additions (real-meeting calibration, unbucketed reporting alone is
+ * not enough on 2-5s shared-mic turns) — the actual scoring/bucketing math
+ * lives in `calibration-metrics.ts`, kept pure/testable and separate from
+ * this file's I/O + CLI orchestration:
+ *  - Every genuine/impostor pairwise set is ALSO broken down by DURATION
+ *    BUCKET (`2-3s`, `3-5s`, `>5s` — clips shorter than 2s, the production
+ *    turn floor `SPEAKER_MIN_SEGMENT_SEC`, are reported once under "all" only,
+ *    same as before, but excluded from the bucketed breakdown).
+ *  - CENTROID trials, per bucket: session merge compares CENTROIDS (an
+ *    N-embedding mean), never single turns, so alongside the single-embedding
+ *    genuine/impostor sets this script also builds one centroid per person per
+ *    bucket from `CENTROID_N` clips (mirrors `canMerge`'s own `embeddingCount
+ *    >= 3` gate) and reports genuine (same person, two independent
+ *    non-overlapping centroids) vs impostor (different people's centroids)
+ *    cosine distributions — a person/bucket needs `>= 2*CENTROID_N` clips to
+ *    contribute a genuine centroid trial, `>= CENTROID_N` for an impostor one.
+ *  - Margin statistics: for each clip (leave-one-out), scores every person by
+ *    the MAX cosine against that person's OTHER clips (mirrors
+ *    `speaker-matcher.ts`'s per-candidate scoring), finds the best- and
+ *    second-best-scoring person, and records `best - second` as a GENUINE
+ *    trial when the best-scoring person is the clip's own person, or an
+ *    IMPOSTOR trial otherwise (the best match was wrong) — informs whether
+ *    `SPEAKER_MATCH_MARGIN`/session merge's identity guard would help without
+ *    rejecting correct matches.
+ *
+ * Default mode prints all of the above for FAR/FRR/EER; `--session` prints the
+ * false-merge/false-split table, also bucketed + centroid + margin.
  */
 import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-import { cosineSimilarity } from '../src/shared/cosine.js';
 import { computeEmbedding } from '../src/server/speaker/embedding-extractor.js';
 import { readWavPcm } from '../src/server/media/decode-audio.js';
+import {
+  DURATION_BUCKETS,
+  THRESHOLD_MAX,
+  THRESHOLD_MIN,
+  THRESHOLD_STEP,
+  bucketFor,
+  centroidTrials,
+  farAt,
+  frrAt,
+  marginTrials,
+  pairwiseScores,
+  printBucketedDistributions,
+  printDistributionSummary,
+  printEerSweep,
+  sweepSessionThresholds,
+  type Sample,
+} from './calibration-metrics.js';
 
 const WAV_HEADER_BYTES = 44;
 const SAMPLE_RATE = 16_000;
 const BYTES_PER_SAMPLE = 2;
-
-const THRESHOLD_MIN = 0.3;
-const THRESHOLD_MAX = 0.8;
-const THRESHOLD_STEP = 0.01;
-
-interface Sample {
-  person: string;
-  file: string;
-  vector: Float32Array;
-}
 
 function wavDurationSec(filePath: string): number {
   const { size } = statSync(filePath);
@@ -75,71 +105,11 @@ async function loadSamples(rootDir: string): Promise<Sample[]> {
       }
       const pcm = await readWavPcm(filePath, 0, durationSec);
       const vector = await computeEmbedding(pcm, SAMPLE_RATE);
-      samples.push({ person: person.name, file, vector });
+      samples.push({ person: person.name, file, vector, durationSec });
       console.log(`  embedded ${person.name}/${file} (${durationSec.toFixed(1)}s, dim=${vector.length})`);
     }
   }
   return samples;
-}
-
-function pairwiseScores(samples: readonly Sample[]): { genuine: number[]; impostor: number[] } {
-  const genuine: number[] = [];
-  const impostor: number[] = [];
-  for (let i = 0; i < samples.length; i++) {
-    for (let j = i + 1; j < samples.length; j++) {
-      const score = cosineSimilarity(samples[i].vector, samples[j].vector);
-      if (samples[i].person === samples[j].person) genuine.push(score);
-      else impostor.push(score);
-    }
-  }
-  return { genuine, impostor };
-}
-
-function farAt(impostor: readonly number[], threshold: number): number {
-  if (impostor.length === 0) return 0;
-  return impostor.filter((s) => s >= threshold).length / impostor.length;
-}
-
-function frrAt(genuine: readonly number[], threshold: number): number {
-  if (genuine.length === 0) return 0;
-  return genuine.filter((s) => s < threshold).length / genuine.length;
-}
-
-/** False-merge rate at a session MERGE threshold: fraction of impostor (different-person) pairs scoring AT OR ABOVE it. */
-function falseMergeAt(impostor: readonly number[], threshold: number): number {
-  return farAt(impostor, threshold);
-}
-
-/** False-split rate at a session MATCH threshold: fraction of genuine (same-person) pairs scoring BELOW it (the label-recycle check would wrongly open a new instance). */
-function falseSplitAt(genuine: readonly number[], threshold: number): number {
-  return frrAt(genuine, threshold);
-}
-
-function sweepSessionThresholds(genuine: readonly number[], impostor: readonly number[]): void {
-  const SESSION_MATCH_MIN = 0.25;
-  const SESSION_MATCH_MAX = 0.6;
-  const SESSION_MERGE_MIN = 0.45;
-  const SESSION_MERGE_MAX = 0.8;
-  const STEP = 0.01;
-
-  console.log('\n== SPEAKER_SESSION_MATCH_THRESHOLD (label-recycle check) ==');
-  console.log('threshold  false-split-rate (genuine pairs wrongly opening label@n)');
-  for (let t = SESSION_MATCH_MIN; t <= SESSION_MATCH_MAX + 1e-9; t += STEP) {
-    const threshold = Math.round(t * 100) / 100;
-    console.log(`${threshold.toFixed(2)}       ${falseSplitAt(genuine, threshold).toFixed(3)}`);
-  }
-
-  console.log('\n== SPEAKER_SESSION_MERGE_THRESHOLD (centroid convergence merge) ==');
-  console.log('threshold  false-merge-rate (impostor pairs wrongly folded into one session speaker)');
-  for (let t = SESSION_MERGE_MIN; t <= SESSION_MERGE_MAX + 1e-9; t += STEP) {
-    const threshold = Math.round(t * 100) / 100;
-    console.log(`${threshold.toFixed(2)}       ${falseMergeAt(impostor, threshold).toFixed(3)}`);
-  }
-  console.log(
-    '\nPick SPEAKER_SESSION_MATCH_THRESHOLD as the highest value with an acceptably low false-split-rate, and\n'
-      + 'SPEAKER_SESSION_MERGE_THRESHOLD (which MUST stay above SPEAKER_SESSION_MATCH_THRESHOLD) as the lowest value\n'
-      + 'with an acceptably low false-merge-rate — plan.md open question #9\'s neighbor, unresolved without real same-session samples.',
-  );
 }
 
 async function main(): Promise<void> {
@@ -176,25 +146,53 @@ async function main(): Promise<void> {
   }
 
   if (sessionMode) {
+    console.log('== SPEAKER_SESSION_MATCH_THRESHOLD / SPEAKER_SESSION_MERGE_THRESHOLD (single-embedding, ALL durations) ==');
     sweepSessionThresholds(genuine, impostor);
+    printBucketedDistributions('single-embedding cosine', samples, pairwiseScores);
+    printBucketedDistributions('N-embedding centroid cosine (SPEAKER_SESSION_MERGE_THRESHOLD regime)', samples, centroidTrials);
+    console.log('\n== margin (best - second scoring person), split by whether the top match was correct ==');
+    const margins = marginTrials(samples);
+    printDistributionSummary('genuine (top match correct)', margins.genuine);
+    printDistributionSummary('impostor (top match WRONG)', margins.impostor);
+    console.log(
+      '\nPick SPEAKER_SESSION_MATCH_THRESHOLD as the highest value with an acceptably low false-split-rate, and\n'
+        + 'SPEAKER_SESSION_MERGE_THRESHOLD (which MUST stay above SPEAKER_SESSION_MATCH_THRESHOLD) as the lowest value\n'
+        + 'with an acceptably low false-merge-rate on the CENTROID (not single-embedding) distribution above — that is\n'
+        + 'the regime `maybeMerge` actually compares in production.',
+    );
     return;
   }
 
+  console.log('== SPEAKER_MATCH_THRESHOLD (single-embedding, ALL durations) ==');
   console.log('threshold  FAR      FRR      |FAR-FRR|');
-  let best = { threshold: THRESHOLD_MIN, far: 1, frr: 1, diff: Infinity };
   for (let t = THRESHOLD_MIN; t <= THRESHOLD_MAX + 1e-9; t += THRESHOLD_STEP) {
     const threshold = Math.round(t * 100) / 100;
-    const far = farAt(impostor, threshold);
-    const frr = frrAt(genuine, threshold);
-    const diff = Math.abs(far - frr);
-    console.log(`${threshold.toFixed(2)}       ${far.toFixed(3)}    ${frr.toFixed(3)}    ${diff.toFixed(3)}`);
-    if (diff < best.diff) best = { threshold, far, frr, diff };
+    console.log(`${threshold.toFixed(2)}       ${farAt(impostor, threshold).toFixed(3)}    ${frrAt(genuine, threshold).toFixed(3)}`);
+  }
+  printEerSweep(genuine, impostor);
+
+  console.log('\n== per-duration-bucket EER (single embeddings) ==');
+  for (const bucket of DURATION_BUCKETS) {
+    const inBucket = samples.filter((s) => bucketFor(s.durationSec) === bucket);
+    console.log(`\nbucket ${bucket} (${inBucket.length} clips):`);
+    const bucketed = pairwiseScores(inBucket);
+    printEerSweep(bucketed.genuine, bucketed.impostor);
   }
 
-  console.log(`\nSuggested threshold (closest to EER): SPEAKER_MATCH_THRESHOLD=${best.threshold.toFixed(2)} (FAR=${best.far.toFixed(3)}, FRR=${best.frr.toFixed(3)})`);
+  printBucketedDistributions('N-embedding centroid cosine', samples, centroidTrials);
+
+  console.log('\n== margin (best - second scoring person), split by whether the top match was correct ==');
+  const margins = marginTrials(samples);
+  printDistributionSummary('genuine (top match correct)', margins.genuine);
+  printDistributionSummary('impostor (top match WRONG)', margins.impostor);
 }
 
-main().catch((error: unknown) => {
-  console.error('calibrate-speaker-threshold failed:', error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+// Guarded so `calibration-metrics.test.ts` can import the pure scoring
+// helpers from `./calibration-metrics.js` without triggering this script's
+// own `main()` as an import-time side effect.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error: unknown) => {
+    console.error('calibrate-speaker-threshold failed:', error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}

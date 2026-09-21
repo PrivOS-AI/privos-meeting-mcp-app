@@ -15,6 +15,7 @@ import path from 'node:path';
 import type { RoomBoundHubClient } from '@privos_ai/app-server';
 
 import { AppError } from '../../shared/app-error.js';
+import { env } from '../env.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { uploadBotFile } from '../files/hub-file-upload.js';
 import { concatParts, deletePartFiles, type PartRef } from '../media/concat-parts.js';
@@ -292,7 +293,14 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       signal,
     });
     await jobRepo.patch(job._id, { audioFileId: audioUpload.fileId });
-    await deletePartFiles(agentBotHub, job.partFileIds, signal);
+    // `keepPartsForCalibration` (operator env toggle, off by default): a
+    // calibration meeting's per-part uploads survive so
+    // `scripts/replay-meeting-speakers.ts` can decode them part-by-part with
+    // the same overlap ring the live chunk worker used — the concatenated
+    // audio.webm alone cannot reproduce that (plan.md § phase 4 fidelity).
+    if (!env.keepPartsForCalibration) {
+      await deletePartFiles(agentBotHub, job.partFileIds, signal);
+    }
 
     // 2. decode wav16k — needed for elevenlabs-batch's input AND (P4) embedding.
     await jobRepo.patch(job._id, { step: 'decode', progress: 0.2 });
