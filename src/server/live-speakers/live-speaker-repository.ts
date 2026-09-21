@@ -16,7 +16,10 @@
  * combined labels/speech, so `loadFrom` can never reload the same merge as
  * two independent speakers after a restart.
  */
+import type { RoomBoundHubClient } from '@privos_ai/app-server';
+
 import { extractDbRecords, type AppDbBotClient, type DbRow } from '../hub/app-db-bot-client.js';
+import { readLiveTurns } from '../media/live-turns-store.js';
 import { openEmbedding, openEmbeddingWithMeta, type SealedEmbedding } from '../speaker/voiceprint-crypto.js';
 import { sealPendingEmbedding } from '../speaker/resolve-speakers.js';
 import { MeetingSessionRegistry, sessionRegistries, type LoadableSpeakerRow, type NameSource } from '../speaker/session-speaker-registry.js';
@@ -95,13 +98,42 @@ export async function loadForMeeting(db: AppDbBotClient, meetingId: string): Pro
  * Get-or-create this meeting's in-memory registry. On first touch after a
  * restart/eviction (the store did not already have it), rebuilds it from
  * `meeting_speakers` so live labels never reset to "Speaker 1".
+ *
+ * `hub`/`roomId`/`folderId` are optional and only used to hydrate the
+ * registry's retained-turns buffer (phase 8) from `live-turns.json` — the
+ * ONE-TIME, restart-only Files read `MeetingSessionRegistry#hasHydratedTurns`
+ * guards against repeating. Omitted (or a meeting with no folder yet) simply
+ * skips hydration; the registry still works, it just has no turn history
+ * older than this process's own uptime. Callers that never need turns (none,
+ * today — every caller either polls or processes chunks, both of which want
+ * turn history) may omit these three args.
  */
-export async function ensureRegistry(db: AppDbBotClient, meetingId: string): Promise<MeetingSessionRegistry> {
+export async function ensureRegistry(
+  db: AppDbBotClient,
+  meetingId: string,
+  hub?: RoomBoundHubClient,
+  roomId?: string,
+  folderId?: string,
+): Promise<MeetingSessionRegistry> {
   const existed = sessionRegistries.has(meetingId);
   const registry = sessionRegistries.get(meetingId);
   if (!existed) {
     const rows = await loadForMeeting(db, meetingId);
     if (rows.length > 0) registry.loadFrom(rows);
+  }
+  if (!registry.hasHydratedTurns() && hub && roomId && folderId) {
+    const file = await readLiveTurns(hub, roomId, folderId).catch(() => null);
+    registry.hydrateRetainedTurns(
+      (file?.turns ?? []).map((t) => ({
+        sessionSpeakerId: t.speakerKey,
+        startMs: t.startMs,
+        endMs: t.endMs,
+        // `live-turns.json` never carried the exact realtime label, only the
+        // session index — best-effort reconstruction, see
+        // `hydrateRetainedTurns`'s own doc comment for the consequence.
+        label: `s${t.sessionIndex}`,
+      })),
+    );
   }
   return registry;
 }

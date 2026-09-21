@@ -8,65 +8,75 @@ function fakeApp(callServerTool: McpApp['callServerTool']): McpApp {
 }
 
 describe('LiveSpeakerPoll', () => {
-  it('builds a speakerKey -> LiveSpeaker map from sonioxLabels', async () => {
-    const updates: Array<Map<string, unknown>> = [];
+  // Phase 8 intentionally drops the `split('@')[0]` label-collapsing map this
+  // poll used to build (`toSpeakerKeyMap`, root cause C7: a recycled label
+  // silently overwrote its instances) — `onUpdate` now hands the caller the
+  // raw `speakers` + `turns` lists straight from the tool response instead.
+  it('forwards the raw speaker list and turns list unmodified', async () => {
+    const onUpdate = vi.fn();
     const poll = new LiveSpeakerPoll(
       fakeApp(async () => ({
         sessionSpeakers: [
           { sessionSpeakerId: 'a', sonioxLabels: ['s0:1', 's0:1@2'], colorKey: 'blue', resolved: true, displayName: 'An', liveSpeechSec: 12 },
         ],
+        turns: [{ startMs: 0, endMs: 3000, label: 's0:1', sessionSpeakerId: 'a' }],
+        nextSinceMs: 3000,
         labelsSupported: true,
         updatedAt: new Date().toISOString(),
       })),
-      { roomId: 'r', meetingId: 'm', onUpdate: (map) => updates.push(map) },
+      { roomId: 'r', meetingId: 'm', onUpdate },
     );
 
     await poll.pollOnce();
     poll.stop();
 
-    expect(updates).toHaveLength(1);
-    expect(updates[0].get('s0:1')).toMatchObject({ displayName: 'An' });
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    const [speakers, turns, meta] = onUpdate.mock.calls[0];
+    expect(speakers).toEqual([
+      { sessionSpeakerId: 'a', sonioxLabels: ['s0:1', 's0:1@2'], colorKey: 'blue', resolved: true, displayName: 'An', liveSpeechSec: 12 },
+    ]);
+    expect(turns).toEqual([{ startMs: 0, endMs: 3000, label: 's0:1', sessionSpeakerId: 'a' }]);
+    expect(meta).toEqual({ degraded: false, labelsSupported: true });
   });
 
-  it('skips a merged-away (mergedInto) session speaker when building the label map — the winner already carries its labels', async () => {
-    const updates: Array<Map<string, unknown>> = [];
+  it('adopts nextSinceMs as the cursor for the following poll, and keeps it when a later poll returns nothing new', async () => {
+    const calls: unknown[] = [];
+    let response = { sessionSpeakers: [], turns: [{ startMs: 0, endMs: 1000, label: 's0:1', sessionSpeakerId: 'a' }], nextSinceMs: 1000 };
     const poll = new LiveSpeakerPoll(
-      fakeApp(async () => ({
-        sessionSpeakers: [
-          { sessionSpeakerId: 'winner', sonioxLabels: ['s0:1', 's0:2'], colorKey: 'blue', resolved: true, displayName: 'An', liveSpeechSec: 20 },
-          { sessionSpeakerId: 'loser', sonioxLabels: ['s0:2'], colorKey: 'gold', resolved: false, liveSpeechSec: 5, mergedInto: 'winner' },
-        ],
-      })),
-      { roomId: 'r', meetingId: 'm', onUpdate: (map) => updates.push(map) },
+      fakeApp(async (params) => {
+        calls.push((params.arguments as Record<string, unknown>).sinceMs);
+        return response;
+      }),
+      { roomId: 'r', meetingId: 'm', onUpdate: () => {} },
     );
 
+    await poll.pollOnce(); // first call: no cursor yet
+    response = { sessionSpeakers: [], turns: [], nextSinceMs: -1 } as never; // server: nothing new, no real cursor to give back
     await poll.pollOnce();
     poll.stop();
 
-    expect(updates[0].get('s0:2')).toMatchObject({ sessionSpeakerId: 'winner' });
+    expect(calls[0]).toBeUndefined(); // sinceMs omitted on the very first poll
+    expect(calls[1]).toBe(1000); // adopted from the first response's nextSinceMs
   });
 
-  it('forwards the raw speaker list and degraded/labelsSupported flags via onSpeakersUpdate', async () => {
-    const onSpeakersUpdate = vi.fn();
+  it('never sends a negative sinceMs even if the server ever echoed one back', async () => {
+    const calls: unknown[] = [];
     const poll = new LiveSpeakerPoll(
-      fakeApp(async () => ({
-        sessionSpeakers: [{ sessionSpeakerId: 'a', sonioxLabels: ['s0:1'], colorKey: 'blue', resolved: false, liveSpeechSec: 3 }],
-        degraded: true,
-        labelsSupported: true,
-      })),
-      { roomId: 'r', meetingId: 'm', onUpdate: () => {}, onSpeakersUpdate },
+      fakeApp(async (params) => {
+        calls.push((params.arguments as Record<string, unknown>).sinceMs);
+        return { sessionSpeakers: [], turns: [], nextSinceMs: -1 };
+      }),
+      { roomId: 'r', meetingId: 'm', onUpdate: () => {} },
     );
 
     await poll.pollOnce();
+    await poll.pollOnce();
     poll.stop();
 
-    expect(onSpeakersUpdate).toHaveBeenCalledTimes(1);
-    const [speakers, meta] = onSpeakersUpdate.mock.calls[0];
-    expect(speakers).toHaveLength(1);
-    expect(meta).toEqual({ degraded: true, labelsSupported: true });
+    expect(calls).toEqual([undefined, undefined]);
   });
 
-  it('swallows a failure (e.g. the P5 tool not existing yet) without throwing', async () => {
+  it('swallows a failure (e.g. the tool not existing yet) without throwing', async () => {
     const onUpdate = vi.fn();
     const poll = new LiveSpeakerPoll(
       fakeApp(async () => {
@@ -86,7 +96,7 @@ describe('LiveSpeakerPoll', () => {
     const poll = new LiveSpeakerPoll(
       fakeApp(async () => {
         calls += 1;
-        return { sessionSpeakers: [] };
+        return { sessionSpeakers: [], turns: [] };
       }),
       { roomId: 'r', meetingId: 'm', intervalMs: 1000, onUpdate: () => {} },
     );

@@ -321,6 +321,10 @@
           },
           "meetingId": {
             "type": "string"
+          },
+          "sinceMs": {
+            "type": "number",
+            "description": "Only return settled turns newer than this meeting-clock timestamp. Omitted -> the most recent turns."
           }
         }
       }

@@ -1,10 +1,12 @@
 /**
- * Polls `meeting_live_speakers` every 3-5s while recording (provider has
- * speaker labels only — D-18) and applies the returned map onto every
- * already-rendered caption line by `speakerKey`: relabel the badge, NEVER the
- * text (plan.md § "Relabel protocol"). Also exposes the raw session-speaker
- * list (`onSpeakersUpdate`) for the "Who's speaking?" chip row, and the
- * `degraded`/`labelsSupported` flags for the UI's own notices.
+ * Polls `meeting_live_speakers` every 4s while recording (provider has
+ * speaker labels only — D-18). Exposes the raw session-speaker list AND the
+ * settled TURNS the server decided on (`turns`), each already carrying its
+ * own final `sessionSpeakerId` — this module no longer collapses turns onto
+ * the realtime label itself (`recording-store.ts` does the per-line
+ * resolution, reading `turns` directly). `sinceMs` is a monotonic cursor:
+ * after the first response with a real `nextSinceMs`, this poll only asks for
+ * turns newer than what it has already seen.
  */
 import { parseToolResult } from '@privos_ai/app-react';
 import type { McpApp } from '@privos_ai/app-react';
@@ -22,8 +24,18 @@ export interface LiveSpeaker {
   mergedInto?: string;
 }
 
+/** One settled turn — the server's own per-turn identity decision. `label` is the realtime label (base form, or `label@n` for a just-recycled instance) this turn was embedded under; `sessionSpeakerId` is who the server decided it belongs to (already remapped through any merge). */
+export interface ServerTurn {
+  startMs: number;
+  endMs: number;
+  label: string;
+  sessionSpeakerId: string;
+}
+
 interface LiveSpeakersResponse {
   sessionSpeakers?: LiveSpeaker[];
+  turns?: ServerTurn[];
+  nextSinceMs?: number;
   degraded?: boolean;
   labelsSupported?: boolean;
   updatedAt?: string;
@@ -33,35 +45,17 @@ export interface LiveSpeakerPollOptions {
   roomId: string;
   meetingId: string;
   intervalMs?: number;
-  /** speakerKey -> LiveSpeaker, applied to every rendered line with that key. */
-  onUpdate(map: Map<string, LiveSpeaker>): void;
-  /** The raw list every poll — drives the "Who's speaking?" chip row. */
-  onSpeakersUpdate?(speakers: LiveSpeaker[], meta: { degraded: boolean; labelsSupported: boolean }): void;
+  /** Every poll's raw speakers + the settled turns newer than the last poll — drives both the "Who's speaking?" chip row and the per-line server-identity resolution. */
+  onUpdate(speakers: LiveSpeaker[], turns: ServerTurn[], meta: { degraded: boolean; labelsSupported: boolean }): void;
 }
 
 const DEFAULT_INTERVAL_MS = 4000;
 
-/**
- * `speakerKey` is `s{sessionIndex}:{label}` — a `sonioxLabels` entry may carry
- * a `@n` split-instance suffix the badge ignores. A session speaker that lost
- * a merge (`mergedInto` set) is skipped here: the WINNER's own `sonioxLabels`
- * already includes every label the loser ever owned (see
- * `session-speaker-registry.ts`'s `maybeMerge`), so mapping the loser too
- * would non-deterministically overwrite the winner's entry depending on
- * array order.
- */
-function toSpeakerKeyMap(speakers: LiveSpeaker[]): Map<string, LiveSpeaker> {
-  const map = new Map<string, LiveSpeaker>();
-  for (const speaker of speakers) {
-    if (speaker.mergedInto) continue;
-    for (const label of speaker.sonioxLabels) map.set(label.split('@')[0], speaker);
-  }
-  return map;
-}
-
 export class LiveSpeakerPoll {
   private timer: ReturnType<typeof setInterval> | null = null;
   private stopped = false;
+  /** `sinceMs` cursor — `undefined` until the server hands back a real one (`nextSinceMs >= 0`); a negative `nextSinceMs` means "no turns settled yet", so the next request still asks for the default recent window instead of an invalid negative cursor. */
+  private sinceMs: number | undefined;
 
   constructor(
     private readonly app: McpApp,
@@ -75,12 +69,14 @@ export class LiveSpeakerPoll {
     try {
       const raw = await this.app.callServerTool({
         name: 'meeting_live_speakers',
-        arguments: { roomId: this.opts.roomId, meetingId: this.opts.meetingId },
+        arguments: { roomId: this.opts.roomId, meetingId: this.opts.meetingId, ...(this.sinceMs !== undefined ? { sinceMs: this.sinceMs } : {}) },
       });
       const parsed = parseToolResult(raw) as LiveSpeakersResponse;
-      const speakers = parsed?.sessionSpeakers ?? [];
-      this.opts.onUpdate(toSpeakerKeyMap(speakers));
-      this.opts.onSpeakersUpdate?.(speakers, { degraded: parsed?.degraded === true, labelsSupported: parsed?.labelsSupported !== false });
+      if (typeof parsed?.nextSinceMs === 'number' && parsed.nextSinceMs >= 0) this.sinceMs = parsed.nextSinceMs;
+      this.opts.onUpdate(parsed?.sessionSpeakers ?? [], parsed?.turns ?? [], {
+        degraded: parsed?.degraded === true,
+        labelsSupported: parsed?.labelsSupported !== false,
+      });
     } catch {
       // Not available before Phase 5, or a transient failure — badges just stay unresolved longer.
     }

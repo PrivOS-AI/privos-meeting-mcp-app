@@ -22,7 +22,7 @@ import { listParts, notifyChunkReady, uploadPart } from '../data/meeting-part-up
 import { uploadLiveCaptions, type CaptionExportLine } from '../data/meeting-caption-upload.js';
 import { PartUploadQueue } from '../data/part-upload-queue.js';
 import { createRealtimeClient, type CaptionEvent, type CaptionStatus, type LiveTurn, type RealtimeConnection } from '../data/realtime-client.js';
-import { LiveSpeakerPoll, type LiveSpeaker } from '../data/live-speaker-poll.js';
+import { LiveSpeakerPoll, type LiveSpeaker, type ServerTurn } from '../data/live-speaker-poll.js';
 import { speakerResolve, type RealtimeAssignChoice } from '../data/speaker-api.js';
 import { ScreenWakeLock, type WakeLockState } from '../data/screen-wake-lock.js';
 import type { RealtimeCapabilities, RealtimeToken, SttVendor } from '../data/stt-types.js';
@@ -71,6 +71,8 @@ export interface RecordingState {
   lineSpeaker: Record<string, string>;
   /** "Apply to every line of this voice": a diarized voice key remapped wholesale to another speaker key. */
   voiceAlias: Record<string, string>;
+  /** Server turn identity resolved ONCE per poll (`matchTurnsToLines`): caption line id -> the `sessionSpeakerId` a settled turn overlapping it belongs to. Read (never scanned) by `resolveLineSpeakerKey` on every render. */
+  lineServerSpeaker: Record<string, string>;
   /** Raw list from the last `meeting_live_speakers` poll — drives the "Who's speaking?" chip row. */
   liveSpeakers: LiveSpeaker[];
   /** True once any chunk for this meeting was dropped/failed (S2-08) — "some segments could not be identified". */
@@ -115,6 +117,7 @@ function initialState(): RecordingState {
     speakerMap: {},
     lineSpeaker: {},
     voiceAlias: {},
+    lineServerSpeaker: {},
     liveSpeakers: [],
     liveSpeakersDegraded: false,
     stageCaptionSize: 'medium',
@@ -124,14 +127,164 @@ function initialState(): RecordingState {
 }
 
 /**
- * Who a caption line belongs to after manual corrections: a per-line override
- * wins, then a whole-voice alias, then what the diarizer said. The diarizer
- * mixes voices up, so the user can fix one segment or a whole voice.
+ * Follows a session speaker's `mergedInto` chain to its ultimate winner, using
+ * only the small `liveSpeakers` list (never a scan of lines/turns) — a
+ * `lineServerSpeaker` entry set on an earlier poll can still point at a since
+ * -merged loser (the merge is only reflected in NEW turns going forward), so
+ * this is resolved at read time instead of eagerly rewriting every stored
+ * entry. Cycle-guarded defensively; a real cycle should never occur.
  */
-export function resolveLineSpeakerKey(state: Pick<RecordingState, 'lineSpeaker' | 'voiceAlias'>, line: Pick<CaptionLine, 'id' | 'speakerKey'>): string | undefined {
+function resolveMergedSpeakerId(id: string, speakers: readonly LiveSpeaker[]): string {
+  let current = id;
+  const seen = new Set<string>();
+  while (!seen.has(current)) {
+    seen.add(current);
+    const speaker = speakers.find((s) => s.sessionSpeakerId === current);
+    if (!speaker?.mergedInto) return current;
+    current = speaker.mergedInto;
+  }
+  return current;
+}
+
+/**
+ * Who a caption line belongs to, in order: a per-line override, then a
+ * whole-voice alias, then the SERVER's own turn-level identity (resolved once
+ * per poll into `lineServerSpeaker` by {@link matchTurnsToLines} — a single
+ * map read here, never a scan), then finally whatever the diarizer's realtime
+ * label said (the ~60-90s before any turn has settled, or a provider with no
+ * turn feed at all). The diarizer mixes voices up, so the user can fix one
+ * segment or a whole voice.
+ */
+export function resolveLineSpeakerKey(
+  state: Pick<RecordingState, 'lineSpeaker' | 'voiceAlias' | 'lineServerSpeaker' | 'liveSpeakers'>,
+  line: Pick<CaptionLine, 'id' | 'speakerKey'>,
+): string | undefined {
   const override = state.lineSpeaker[line.id];
   if (override) return override;
-  return line.speakerKey ? (state.voiceAlias[line.speakerKey] ?? line.speakerKey) : undefined;
+  if (line.speakerKey) {
+    const alias = state.voiceAlias[line.speakerKey];
+    if (alias) return alias;
+  }
+  const serverId = state.lineServerSpeaker[line.id];
+  if (serverId) return resolveMergedSpeakerId(serverId, state.liveSpeakers);
+  return line.speakerKey;
+}
+
+/** A settled turn already newer than the previous poll's cursor plus the base label it was embedded under — the shape both `matchTurnsToLines` and `accumulateLabelSpeech`/`ownerForLabel` operate on. */
+type ResolvedTurn = ServerTurn;
+
+/** Only the most recent lines are ever worth checking against a NEW turn — a settled turn always corresponds to something spoken within the last chunk-processing cycle, never meeting history. Keeps the per-poll matcher's cost bounded regardless of how long the meeting has run. */
+const RECENT_LINES_WINDOW = 500;
+/** A line counts as "this turn's line" once the turn covers at least half of the line's own timespan — the same bar plan.md sets for the server-identity resolution step. */
+const TURN_LINE_OVERLAP_RATIO = 0.5;
+
+/**
+ * New settled turns (this poll only) matched against a bounded recent-lines
+ * window -> a `lineServerSpeaker` patch. Matches by base realtime label (a
+ * recycled label's OLD and NEW turns share the same raw label — only time
+ * tells them apart) plus >=50% time overlap; never scans the full line
+ * history (see `RECENT_LINES_WINDOW`). Exported for direct unit testing.
+ */
+export function matchTurnsToLines(lines: readonly CaptionLine[], turns: readonly ResolvedTurn[]): Record<string, string> {
+  if (turns.length === 0) return {};
+  const candidates = lines.slice(-RECENT_LINES_WINDOW);
+  const patch: Record<string, string> = {};
+  for (const turn of turns) {
+    const baseLabel = turn.label.split('@')[0];
+    let bestLine: CaptionLine | undefined;
+    let bestRatio = 0;
+    for (const line of candidates) {
+      if (!line.speakerKey || line.speakerKey.split('@')[0] !== baseLabel) continue;
+      const lineStartMs = line.atSec * 1000;
+      const lineEndMs = line.endSec * 1000;
+      const lineDurMs = Math.max(1, lineEndMs - lineStartMs);
+      const overlapMs = Math.min(turn.endMs, lineEndMs) - Math.max(turn.startMs, lineStartMs);
+      const ratio = overlapMs / lineDurMs;
+      if (ratio > bestRatio) {
+        bestRatio = ratio;
+        bestLine = line;
+      }
+    }
+    if (bestLine && bestRatio >= TURN_LINE_OVERLAP_RATIO) patch[bestLine.id] = turn.sessionSpeakerId;
+  }
+  return patch;
+}
+
+/** Adds this poll's new turns' speech duration onto a running `baseLabel -> sessionSpeakerId -> ms` tally — the only source {@link ownerForLabel} needs to break a recycled label's tie by majority speech. Mutates `tally` in place. */
+export function accumulateLabelSpeech(tally: Map<string, Map<string, number>>, turns: readonly ResolvedTurn[]): void {
+  for (const turn of turns) {
+    const baseLabel = turn.label.split('@')[0];
+    let bySpeaker = tally.get(baseLabel);
+    if (!bySpeaker) {
+      bySpeaker = new Map();
+      tally.set(baseLabel, bySpeaker);
+    }
+    bySpeaker.set(turn.sessionSpeakerId, (bySpeaker.get(turn.sessionSpeakerId) ?? 0) + Math.max(0, turn.endMs - turn.startMs));
+  }
+}
+
+/**
+ * The session speaker that CURRENTLY owns a realtime label — the target for
+ * both a pending manual name and speakerMap chip folding. A label held by
+ * exactly one live (non-merged) session speaker resolves trivially; a
+ * RECYCLED label held by two resolves to whichever has spoken more of it so
+ * far (`tally`), falling back to the first-listed candidate when no speech
+ * has been tallied for it yet (e.g. the very poll that just created the
+ * second one). `undefined` when no live session speaker has claimed the label
+ * at all.
+ */
+export function ownerForLabel(baseLabel: string, speakers: readonly LiveSpeaker[], tally: ReadonlyMap<string, ReadonlyMap<string, number>>): LiveSpeaker | undefined {
+  const candidates = speakers.filter((s) => !s.mergedInto && s.sonioxLabels.some((l) => l.split('@')[0] === baseLabel));
+  if (candidates.length <= 1) return candidates[0];
+  const speech = tally.get(baseLabel);
+  if (!speech) return candidates[0];
+  let best = candidates[0];
+  let bestMs = speech.get(best.sessionSpeakerId) ?? 0;
+  for (const candidate of candidates.slice(1)) {
+    const ms = speech.get(candidate.sessionSpeakerId) ?? 0;
+    if (ms > bestMs) {
+      bestMs = ms;
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+/**
+ * Folds each realtime label's chip into its OWNING session speaker's own chip
+ * (name/colour/`resolved` carried over), re-keyed from now on by
+ * `sessionSpeakerId` — the server-confirmed `displayName`/`colorKey`/
+ * `resolved` always wins over whatever the label chip locally guessed, once
+ * the server has an opinion. A label nobody has claimed yet (no live session
+ * speaker owns it) keeps its own untouched entry — "labels with no session
+ * speaker yet keep their own chip" (plan.md).
+ */
+export function foldSpeakerMap(
+  speakerMap: Record<string, LiveSpeakerBadge>,
+  speakers: readonly LiveSpeaker[],
+  tally: ReadonlyMap<string, ReadonlyMap<string, number>>,
+): Record<string, LiveSpeakerBadge> {
+  const next = { ...speakerMap };
+  for (const speaker of speakers) {
+    if (speaker.mergedInto) continue;
+    const bareLabels = [...new Set(speaker.sonioxLabels.map((l) => l.split('@')[0]))];
+    let folded: LiveSpeakerBadge | undefined;
+    for (const label of bareLabels) {
+      const existing = next[label];
+      if (!existing) continue;
+      if (ownerForLabel(label, speakers, tally)?.sessionSpeakerId !== speaker.sessionSpeakerId) continue; // this speaker isn't (yet) the label's current owner — leave its chip alone
+      folded = existing;
+      delete next[label];
+    }
+    const prev = next[speaker.sessionSpeakerId] ?? folded;
+    next[speaker.sessionSpeakerId] = {
+      displayName: speaker.displayName ?? prev?.displayName,
+      colorKey: speaker.colorKey || prev?.colorKey || PALETTE[Object.keys(next).length % PALETTE.length],
+      liveConfidence: speaker.liveConfidence ?? prev?.liveConfidence,
+      resolved: speaker.resolved || Boolean(prev?.resolved),
+    };
+  }
+  return next;
 }
 
 /** Merge one caption event into the line list: upsert by id, else promote the most recent still-draft line to final. */
@@ -204,6 +357,8 @@ export class RecordingStore {
   /** Manual early assignments keyed by REALTIME speaker key, awaiting a session speaker to enrol against. */
   private pendingAssignments = new Map<string, RealtimeAssignChoice>();
   private reconciling = false;
+  /** Running `baseLabel -> sessionSpeakerId -> speechMs` tally built from every poll's new turns — the only input {@link ownerForLabel} needs to break a recycled label's tie by majority speech. */
+  private readonly labelSpeechMsBySpeaker = new Map<string, Map<string, number>>();
 
   constructor(
     private readonly app: McpApp,
@@ -440,11 +595,7 @@ export class RecordingStore {
       this.speakerPoll = new LiveSpeakerPoll(this.app, {
         roomId: this.ctx.roomId,
         meetingId,
-        onUpdate: (map) => this.applySpeakerMap(map),
-        onSpeakersUpdate: (speakers, meta) => {
-          this.setState({ liveSpeakers: speakers, liveSpeakersDegraded: meta.degraded });
-          void this.reconcilePendingAssignments(); // a new session speaker may now cover an early manual assignment
-        },
+        onUpdate: (speakers, turns, meta) => this.applyPollUpdate(speakers, turns, meta),
       });
     }
 
@@ -484,18 +635,25 @@ export class RecordingStore {
     });
   }
 
-  private applySpeakerMap(map: Map<string, LiveSpeaker>): void {
-    const speakerMap = { ...this.state.speakerMap };
-    for (const [key, speaker] of map) {
-      speakerMap[key] = {
-        displayName: speaker.displayName,
-        colorKey: speaker.colorKey || speakerMap[key]?.colorKey || this.nextColor(),
-        liveConfidence: speaker.liveConfidence,
-        resolved: speaker.resolved,
-      };
-    }
-    // Relabel every rendered line's badge only — never touch `text`.
-    this.setState({ speakerMap });
+  /**
+   * One `meeting_live_speakers` poll's worth of work, all done ONCE here
+   * rather than per render/per line: tally this poll's new turns' speech
+   * (for {@link ownerForLabel}'s majority tie-break), resolve them against the
+   * recent lines into a `lineServerSpeaker` patch, and fold each label's chip
+   * into its owning session speaker's chip. Relabels badges only — never
+   * touches caption `text`.
+   */
+  private applyPollUpdate(speakers: LiveSpeaker[], turns: ServerTurn[], meta: { degraded: boolean; labelsSupported: boolean }): void {
+    accumulateLabelSpeech(this.labelSpeechMsBySpeaker, turns);
+    const lineServerSpeakerPatch = matchTurnsToLines(this.state.lines, turns);
+    const speakerMap = foldSpeakerMap(this.state.speakerMap, speakers, this.labelSpeechMsBySpeaker);
+    this.setState({
+      liveSpeakers: speakers,
+      liveSpeakersDegraded: meta.degraded,
+      speakerMap,
+      lineServerSpeaker: Object.keys(lineServerSpeakerPatch).length > 0 ? { ...this.state.lineServerSpeaker, ...lineServerSpeakerPatch } : this.state.lineServerSpeaker,
+    });
+    void this.reconcilePendingAssignments(); // a new/updated session speaker may now cover an early manual assignment
   }
 
   /**
@@ -558,21 +716,21 @@ export class RecordingStore {
   }
 
   /**
-   * For every pending manual assignment, find the session speaker whose
-   * `sonioxLabels` now include that realtime key and persist the identity via
-   * `speaker_resolve` (enrolling the voiceprint). Runs after each live-speaker
-   * poll and right after a manual assignment; single-flighted so overlapping
-   * polls do not double-resolve. A `not_found` (session speaker not written
-   * yet) leaves the assignment pending for a later poll.
+   * For every pending manual assignment, find the session speaker that
+   * CURRENTLY owns that realtime key ({@link ownerForLabel} — the majority-
+   * speech owner when the label has recycled into two session speakers) and
+   * persist the identity via `speaker_resolve` (enrolling the voiceprint).
+   * Runs after each live-speaker poll and right after a manual assignment;
+   * single-flighted so overlapping polls do not double-resolve. A `not_found`
+   * (session speaker not written yet) leaves the assignment pending for a
+   * later poll.
    */
   private async reconcilePendingAssignments(): Promise<void> {
     if (this.reconciling || this.pendingAssignments.size === 0 || !this.state.meetingId) return;
     this.reconciling = true;
     try {
       for (const [speakerKey, choice] of [...this.pendingAssignments]) {
-        const session = this.state.liveSpeakers.find(
-          (s) => !s.mergedInto && s.sonioxLabels.some((lbl) => lbl.split('@')[0] === speakerKey),
-        );
+        const session = ownerForLabel(speakerKey, this.state.liveSpeakers, this.labelSpeechMsBySpeaker);
         if (!session) continue; // no session speaker yet — keep it pending
         try {
           const [result] = await speakerResolve(this.app, this.ctx.roomId, this.state.meetingId, [

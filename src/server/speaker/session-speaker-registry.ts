@@ -26,6 +26,8 @@ import { configFromEnv, type SpeakerThresholds } from './speaker-thresholds.js';
 const PALETTE = ['blue', 'gold', 'green', 'purple', 'coral', 'teal'] as const;
 /** Idle-registry eviction (S2-13) — no chunk processed for this long -> the registry-of-registries drops the meeting entirely. */
 export const REGISTRY_TTL_MS = 30 * 60 * 1000;
+/** Bound for BOTH the retained-turns buffer and `processedTurns` — oldest evicted first. Large enough that a client catching up after being away for a while still gets a useful backlog page, small enough to stay a rounding error of memory for a single meeting. */
+const RETAINED_TURNS_CAP = 5000;
 /**
  * Profile-match retry backoff (plan.md: "replace the hard attempt cap with
  * backoff by NEW speech; no cap") — a sticky, unresolved speaker becomes (or
@@ -222,6 +224,22 @@ export class MeetingSessionRegistry {
   private readonly processedTurns = new Set<string>();
   private readonly deferredSegments: ChunkSegment[] = [];
   private pendingSettled: SettledTurn[] = [];
+  /**
+   * Every settled turn since this registry was created, NEVER consumed
+   * (unlike `pendingSettled`, which `settledTurns()` drains for
+   * `live-turns.json`) — `meeting_live_speakers`'s per-poll turn feed reads
+   * this directly via {@link turnsSince}, so a client's 4s poll never
+   * triggers a Files read (`live-speakers-tool.ts`). Capped at
+   * `RETAINED_TURNS_CAP`, oldest dropped.
+   */
+  private readonly retainedTurns: SettledTurn[] = [];
+  /**
+   * Set once {@link hydrateRetainedTurns} has run (even with zero rows) —
+   * tells a freshly-rebuilt-after-restart registry apart from one that
+   * already tried and found nothing, so `ensureRegistry` reads
+   * `live-turns.json` at most once per meeting per process.
+   */
+  private turnsHydrated = false;
   private ringPcm: Float32Array = new Float32Array(0);
   private decodedSecTotal = 0;
   private lastProcessedSeq = -1;
@@ -314,6 +332,13 @@ export class MeetingSessionRegistry {
 
   private markProcessed(seg: Pick<ChunkSegment, 'speaker' | 'startMs'>): void {
     this.processedTurns.add(this.turnKey(seg));
+    // Same cap policy as `retainedTurns` — a `Set` iterates in insertion
+    // order, so its own oldest key is always `.values().next().value`; no
+    // separate ring buffer needed just to evict it.
+    if (this.processedTurns.size > RETAINED_TURNS_CAP) {
+      const oldest = this.processedTurns.values().next().value;
+      if (oldest !== undefined) this.processedTurns.delete(oldest);
+    }
   }
 
   // --------------------------------------------------------------- defer
@@ -546,7 +571,10 @@ export class MeetingSessionRegistry {
     target.turnCount += 1;
     target.sticky = target.turnCount >= 2 && target.speechSec >= this.thresholds.liveMinSpeechSec;
 
-    this.pendingSettled.push({ sessionSpeakerId: target.sessionSpeakerId, startMs: seg.startMs, endMs: seg.endMs, sonioxLabel: label });
+    const settledTurn: SettledTurn = { sessionSpeakerId: target.sessionSpeakerId, startMs: seg.startMs, endMs: seg.endMs, sonioxLabel: label };
+    this.pendingSettled.push(settledTurn);
+    this.retainedTurns.push(settledTurn);
+    if (this.retainedTurns.length > RETAINED_TURNS_CAP) this.retainedTurns.splice(0, this.retainedTurns.length - RETAINED_TURNS_CAP);
     this.lastActivityAt = Date.now();
 
     if (onFact) {
@@ -798,6 +826,76 @@ export class MeetingSessionRegistry {
     const out = this.pendingSettled;
     this.pendingSettled = [];
     return out;
+  }
+
+  /** True once this registry's retained-turns buffer has been hydrated from `live-turns.json` (or confirmed there was nothing to hydrate) — `live-speaker-repository.ts#ensureRegistry` checks this before ever reading Files. */
+  hasHydratedTurns(): boolean {
+    return this.turnsHydrated;
+  }
+
+  /**
+   * One-time seed of the retained-turns buffer from a prior `live-turns.json`
+   * read — restart/eviction recovery ONLY (a registry that never lost its
+   * in-memory state never calls this; `observe()` is its normal source). A
+   * no-op after the first call, even when `rows` is empty (that IS the
+   * "nothing to hydrate" outcome — see {@link hasHydratedTurns}). Stays
+   * pure/I-O-free: the caller does the actual Files read and hands back
+   * plain data. `label` here is best-effort for a row written before this
+   * phase or reconstructed from `sessionIndex` alone (`live-turns.json` never
+   * carried the exact realtime label) — a mismatch only means the client's
+   * label-gated overlap match falls back to the realtime label for that one
+   * turn, never a wrong assignment.
+   */
+  hydrateRetainedTurns(rows: readonly { sessionSpeakerId: string; startMs: number; endMs: number; label: string }[]): void {
+    if (this.turnsHydrated) return;
+    this.turnsHydrated = true;
+    for (const row of rows) {
+      this.retainedTurns.push({ sessionSpeakerId: row.sessionSpeakerId, startMs: row.startMs, endMs: row.endMs, sonioxLabel: row.label });
+    }
+    if (this.retainedTurns.length > RETAINED_TURNS_CAP) this.retainedTurns.splice(0, this.retainedTurns.length - RETAINED_TURNS_CAP);
+  }
+
+  /**
+   * Follows a session speaker's `mergedInto` chain to its ultimate winner — a
+   * merge loser's OWN id never appears in a `turnsSince` result once this
+   * resolves it, matching the winner's row already carrying the combined
+   * labels/speech (`performMerge`). Cycle-guarded defensively; a real cycle
+   * should never occur.
+   */
+  private resolveMergedSessionId(id: string): string {
+    let current = id;
+    const seen = new Set<string>();
+    while (!seen.has(current)) {
+      seen.add(current);
+      const next = this.byId.get(current)?.mergedInto;
+      if (!next) return current;
+      current = next;
+    }
+    return current;
+  }
+
+  /**
+   * One page of settled turns strictly newer than `sinceMs` (oldest-first),
+   * for `meeting_live_speakers`'s per-poll turn feed — the only reader of
+   * {@link retainedTurns}; unlike `settledTurns()`, this never consumes it.
+   * `sinceMs` omitted -> the most recent `DEFAULT_RECENT_TURNS`. Every
+   * result's `sessionSpeakerId` is remapped through
+   * {@link resolveMergedSessionId} so a merge that happened AFTER a turn was
+   * recorded still reports it under the winner (plan.md: "turns of the loser
+   * are reported under the winner id"). Hard-capped at `MAX_TURNS_PER_PAGE`;
+   * `nextSinceMs` is the returned page's own high-water mark, or the caller's
+   * own `sinceMs` unchanged when nothing new was found — `-1` only when there
+   * is no cursor at all yet (no turns ever settled), so a turn that
+   * legitimately starts at `startMs:0` is never silently skipped by a naive
+   * `sinceMs:0` on the next call.
+   */
+  turnsSince(sinceMs?: number): { turns: SettledTurn[]; nextSinceMs: number } {
+    const DEFAULT_RECENT_TURNS = 200;
+    const MAX_TURNS_PER_PAGE = 500;
+    const source = sinceMs === undefined ? this.retainedTurns.slice(-DEFAULT_RECENT_TURNS) : this.retainedTurns.filter((t) => t.startMs > sinceMs);
+    const page = source.slice(0, MAX_TURNS_PER_PAGE).map((t) => ({ ...t, sessionSpeakerId: this.resolveMergedSessionId(t.sessionSpeakerId) }));
+    const nextSinceMs = page.length > 0 ? page[page.length - 1].startMs : (sinceMs ?? -1);
+    return { turns: page, nextSinceMs };
   }
 
   snapshot(): SessionSpeakerSnapshot[] {
