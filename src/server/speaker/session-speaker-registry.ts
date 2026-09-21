@@ -19,6 +19,7 @@ import { randomUUID } from 'node:crypto';
 
 import { cosineSimilarity } from '../../shared/cosine.js';
 import { env } from '../env.js';
+import { canMerge, identityOutranks, isExplicitMergeRequest, mergePairKey, nextMergeStreak, type MergeBlockReason, type MergeCandidate, type MergeStreakEntry } from './session-speaker-merge-policy.js';
 import { matchSpeaker } from './speaker-matcher.js';
 import type { SpeakerProfile } from './profile-store.js';
 
@@ -67,17 +68,25 @@ export interface ObserveFact {
   action: 'folded' | 'new' | 'reinstanced';
 }
 
-/** Diagnostics fact emitted by `maybeMerge` when it actually merges two session speakers. */
+/**
+ * Diagnostics fact emitted by `maybeMerge` for EVERY pair whose centroids
+ * cleared the merge threshold, whether or not the merge actually happened.
+ * `blockedBy` is absent exactly when this check performed the merge.
+ */
 export interface MergeFact {
   kind: 'merge';
   winnerId: string;
   loserId: string;
   cos: number;
-  /** Each side's OWN accumulated speech, just before the merge combined them. */
+  /** Each side's OWN accumulated speech, just before the merge combined them (or as of this check, if blocked). */
   winnerSpeechSec: number;
   loserSpeechSec: number;
   winnerNamed: boolean;
   loserNamed: boolean;
+  /** The sustained-evidence streak count as of this check (0 when blocked by `identity`/`min-speech`, which never touch the streak). */
+  streak: number;
+  /** Set when this pair cleared the merge threshold but did NOT merge; absent when it did. */
+  blockedBy?: MergeBlockReason;
 }
 
 export type SpeakerRegistryFact = ObserveFact | MergeFact;
@@ -199,6 +208,8 @@ export class MeetingSessionRegistry {
   private degradedFlag = false;
   private lastPersistedHash = '';
   private webmInitSegment: Buffer | null = null;
+  /** Sustained-evidence bookkeeping per candidate pair (`session-speaker-merge-policy.ts#mergePairKey`) — memory-only, never persisted (a restart resets streaks, the safe direction: plan.md § Non-functional). */
+  private readonly mergeStreaks = new Map<string, MergeStreakEntry>();
 
   /**
    * Diagnostics write buffer (`speaker-diagnostics-log.ts`'s `append`/`flush`)
@@ -512,48 +523,126 @@ export class MeetingSessionRegistry {
     return out;
   }
 
-  /** After every centroid update, checks for convergence with another session speaker; merges at most one pair per `observe()` call (the next call re-checks, so a chain of merges resolves over a few turns rather than needing recursion here). */
+  /** `SessionSpeaker` -> the narrow shape `session-speaker-merge-policy.ts` actually needs — never the full internal object. */
+  private toMergeCandidate(speaker: SessionSpeaker): MergeCandidate {
+    return {
+      centroid: speaker.centroid!,
+      speechSec: speaker.speechSec,
+      embeddingCount: speaker.embeddings.length,
+      displayName: speaker.displayName,
+      profileId: speaker.profileId,
+      nameSource: speaker.nameSource,
+    };
+  }
+
+  /** Builds the diagnostics fact for one evaluated pair — `blockedBy` set when this check did NOT merge. */
+  private buildMergeFact(a: SessionSpeaker, b: SessionSpeaker, cos: number, streak: number, blockedBy?: MergeBlockReason): MergeFact {
+    const [winner, loser] = a.speechSec >= b.speechSec ? [a, b] : [b, a];
+    return {
+      kind: 'merge',
+      winnerId: winner.sessionSpeakerId,
+      loserId: loser.sessionSpeakerId,
+      cos,
+      winnerSpeechSec: winner.speechSec,
+      loserSpeechSec: loser.speechSec,
+      winnerNamed: Boolean(winner.displayName || winner.profileId),
+      loserNamed: Boolean(loser.displayName || loser.profileId),
+      streak,
+      blockedBy,
+    };
+  }
+
+  /**
+   * Folds `loser` into `winner` (by accumulated speech — ties keep `a`) and
+   * marks `loser.mergedInto`. The name/profile/user-identity fields are
+   * decided SEPARATELY by precedence (`identityOutranks`: user > profile/
+   * live/async > none), regardless of which side won by speech — today a
+   * named loser's identity was dropped whenever the speech-winner already had
+   * any name at all.
+   */
+  private performMerge(a: SessionSpeaker, b: SessionSpeaker, cos: number, streak: number, onFact?: SpeakerRegistryFactListener): void {
+    const [winner, loser] = a.speechSec >= b.speechSec ? [a, b] : [b, a];
+    // Captured BEFORE combining — the diagnostics event records what each side brought to the merge, not the post-merge total.
+    const winnerSpeechSecBeforeMerge = winner.speechSec;
+    const loserSpeechSecBeforeMerge = loser.speechSec;
+    const winnerNamed = Boolean(winner.displayName || winner.profileId);
+    const loserNamed = Boolean(loser.displayName || loser.profileId);
+
+    for (const label of loser.sonioxLabels) {
+      if (!winner.sonioxLabels.includes(label)) winner.sonioxLabels.push(label);
+      this.byLabel.set(label, winner);
+    }
+    winner.embeddings = [...winner.embeddings, ...loser.embeddings].slice(-EMBEDDING_CAP);
+    winner.centroid = meanNormalize(winner.embeddings);
+    winner.speechSec += loser.speechSec;
+    winner.turnCount += loser.turnCount;
+    winner.sticky = winner.turnCount >= 2 && winner.speechSec >= env.liveMinSpeechSec;
+    if (identityOutranks(loser, winner)) {
+      winner.profileId = loser.profileId;
+      winner.displayName = loser.displayName;
+      winner.nameSource = loser.nameSource;
+      winner.privosUserId = loser.privosUserId;
+      winner.liveConfidence = loser.liveConfidence;
+    }
+    loser.mergedInto = winner.sessionSpeakerId;
+
+    onFact?.({
+      kind: 'merge',
+      winnerId: winner.sessionSpeakerId,
+      loserId: loser.sessionSpeakerId,
+      cos,
+      winnerSpeechSec: winnerSpeechSecBeforeMerge,
+      loserSpeechSec: loserSpeechSecBeforeMerge,
+      winnerNamed,
+      loserNamed,
+      streak,
+    });
+  }
+
+  /**
+   * After every centroid update, checks for convergence with another session
+   * speaker; merges at most one pair per `observe()` call (the next call
+   * re-checks, so a chain of merges resolves over a few turns rather than
+   * needing recursion here). Three gates, in order: (1) `canMerge` — never
+   * merge two speakers a human/voiceprint already told apart, and (once
+   * enabled) require both sides to have spoken enough; (2) an explicit merge
+   * request (same user-given name/profile on both sides) merges immediately;
+   * (3) otherwise, `SPEAKER_SESSION_MERGE_STREAK` consecutive qualifying
+   * checks are required (`nextMergeStreak`) — the neutral default of 1
+   * reproduces today's single-shot-on-first-clear behaviour.
+   */
   private maybeMerge(changed: SessionSpeaker, onFact?: SpeakerRegistryFactListener): void {
     if (!changed.centroid) return;
     for (const other of this.byId.values()) {
       if (other === changed || other.mergedInto || !other.centroid) continue;
       const cos = cosineSimilarity(changed.centroid, other.centroid);
-      if (cos < env.speakerSessionMergeThreshold) continue;
-
-      const [winner, loser] = changed.speechSec >= other.speechSec ? [changed, other] : [other, changed];
-      // Captured BEFORE combining — the diagnostics event records what each side brought to the merge, not the post-merge total.
-      const winnerSpeechSecBeforeMerge = winner.speechSec;
-      const loserSpeechSecBeforeMerge = loser.speechSec;
-      const winnerNamed = Boolean(winner.displayName || winner.profileId);
-      const loserNamed = Boolean(loser.displayName || loser.profileId);
-
-      for (const label of loser.sonioxLabels) {
-        if (!winner.sonioxLabels.includes(label)) winner.sonioxLabels.push(label);
-        this.byLabel.set(label, winner);
+      const key = mergePairKey(changed.sessionSpeakerId, other.sessionSpeakerId);
+      if (cos < env.speakerSessionMergeThreshold) {
+        this.mergeStreaks.delete(key);
+        continue;
       }
-      winner.embeddings = [...winner.embeddings, ...loser.embeddings].slice(-EMBEDDING_CAP);
-      winner.centroid = meanNormalize(winner.embeddings);
-      winner.speechSec += loser.speechSec;
-      winner.turnCount += loser.turnCount;
-      winner.sticky = winner.turnCount >= 2 && winner.speechSec >= env.liveMinSpeechSec;
-      if (!winner.profileId && loser.profileId) {
-        winner.profileId = loser.profileId;
-        winner.displayName = loser.displayName;
-        winner.nameSource = loser.nameSource;
-        winner.liveConfidence = loser.liveConfidence;
-      }
-      loser.mergedInto = winner.sessionSpeakerId;
 
-      onFact?.({
-        kind: 'merge',
-        winnerId: winner.sessionSpeakerId,
-        loserId: loser.sessionSpeakerId,
-        cos,
-        winnerSpeechSec: winnerSpeechSecBeforeMerge,
-        loserSpeechSec: loserSpeechSecBeforeMerge,
-        winnerNamed,
-        loserNamed,
-      });
+      const a = this.toMergeCandidate(changed);
+      const b = this.toMergeCandidate(other);
+      const guard = canMerge(a, b, { minSpeechSec: env.speakerSessionMergeMinSpeechSec });
+      if (!guard.ok) {
+        this.mergeStreaks.delete(key);
+        onFact?.(this.buildMergeFact(changed, other, cos, 0, guard.blockedBy));
+        continue;
+      }
+
+      const streakResult = isExplicitMergeRequest(a, b)
+        ? { count: Math.max(1, env.speakerSessionMergeStreak), satisfied: true }
+        : nextMergeStreak(this.mergeStreaks.get(key), cos, env.speakerSessionMergeThreshold, changed.centroid, other.centroid, env.speakerSessionMergeStreak);
+
+      if (!streakResult.satisfied) {
+        this.mergeStreaks.set(key, { count: streakResult.count, lastCentroidA: changed.centroid, lastCentroidB: other.centroid });
+        onFact?.(this.buildMergeFact(changed, other, cos, streakResult.count, 'streak'));
+        continue;
+      }
+
+      this.mergeStreaks.delete(key);
+      this.performMerge(changed, other, cos, streakResult.count, onFact);
       return;
     }
   }

@@ -10,7 +10,11 @@
  * `upsertAll` seals the centroid the same way P4 seals every other embedding
  * (`voiceprint-crypto.sealEmbedding`) and is gated by
  * `MeetingSessionRegistry.snapshotChanged()` so a meeting writes App DB at
- * most once per part (S2-14).
+ * most once per part (S2-14). A row whose in-memory speaker carries
+ * `mergedInto` (folded into another session speaker by the registry) is
+ * DELETED here rather than upserted — the surviving row already carries the
+ * combined labels/speech, so `loadFrom` can never reload the same merge as
+ * two independent speakers after a restart.
  */
 import { extractDbRecords, type AppDbBotClient, type DbRow } from '../hub/app-db-bot-client.js';
 import { openEmbedding, openEmbeddingWithMeta, type SealedEmbedding } from '../speaker/voiceprint-crypto.js';
@@ -133,6 +137,19 @@ export async function upsertAll(db: AppDbBotClient, meetingId: string, registry:
 
   for (const speaker of snapshot) {
     const row = bySessionId.get(speaker.sessionSpeakerId);
+
+    if (speaker.mergedInto) {
+      // A merge loser: its labels/speech were already folded into the WINNER's
+      // own snapshot entry (`session-speaker-registry.ts#performMerge`), so
+      // this row is redundant — delete it rather than writing its stale
+      // pre-merge state. Without this, `mergedInto` was memory-only and never
+      // written, so a restart/eviction reloaded both rows as independent
+      // speakers with overlapping labels (plan.md: "a merge survives a
+      // restart"). A no-op when this loser was never persisted individually.
+      if (row) await db.delete(COLLECTION, SCOPE, row._id);
+      continue;
+    }
+
     // Never downgrade a DB row already confirmed by a human (defense in depth
     // — the primary guard is running `speaker_resolve`'s mutation+write on this
     // SAME keyed queue, see `chunk-worker.ts#runOnMeetingQueue`). A row can only

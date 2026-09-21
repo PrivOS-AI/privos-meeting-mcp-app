@@ -142,6 +142,8 @@ function toDiagnosticEvent(meetingId: string, seq: number, fact: SpeakerRegistry
     loserSpeechSec: fact.loserSpeechSec,
     winnerNamed: fact.winnerNamed,
     loserNamed: fact.loserNamed,
+    streak: fact.streak,
+    blockedBy: fact.blockedBy,
   };
 }
 

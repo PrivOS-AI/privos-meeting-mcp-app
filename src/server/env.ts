@@ -47,6 +47,10 @@ export interface AppEnv {
   speakerEnrolTargetSec: number;
   speakerSessionMatchThreshold: number;
   speakerSessionMergeThreshold: number;
+  /** Consecutive `observe()`-triggered checks a pair must clear `speakerSessionMergeThreshold` on (with a changed centroid each time) before it actually merges. 1 = today's single-shot behaviour; raise after phase-4 calibration. */
+  speakerSessionMergeStreak: number;
+  /** Both sides' accumulated speech (seconds) required before a merge is even considered; 0 disables the gate (today's behaviour). Once >0, both sides also need >=3 held embeddings. */
+  speakerSessionMergeMinSpeechSec: number;
   liveMinSpeechSec: number;
   liveChunkOverlapSec: number;
   /** One-shot live enrolment bar (speaker_resolve time): minimum accumulated speech before a live centroid is trusted enough to enrol as `user-live`. */
@@ -87,6 +91,8 @@ export function loadEnv(): AppEnv {
     speakerEnrolTargetSec: num('SPEAKER_ENROL_TARGET_SEC', 25),
     speakerSessionMatchThreshold: num('SPEAKER_SESSION_MATCH_THRESHOLD', 0.4),
     speakerSessionMergeThreshold: num('SPEAKER_SESSION_MERGE_THRESHOLD', 0.6),
+    speakerSessionMergeStreak: num('SPEAKER_SESSION_MERGE_STREAK', 1),
+    speakerSessionMergeMinSpeechSec: num('SPEAKER_SESSION_MERGE_MIN_SPEECH_SEC', 0),
     liveMinSpeechSec: num('LIVE_MIN_SPEECH_SEC', 8),
     liveChunkOverlapSec: num('LIVE_CHUNK_OVERLAP_SEC', 8),
     liveEnrolMinSpeechSec: num('LIVE_ENROL_MIN_SPEECH_SEC', 20),

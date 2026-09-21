@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { env } from '../env.js';
 import { MeetingSessionRegistry, SessionRegistryStore, type SpeakerRegistryFact } from './session-speaker-registry.js';
@@ -52,7 +52,9 @@ describe('MeetingSessionRegistry', () => {
     expect(after).toEqual(before); // untouched
   });
 
-  it('(d) two session speakers whose centroids converge get merged, the larger speechSec side wins', () => {
+  it('(d) two session speakers whose centroids converge get merged, the larger speechSec side wins (neutral defaults: streak=1, minSpeech=0)', () => {
+    expect(env.speakerSessionMergeStreak).toBe(1);
+    expect(env.speakerSessionMergeMinSpeechSec).toBe(0);
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // speaker A: speechSec=5
 
@@ -256,6 +258,8 @@ describe('diagnostics facts (onFact)', () => {
     expect(mergeFact!.loserSpeechSec).toBeCloseTo(5); // A's own total right before being absorbed
     expect(mergeFact!.winnerNamed).toBe(false);
     expect(mergeFact!.loserNamed).toBe(false);
+    expect(mergeFact!.streak).toBe(1); // neutral default SPEAKER_SESSION_MERGE_STREAK=1 -> satisfied on the first qualifying check
+    expect(mergeFact!.blockedBy).toBeUndefined(); // this check actually merged
   });
 
   it('applyProfileMatch returns the post-increment attempt count (0 for an unknown id)', () => {
@@ -335,6 +339,153 @@ describe('diagnostics buffer', () => {
     expect(store.has('m1')).toBe(false);
     const fresh = store.get('m1'); // a brand-new registry — never touched by the pushDiagnosticEvent call above
     expect(fresh.drainDiagnosticEvents()).toEqual([]);
+  });
+});
+
+describe('merge hardening', () => {
+  const defaultStreak = env.speakerSessionMergeStreak;
+  const defaultMinSpeech = env.speakerSessionMergeMinSpeechSec;
+
+  afterEach(() => {
+    env.speakerSessionMergeStreak = defaultStreak;
+    env.speakerSessionMergeMinSpeechSec = defaultMinSpeech;
+  });
+
+  it('(a) two speakers who already carry DIFFERENT confirmed names never merge, even at cos 0.9', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    const { facts, onFact } = (() => {
+      const events: SpeakerRegistryFact[] = [];
+      return { facts: events, onFact: (f: SpeakerRegistryFact) => events.push(f) };
+    })();
+
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0), onFact);
+    const idA = reg.snapshot()[0].sessionSpeakerId;
+    reg.applyUserIdentity(idA, { displayName: 'An' });
+
+    // B starts orthogonal (cos 0 with A) so naming it carries no merge risk yet.
+    reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 20000), onFact);
+    const idB = reg.snapshot().find((s) => s.sessionSpeakerId !== idA)!.sessionSpeakerId;
+    reg.applyUserIdentity(idB, { displayName: 'Binh' });
+
+    // A second, heavily A-ward embedding pulls B's centroid to cos 0.9 with A's — well above the 0.6 merge threshold.
+    reg.observe('s0:2', vec(3.6, 0.7436), 5, seg('s0:2', 26000), onFact);
+
+    const snap = reg.snapshot();
+    expect(snap.filter((s) => !s.mergedInto)).toHaveLength(2);
+    expect(snap.find((s) => s.sessionSpeakerId === idA)!.displayName).toBe('An');
+    expect(snap.find((s) => s.sessionSpeakerId === idB)!.displayName).toBe('Binh');
+
+    const blocked = facts.find((f): f is Extract<SpeakerRegistryFact, { kind: 'merge' }> => f.kind === 'merge' && f.blockedBy === 'identity');
+    expect(blocked).toBeDefined();
+    expect(blocked!.cos).toBeCloseTo(0.9, 1);
+  });
+
+  it('(b) a single spike >= threshold does not merge when SPEAKER_SESSION_MERGE_STREAK > 1', () => {
+    env.speakerSessionMergeStreak = 3;
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // A: speechSec=5
+    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000)); // B starts distinct (cos 0.3 < threshold)
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 16000)); // B's centroid crosses the 0.6 merge threshold — but that's only streak=1
+
+    expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
+  });
+
+  it('(c) 3 consecutive checks with a changed centroid each time DOES merge at SPEAKER_SESSION_MERGE_STREAK=3', () => {
+    env.speakerSessionMergeStreak = 3;
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // A: speechSec=5, centroid=(1,0)
+
+    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000)); // B turn 1: cos(A,B)=0.3 < threshold — no check counted
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 16000)); // B turn 2: mean cos ~0.81 >= threshold, streak=1 (changed from "no prior")
+    expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
+
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000)); // B turn 3: mean changes again, cos ~0.92, streak=2
+    expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
+
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 28000)); // B turn 4: mean changes again, cos ~0.96, streak=3 -> merges
+    const snap = reg.snapshot();
+    expect(snap.filter((s) => !s.mergedInto)).toHaveLength(1);
+  });
+
+  it('(d) reconnect case: a new realtime session index for the SAME voice (s0:1 -> s1:1) still merges under neutral defaults', () => {
+    expect(env.speakerSessionMergeStreak).toBe(1);
+    expect(env.speakerSessionMergeMinSpeechSec).toBe(0);
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 20, seg('s0:1', 0));
+    reg.observe('s1:1', vec(0.99, 0.14), 10, seg('s1:1', 60000)); // reconnect: brand-new label, same voice
+
+    const active = reg.snapshot().filter((s) => !s.mergedInto);
+    expect(active).toHaveLength(1);
+    expect(active[0].sonioxLabels.sort()).toEqual(['s0:1', 's1:1']);
+    expect(active[0].liveSpeechSec).toBeCloseTo(30);
+  });
+
+  it('(e) winner keeps the name by precedence (user > profile/live/async > none), regardless of which side has more speech', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    // The BIGGER speaker (by speechSec) starts unnamed.
+    reg.observe('s0:1', vec(1, 0), 20, seg('s0:1', 0));
+    const idBig = reg.snapshot()[0].sessionSpeakerId;
+
+    // The SMALLER speaker gets a user-confirmed name.
+    reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 30000));
+    const idSmall = reg.snapshot().find((s) => s.sessionSpeakerId !== idBig)!.sessionSpeakerId;
+    reg.applyUserIdentity(idSmall, { displayName: 'An', privosUserId: 'user-1' });
+
+    // Converge the smaller speaker's centroid onto the bigger one's — one side named, no identity conflict.
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 36000));
+
+    const active = reg.snapshot().filter((s) => !s.mergedInto);
+    expect(active).toHaveLength(1);
+    expect(active[0].displayName).toBe('An');
+    expect(active[0].nameSource).toBe('user');
+    expect(active[0].privosUserId).toBe('user-1');
+    // The bigger speaker's own speech still dominates the combined total — only the NAME follows precedence, not the survivor id.
+    expect(active[0].liveSpeechSec).toBeCloseTo(30);
+  });
+
+  it('(e) a user-confirmed name outranks an existing live/profile-matched name, even on the speechSec-winning side', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 20, seg('s0:1', 0));
+    const winnerId = reg.snapshot()[0].sessionSpeakerId;
+    reg.applyProfileMatch(winnerId, { profileId: 'profile-1', displayName: 'Live Guess', confidence: 0.7 });
+
+    reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 30000));
+    const loserId = reg.snapshot().find((s) => s.sessionSpeakerId !== winnerId)!.sessionSpeakerId;
+    reg.applyUserIdentity(loserId, { displayName: 'Confirmed Name' });
+
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 36000));
+
+    const active = reg.snapshot().filter((s) => !s.mergedInto);
+    expect(active).toHaveLength(1);
+    expect(active[0].displayName).toBe('Confirmed Name');
+    expect(active[0].nameSource).toBe('user');
+  });
+
+  it('min-speech gate: both sides must clear SPEAKER_SESSION_MERGE_MIN_SPEECH_SEC (and >=3 embeddings each) once enabled', () => {
+    env.speakerSessionMergeMinSpeechSec = 15;
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // A: speechSec=5 < 15
+    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000));
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 16000)); // B crosses the merge threshold, but A hasn't spoken enough
+
+    expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
+  });
+
+  it('explicit merge request: the SAME user-given name on both sides merges immediately, bypassing the streak', () => {
+    env.speakerSessionMergeStreak = 5; // would otherwise take 5 qualifying checks
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
+    const idA = reg.snapshot()[0].sessionSpeakerId;
+    reg.applyUserIdentity(idA, { displayName: 'An' });
+
+    reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 10000));
+    const idB = reg.snapshot().find((s) => s.sessionSpeakerId !== idA)!.sessionSpeakerId;
+    reg.applyUserIdentity(idB, { displayName: 'An' }); // SAME name -> explicit merge request
+
+    // A single qualifying check is enough despite streak=5, because it's explicit.
+    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 16000));
+
+    expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(1);
   });
 });
 

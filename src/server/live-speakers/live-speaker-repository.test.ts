@@ -116,6 +116,33 @@ describe('live-speaker-repository', () => {
     expect(after.liveSpeechSec).toBeCloseTo(10);
   });
 
+  it('a merge survives a restart: upsertAll deletes the loser row, so loadFrom never reloads two overlapping speakers', async () => {
+    const meetingId = `m-${Math.random()}`;
+    const original = new MeetingSessionRegistry(meetingId);
+    original.observe('s0:1', new Float32Array([1, 0, 0, 0]), 20, seg('s0:1', 0)); // A: speechSec=20
+    original.observe('s0:2', new Float32Array([0, 1, 0, 0]), 5, seg('s0:2', 30_000)); // B: distinct, speechSec=5
+    await upsertAll(db(), meetingId, original); // both rows persisted independently
+    expect(store.meeting_speakers).toHaveLength(2);
+
+    // B's centroid converges onto A's — merges in-memory (default streak=1, no identity conflict).
+    original.observe('s0:2', new Float32Array([1, 0, 0, 0]), 5, seg('s0:2', 36_000));
+    const active = original.snapshot().filter((s) => !s.mergedInto);
+    expect(active).toHaveLength(1);
+    const winnerId = active[0].sessionSpeakerId;
+
+    await upsertAll(db(), meetingId, original);
+    expect(store.meeting_speakers).toHaveLength(1); // the loser's row was deleted, not just left stale
+    expect(store.meeting_speakers[0].sessionSpeakerId).toBe(winnerId);
+    expect(store.meeting_speakers[0].liveSpeechSec).toBeCloseTo(30);
+
+    // Simulate a restart: nothing in the process-wide store for this meeting yet.
+    const rebuilt = await ensureRegistry(db(), meetingId);
+    const rebuiltSnap = rebuilt.snapshot();
+    expect(rebuiltSnap).toHaveLength(1); // never reloads as two overlapping speakers
+    expect(rebuiltSnap[0].sonioxLabels.sort()).toEqual(['s0:1', 's0:2']);
+    expect(rebuiltSnap[0].liveSpeechSec).toBeCloseTo(30);
+  });
+
   it('merges field-by-field: a live write never clobbers fields it does not itself set', async () => {
     const meetingId = `m-${Math.random()}`;
     store.meeting_speakers.push({ _id: 'async-row', meeting: meetingId, speakerId: 'spkA', displayName: 'Async Name', totalSpeakSec: 30, nameSource: 'async' });

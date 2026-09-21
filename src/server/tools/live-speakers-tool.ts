@@ -81,10 +81,13 @@ export const liveSpeakersTool: AppTool = {
 
     // `mergedInto` is not a stored field — it only exists in-process, on the
     // registry, for the brief window between a merge and the next
-    // `upsertAll` folding the loser row's labels into the winner's. Surface
-    // it when this process happens to be running that meeting's worker; a
-    // miss (different pm2 worker, or already reconciled away) just means the
-    // UI relies on the next poll after the merge has fully landed in App DB.
+    // `upsertAll`, which now DELETES the loser's `meeting_speakers` row
+    // outright (`live-speaker-repository.ts`). So this is a short-window
+    // nicety only: it lets the UI hide the loser immediately, before that
+    // delete lands, when this process happens to be running that meeting's
+    // worker. A miss (different pm2 worker, or the delete already landed)
+    // just means the loser row is already gone from the query above, or the
+    // UI waits for the next poll after the merge fully lands in App DB.
     const registry = sessionRegistries.has(meetingId) ? sessionRegistries.get(meetingId) : null;
     const mergedIntoBySessionId = new Map(registry ? registry.snapshot().map((s) => [s.sessionSpeakerId, s.mergedInto]) : []);
     for (const speaker of sessionSpeakers) {

@@ -55,6 +55,10 @@ export interface MergeEvent extends EventEnvelope {
   loserSpeechSec: number;
   winnerNamed: boolean;
   loserNamed: boolean;
+  /** The sustained-evidence streak count at the time of this check (0 when blocked by a guard, not by streak). */
+  streak: number;
+  /** Absent when this pair actually merged; set to why it did NOT when the pair cleared the merge threshold but was blocked. */
+  blockedBy?: 'identity' | 'min-speech' | 'streak';
 }
 
 export interface CentroidsEvent extends EventEnvelope {
@@ -93,7 +97,7 @@ export const NODE_ALLOWLISTS: Record<DiagnosticEvent['type'], readonly string[]>
   chunk: [...SHARED_FIELDS, 'seq', 'spans', 'clientDurationMs', 'decodedDurationSec', 'uploadLagMs', 'captureDriftMs', 'overlapSec', 'deferredCount', 'skipped', 'ok'],
   gap: [...SHARED_FIELDS, 'fromSeq', 'toSeq'],
   observe: [...SHARED_FIELDS, 'seq', 'label', 'startMs', 'endMs', 'durSec', 'final', 'targetId', 'decisionScore', 'scores', 'sticky', 'action'],
-  merge: [...SHARED_FIELDS, 'winnerId', 'loserId', 'cos', 'winnerSpeechSec', 'loserSpeechSec', 'winnerNamed', 'loserNamed'],
+  merge: [...SHARED_FIELDS, 'winnerId', 'loserId', 'cos', 'winnerSpeechSec', 'loserSpeechSec', 'winnerNamed', 'loserNamed', 'streak', 'blockedBy'],
   centroids: [...SHARED_FIELDS, 'pairs'],
   'profile-match': [...SHARED_FIELDS, 'sessionSpeakerId', 'attempt', 'best', 'second', 'threshold', 'accepted'],
   enrol: [...SHARED_FIELDS, 'profile', 'source', 'coherence', 'durationSec', 'vectorCountAfter'],
