@@ -61,7 +61,11 @@ export const speakerProfileListTool: AppTool = {
   async execute(_args, context) {
     const actor = requireVerifiedActor(context);
     const db = new AppDbBotClient(actor.roomId ?? context.roomId);
-    const [profiles, threshold] = await Promise.all([profileStore.listProfiles(db), readMatchThreshold(db)]);
+    // Profile health uses the workspace-default match threshold, not this
+    // room's tuned value: profiles are workspace-global and `pruneOutliers`
+    // (a room-less tool) removes outliers on that same workspace-default
+    // basis, so the displayed outlier count matches what a prune would drop.
+    const [profiles, threshold] = await Promise.all([profileStore.listProfiles(db), readMatchThreshold(new AppDbBotClient())]);
     return { profiles: profiles.map((p) => toListItem(p, canEditProfile(p, actor) ? profileStore.profileHealth(p, threshold) : undefined)) };
   },
 };

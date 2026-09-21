@@ -718,12 +718,21 @@ export class MeetingSessionRegistry {
         continue;
       }
 
+      // Store the two centroids in the same canonical (sorted-id) order that
+      // `key` uses, so `lastCentroidA`/`lastCentroidB` always map to the same
+      // speaker across observes no matter which side was just updated. Keying
+      // them positionally by changed/other would flip them between calls and
+      // make the "no new evidence" streak check compare mismatched speakers.
+      const changedIsLower = changed.sessionSpeakerId < other.sessionSpeakerId;
+      const centroidLow = changedIsLower ? changedCentroid : otherCentroid;
+      const centroidHigh = changedIsLower ? otherCentroid : changedCentroid;
+
       const streakResult = isExplicitMergeRequest(a, b)
         ? { count: Math.max(1, this.thresholds.sessionMergeStreak), satisfied: true }
-        : nextMergeStreak(this.mergeStreaks.get(key), cos, this.thresholds.sessionMergeThreshold, changedCentroid, otherCentroid, this.thresholds.sessionMergeStreak);
+        : nextMergeStreak(this.mergeStreaks.get(key), cos, this.thresholds.sessionMergeThreshold, centroidLow, centroidHigh, this.thresholds.sessionMergeStreak);
 
       if (!streakResult.satisfied) {
-        this.mergeStreaks.set(key, { count: streakResult.count, lastCentroidA: changedCentroid, lastCentroidB: otherCentroid });
+        this.mergeStreaks.set(key, { count: streakResult.count, lastCentroidA: centroidLow, lastCentroidB: centroidHigh });
         onFact?.(this.buildMergeFact(changed, other, cos, streakResult.count, 'streak'));
         continue;
       }
