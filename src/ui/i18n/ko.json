@@ -239,6 +239,7 @@
   "history.rowMenu.exportSrt": "SRT로 내보내기",
   "history.rowMenu.exportDocx": "DOCX로 내보내기",
   "history.rowMenu.delete": "삭제",
+  "history.rowMenu.deleting": "삭제 중…",
 
   "status.summarized": "요약됨",
   "status.processing": "처리 중",

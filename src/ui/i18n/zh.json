@@ -239,6 +239,7 @@
   "history.rowMenu.exportSrt": "导出 SRT",
   "history.rowMenu.exportDocx": "导出 DOCX",
   "history.rowMenu.delete": "删除",
+  "history.rowMenu.deleting": "删除中…",
 
   "status.summarized": "已生成摘要",
   "status.processing": "处理中",

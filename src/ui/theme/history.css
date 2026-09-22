@@ -229,6 +229,20 @@
   color: var(--ma-status-danger);
 }
 
+/* Trigger while deleteMeeting is in flight: muted text, no pointer. */
+.ma-row-menu__trigger--deleting {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
+}
+
+.ma-row-menu__deleting-label {
+  font-size: var(--caption-size);
+  color: var(--ma-fg-3);
+  white-space: nowrap;
+  padding: 0 var(--space-1);
+}
+
 /* ---------- meeting-history-row ---------- */
 
 .ma-history-row td {

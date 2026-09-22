@@ -9,6 +9,10 @@
  * by scroll ancestors — the history table's `overflow-x:auto` on mobile and the
  * app column's `overflow:auto` on desktop both cut off a dropdown that opens
  * downward — which made the menu look dead. A portal escapes every such box.
+ *
+ * Direction heuristic: if less than MENU_MAX_HEIGHT px remain below the
+ * trigger, the list opens upward (anchored to the trigger's top edge) instead
+ * of downward, so rows near the bottom of the viewport are never clipped.
  */
 import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -17,9 +21,13 @@ import { useI18n } from '../i18n/i18n-provider.js';
 import { Icon } from './icon.js';
 
 const MENU_GAP = 4;
+// Estimated max height of the menu list (5 items × ~36 px + 16 px padding).
+const MENU_MAX_HEIGHT = 220;
 
 export interface MeetingRowMenuProps {
   canDelete: boolean;
+  /** True while deleteMeeting is in flight — shows "Deleting…" and disables the trigger. */
+  isDeleting?: boolean;
   onOpen(): void;
   onRename(): void;
   onExportSrt(): void;
@@ -28,11 +36,14 @@ export interface MeetingRowMenuProps {
 }
 
 interface MenuCoords {
-  top: number;
+  /** Set when opening downward. */
+  top?: number;
+  /** Set when opening upward (anchored to trigger's top edge). */
+  bottom?: number;
   right: number;
 }
 
-export function MeetingRowMenu({ canDelete, onOpen, onRename, onExportSrt, onExportDocx, onDelete }: MeetingRowMenuProps) {
+export function MeetingRowMenu({ canDelete, isDeleting, onOpen, onRename, onExportSrt, onExportDocx, onDelete }: MeetingRowMenuProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<MenuCoords | null>(null);
@@ -42,13 +53,18 @@ export function MeetingRowMenu({ canDelete, onOpen, onRename, onExportSrt, onExp
   useLayoutEffect(() => {
     if (!open) return undefined;
 
-    // Right-align the menu to the trigger's right edge, mirroring the previous
-    // `right: 0` absolute layout, but in viewport coordinates for the portal.
     function reposition(): void {
       const el = triggerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      setCoords({ top: rect.bottom + MENU_GAP, right: window.innerWidth - rect.right });
+      const right = window.innerWidth - rect.right;
+      const spaceBelow = window.innerHeight - rect.bottom - MENU_GAP;
+      if (spaceBelow < MENU_MAX_HEIGHT) {
+        // Not enough room below — anchor to trigger's top edge and open upward.
+        setCoords({ bottom: window.innerHeight - rect.top + MENU_GAP, right });
+      } else {
+        setCoords({ top: rect.bottom + MENU_GAP, right });
+      }
     }
     reposition();
 
@@ -83,17 +99,23 @@ export function MeetingRowMenu({ canDelete, onOpen, onRename, onExportSrt, onExp
       <button
         type="button"
         ref={triggerRef}
-        className="ma-row-menu__trigger"
-        aria-label={t('history.rowMenu.label')}
+        className={isDeleting ? 'ma-row-menu__trigger ma-row-menu__trigger--deleting' : 'ma-row-menu__trigger'}
+        aria-label={isDeleting ? t('history.rowMenu.deleting') : t('history.rowMenu.label')}
         aria-haspopup="menu"
         aria-expanded={open}
+        disabled={isDeleting}
         onClick={() => setOpen((v) => !v)}
       >
-        <Icon name="more" size={16} />
+        {isDeleting ? <span className="ma-row-menu__deleting-label">{t('history.rowMenu.deleting')}</span> : <Icon name="more" size={16} />}
       </button>
       {open && coords
         ? createPortal(
-            <ul className="ma-row-menu__list" role="menu" ref={listRef} style={{ position: 'fixed', top: coords.top, right: coords.right, margin: 0 }}>
+            <ul
+              className="ma-row-menu__list"
+              role="menu"
+              ref={listRef}
+              style={{ position: 'fixed', top: coords.top, bottom: coords.bottom, right: coords.right, margin: 0 }}
+            >
               <li>
                 <button type="button" role="menuitem" onClick={() => run(onOpen)}>
                   {t('history.rowMenu.open')}

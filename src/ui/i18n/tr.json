@@ -239,6 +239,7 @@
   "history.rowMenu.exportSrt": "SRT dışa aktar",
   "history.rowMenu.exportDocx": "DOCX dışa aktar",
   "history.rowMenu.delete": "Sil",
+  "history.rowMenu.deleting": "Siliniyor…",
 
   "status.summarized": "Özetlendi",
   "status.processing": "İşleniyor",

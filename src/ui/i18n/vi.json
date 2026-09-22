@@ -239,6 +239,7 @@
   "history.rowMenu.exportSrt": "Xuất SRT",
   "history.rowMenu.exportDocx": "Xuất DOCX",
   "history.rowMenu.delete": "Xoá",
+  "history.rowMenu.deleting": "Đang xoá…",
 
   "status.summarized": "Đã tóm tắt",
   "status.processing": "Đang xử lý",

@@ -239,6 +239,7 @@
   "history.rowMenu.exportSrt": "Export SRT",
   "history.rowMenu.exportDocx": "Export DOCX",
   "history.rowMenu.delete": "Delete",
+  "history.rowMenu.deleting": "Deleting…",
 
   "status.summarized": "Summarized",
   "status.processing": "Processing",

@@ -58,6 +58,9 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<MeetingReadModel | null>(null);
+  // The id of the meeting currently being deleted — lets the row button show
+  // "Deleting…" and stay disabled until the async operation settles.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadPage = useCallback(
     async (offset: number, replace: boolean) => {
@@ -108,11 +111,14 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
     const meeting = pendingDelete;
     if (!meeting) return;
     setPendingDelete(null);
+    setDeletingId(meeting._id);
     try {
       await deleteMeeting(app, meeting);
       setMeetings((prev) => prev.filter((m) => m._id !== meeting._id));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -186,6 +192,7 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
                 speakers={speakersByMeeting[meeting._id] ?? []}
                 actionItemCount={actionCounts[meeting._id]?.total ?? 0}
                 isOwner={meeting.ownerUserId === userId}
+                isDeleting={deletingId === meeting._id}
                 onOpen={() => onOpenMeeting(meeting._id)}
                 onRename={() => void handleRename(meeting)}
                 onExportSrt={() => void runExport(() => downloadMeetingSrt(app, meeting))}

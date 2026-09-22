@@ -239,6 +239,7 @@
   "history.rowMenu.exportSrt": "SRTをエクスポート",
   "history.rowMenu.exportDocx": "DOCXをエクスポート",
   "history.rowMenu.delete": "削除",
+  "history.rowMenu.deleting": "削除中…",
 
   "status.summarized": "要約済み",
   "status.processing": "処理中",

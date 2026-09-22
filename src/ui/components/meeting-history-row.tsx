@@ -18,6 +18,8 @@ export interface MeetingHistoryRowProps {
   speakers: MeetingSpeakerSummary[];
   actionItemCount: number;
   isOwner: boolean;
+  /** True while deleteMeeting is in flight for this row — disables the menu trigger. */
+  isDeleting?: boolean;
   onOpen(): void;
   onRename(): void;
   onExportSrt(): void;
@@ -25,7 +27,7 @@ export interface MeetingHistoryRowProps {
   onDelete(): void;
 }
 
-export function MeetingHistoryRow({ meeting, speakers, actionItemCount, isOwner, onOpen, onRename, onExportSrt, onExportDocx, onDelete }: MeetingHistoryRowProps) {
+export function MeetingHistoryRow({ meeting, speakers, actionItemCount, isOwner, isDeleting, onOpen, onRename, onExportSrt, onExportDocx, onDelete }: MeetingHistoryRowProps) {
   const { t } = useI18n();
   const shown = speakers.slice(0, MAX_AVATARS);
   const overflow = speakers.length - shown.length;
@@ -51,7 +53,7 @@ export function MeetingHistoryRow({ meeting, speakers, actionItemCount, isOwner,
         <StatusBadge status={meeting.status} />
       </td>
       <td className="ma-history-row__menu">
-        <MeetingRowMenu canDelete={isOwner} onOpen={onOpen} onRename={onRename} onExportSrt={onExportSrt} onExportDocx={onExportDocx} onDelete={onDelete} />
+        <MeetingRowMenu canDelete={isOwner} isDeleting={isDeleting} onOpen={onOpen} onRename={onRename} onExportSrt={onExportSrt} onExportDocx={onExportDocx} onDelete={onDelete} />
       </td>
     </tr>
   );
