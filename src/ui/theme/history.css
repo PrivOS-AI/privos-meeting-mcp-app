@@ -199,7 +199,10 @@
   position: absolute;
   right: 0;
   top: 100%;
-  z-index: 10;
+  /* Portaled to body and position:fixed. Must sit above the app chrome (rail /
+     mobile bars, z-index 40–60) so an upward-opening menu on a bottom row is
+     not hidden behind them; still below the confirm dialog overlay (100). */
+  z-index: 90;
   background: var(--ma-surface-raised);
   border: 1px solid var(--ma-border-1);
   border-radius: var(--ma-radius-sm);
