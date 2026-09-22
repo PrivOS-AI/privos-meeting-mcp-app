@@ -229,6 +229,8 @@
   "history.sort.longest": "Plus longues",
   "history.renamePrompt": "Renommer la réunion",
   "history.deleteConfirm": "Supprimer cette réunion ? Son audio et sa transcription sur Files seront également supprimés. Cette action est irréversible.",
+  "history.deleteConfirmTitle": "Supprimer la réunion ?",
+  "history.deleteCancel": "Annuler",
   "history.loading": "Chargement…",
   "history.loadMore": "Charger plus",
   "history.rowMenu.label": "Plus d'actions",

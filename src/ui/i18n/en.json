@@ -229,6 +229,8 @@
   "history.sort.longest": "Longest",
   "history.renamePrompt": "Rename meeting",
   "history.deleteConfirm": "Delete this meeting? Its audio and transcript on Files will also be deleted. This cannot be undone.",
+  "history.deleteConfirmTitle": "Delete meeting?",
+  "history.deleteCancel": "Cancel",
   "history.loading": "Loading…",
   "history.loadMore": "Load more",
   "history.rowMenu.label": "More actions",

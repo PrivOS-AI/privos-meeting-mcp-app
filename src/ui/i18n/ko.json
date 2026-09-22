@@ -229,6 +229,8 @@
   "history.sort.longest": "긴 순",
   "history.renamePrompt": "회의 이름 변경",
   "history.deleteConfirm": "이 회의를 삭제하시겠습니까? Files에 저장된 오디오와 대화록도 함께 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+  "history.deleteConfirmTitle": "회의를 삭제할까요?",
+  "history.deleteCancel": "취소",
   "history.loading": "불러오는 중…",
   "history.loadMore": "더 보기",
   "history.rowMenu.label": "추가 작업",

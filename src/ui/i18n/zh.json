@@ -229,6 +229,8 @@
   "history.sort.longest": "最长",
   "history.renamePrompt": "重命名会议",
   "history.deleteConfirm": "删除此会议？其在 Files 中的音频和转录文本也将被删除。此操作无法撤销。",
+  "history.deleteConfirmTitle": "删除会议？",
+  "history.deleteCancel": "取消",
   "history.loading": "正在加载…",
   "history.loadMore": "加载更多",
   "history.rowMenu.label": "更多操作",

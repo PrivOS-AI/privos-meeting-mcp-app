@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
+import { ConfirmDialog } from '../components/confirm-dialog.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FilterChips, type FilterChipOption } from '../components/filter-chips.js';
 import { Icon } from '../components/icon.js';
@@ -56,6 +57,7 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<MeetingReadModel | null>(null);
 
   const loadPage = useCallback(
     async (offset: number, replace: boolean) => {
@@ -102,10 +104,16 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
     setMeetings((prev) => prev.map((m) => (m._id === meeting._id ? { ...m, title: next.trim() } : m)));
   }
 
-  async function handleDelete(meeting: MeetingReadModel): Promise<void> {
-    if (!window.confirm(t('history.deleteConfirm'))) return;
-    await deleteMeeting(app, meeting);
-    setMeetings((prev) => prev.filter((m) => m._id !== meeting._id));
+  async function confirmDelete(): Promise<void> {
+    const meeting = pendingDelete;
+    if (!meeting) return;
+    setPendingDelete(null);
+    try {
+      await deleteMeeting(app, meeting);
+      setMeetings((prev) => prev.filter((m) => m._id !== meeting._id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   async function runExport(action: () => Promise<void>): Promise<void> {
@@ -182,7 +190,7 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
                 onRename={() => void handleRename(meeting)}
                 onExportSrt={() => void runExport(() => downloadMeetingSrt(app, meeting))}
                 onExportDocx={() => void runExport(() => downloadMeetingDocx(app, meeting))}
-                onDelete={() => void handleDelete(meeting)}
+                onDelete={() => setPendingDelete(meeting)}
               />
             ))}
           </tbody>
@@ -193,6 +201,18 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
         <button type="button" className="ma-history-screen__load-more" disabled={loading} onClick={() => void loadPage(meetings.length, false)}>
           {loading ? t('history.loading') : t('history.loadMore')}
         </button>
+      ) : null}
+
+      {pendingDelete ? (
+        <ConfirmDialog
+          title={t('history.deleteConfirmTitle')}
+          message={t('history.deleteConfirm')}
+          confirmLabel={t('history.rowMenu.delete')}
+          cancelLabel={t('history.deleteCancel')}
+          danger
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setPendingDelete(null)}
+        />
       ) : null}
     </div>
   );

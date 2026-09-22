@@ -229,6 +229,8 @@
   "history.sort.longest": "En uzun",
   "history.renamePrompt": "Toplantıyı yeniden adlandır",
   "history.deleteConfirm": "Bu toplantı silinsin mi? Dosyalar'daki sesi ve metin dökümü de silinecek. Bu geri alınamaz.",
+  "history.deleteConfirmTitle": "Toplantı silinsin mi?",
+  "history.deleteCancel": "İptal",
   "history.loading": "Yükleniyor…",
   "history.loadMore": "Daha fazla yükle",
   "history.rowMenu.label": "Daha fazla eylem",

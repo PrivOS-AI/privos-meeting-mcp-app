@@ -48,6 +48,54 @@
   padding: var(--space-6);
 }
 
+/* ---------- confirm-dialog (in-app replacement for window.confirm) ---------- */
+
+.ma-confirm-dialog {
+  max-width: 420px;
+}
+
+.ma-confirm-dialog__title {
+  margin: 0;
+  font-size: var(--title-sm-size, 1.125rem);
+  font-weight: var(--weight-semibold);
+  color: var(--ma-fg-1);
+}
+
+.ma-confirm-dialog__message {
+  margin: var(--space-3) 0 0;
+  color: var(--ma-fg-2);
+  font-size: var(--body-sm-size);
+  line-height: 1.5;
+}
+
+.ma-confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.ma-confirm-dialog__cancel {
+  background: none;
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-2) var(--space-5);
+  color: var(--ma-fg-1);
+}
+
+.ma-confirm-dialog__confirm {
+  background: var(--ma-brand-blue);
+  color: var(--ma-fg-inverse);
+  border: none;
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-2) var(--space-5);
+  font-weight: var(--weight-semibold);
+}
+
+.ma-confirm-dialog__confirm--danger {
+  background: var(--ma-status-danger);
+}
+
 /* ---------- resolve-speakers-modal ---------- */
 
 .ma-resolve-speakers__subtitle {

@@ -229,6 +229,8 @@
   "history.sort.longest": "Längste",
   "history.renamePrompt": "Besprechung umbenennen",
   "history.deleteConfirm": "Diese Besprechung löschen? Audio und Transkript in Files werden ebenfalls gelöscht. Dies kann nicht rückgängig gemacht werden.",
+  "history.deleteConfirmTitle": "Besprechung löschen?",
+  "history.deleteCancel": "Abbrechen",
   "history.loading": "Wird geladen…",
   "history.loadMore": "Mehr laden",
   "history.rowMenu.label": "Weitere Aktionen",
