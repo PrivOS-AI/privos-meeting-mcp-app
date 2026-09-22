@@ -17,7 +17,7 @@ import { VoiceWaveform } from '../components/voice-waveform.js';
 import { RecIndicator } from '../components/rec-indicator.js';
 import { RecordingFooter } from '../components/recording-footer.js';
 import { StageCaption } from '../components/stage-caption.js';
-import { deleteBookmark, listBookmarks, type BookmarkRecord } from '../data/bookmark-read-model.js';
+import { listBookmarks, type BookmarkRecord } from '../data/bookmark-read-model.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 import { resolveLineSpeakerKey, useRecordingState, useRecordingStore } from '../stores/recording-store.js';
 
@@ -171,6 +171,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
           ) : (
             state.lines.map((line) => {
               const effectiveKey = resolveLineSpeakerKey(state, line);
+              const isBookmarked = state.bookmarkedSecs.includes(Math.round(line.atSec));
               return (
                 <CaptionLine
                   key={line.id}
@@ -186,8 +187,8 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
                   timeMode={timeMode}
                   onToggleTimeMode={() => setTimeMode((m) => (m === 'clock' ? 'wall' : 'clock'))}
                   startedAtMs={state.startedAt}
-                  bookmarked={state.bookmarkedSecs.includes(Math.round(line.atSec))}
-                  onBookmark={() => void store.addBookmark(line.atSec, line.text)}
+                  bookmarked={isBookmarked}
+                  onBookmark={() => void (isBookmarked ? store.removeBookmark(line.atSec) : store.addBookmark(line.atSec, line.text))}
                 />
               );
             })
@@ -200,7 +201,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
         <button type="button" className="ma-live__side-close" onClick={() => setSideOpen(false)} aria-label={t('recording.side.close')}>
           <Icon name="close" size={18} />
         </button>
-        <LiveSidePanel meetingId={state.meetingId} bookmarkAtSec={state.bookmarkAtSec} />
+        <LiveSidePanel meetingId={state.meetingId} bookmarkRev={state.bookmarkRev} />
       </aside>
     </div>
   );
@@ -210,8 +211,8 @@ type SideTab = 'summary' | 'bookmarks';
 
 interface LiveSidePanelProps {
   meetingId: string | null;
-  /** Changes every time a bookmark is added during this session — the trigger to refetch the list below. */
-  bookmarkAtSec?: number;
+  /** Bumps on every bookmark add/remove this session — the trigger to refetch the list below. */
+  bookmarkRev: number;
 }
 
 /**
@@ -221,9 +222,10 @@ interface LiveSidePanelProps {
  * Bookmarks, in contrast, are written live (`recording-store.ts#addBookmark`)
  * and worth showing immediately — reuses P7's `bookmarks-panel.tsx`.
  */
-function LiveSidePanel({ meetingId, bookmarkAtSec }: LiveSidePanelProps) {
+function LiveSidePanel({ meetingId, bookmarkRev }: LiveSidePanelProps) {
   const app = usePrivosApp();
   const { t } = useI18n();
+  const store = useRecordingStore();
   const [tab, setTab] = useState<SideTab>('summary');
   const [bookmarks, setBookmarks] = useState<BookmarkRecord[]>([]);
   // Summary + action items share ONE tab (action items render under the summary),
@@ -239,11 +241,15 @@ function LiveSidePanel({ meetingId, bookmarkAtSec }: LiveSidePanelProps) {
     listBookmarks(app, meetingId)
       .then(setBookmarks)
       .catch(() => setBookmarks([]));
-  }, [app, meetingId, tab, bookmarkAtSec]);
+  }, [app, meetingId, tab, bookmarkRev]);
 
+  // Delete through the store so the meeting's caption line un-fills too (it owns
+  // `bookmarkedSecs`); bumping bookmarkRev refetches this list.
   async function removeBookmark(id: string): Promise<void> {
-    await deleteBookmark(app, id);
+    const bookmark = bookmarks.find((b) => b.id === id);
+    if (!bookmark) return;
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
+    await store.removeBookmark(bookmark.atSec);
   }
 
   return (

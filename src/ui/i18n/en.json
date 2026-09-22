@@ -70,6 +70,7 @@
   "speaker.linePicker.applyToVoice": "Apply to every line of this voice",
   "recording.bookmark.add": "Bookmark here",
   "recording.bookmark.saved": "Bookmarked",
+  "recording.bookmark.remove": "Remove bookmark",
   "recording.footer.mute": "Mute/unmute microphone",
   "recording.footer.textSize": "Caption text size",
   "recording.footer.pause": "Pause",

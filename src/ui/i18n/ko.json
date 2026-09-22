@@ -70,6 +70,7 @@
   "speaker.linePicker.applyToVoice": "이 목소리의 모든 줄에 적용",
   "recording.bookmark.add": "여기에 북마크 추가",
   "recording.bookmark.saved": "북마크됨",
+  "recording.bookmark.remove": "북마크 삭제",
   "recording.footer.mute": "마이크 음소거/음소거 해제",
   "recording.footer.textSize": "자막 글자 크기",
   "recording.footer.pause": "일시정지",

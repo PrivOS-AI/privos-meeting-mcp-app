@@ -13,6 +13,7 @@ import { parseToolResult, usePrivosApp, usePrivosContext } from '@privos_ai/app-
 import type { McpApp } from '@privos_ai/app-react';
 
 import { folderName, slugify } from '../../shared/meeting-slug.js';
+import { deleteBookmark, listBookmarks } from '../data/bookmark-read-model.js';
 import { addBookmark, createMeeting, updateRecordingMeeting } from '../data/meeting-draft-repository.js';
 import { ensureMeetingFolder } from '../data/meeting-folder.js';
 import { MeetingClock } from '../data/meeting-clock.js';
@@ -83,6 +84,10 @@ export interface RecordingState {
   bookmarkAtSec?: number;
   /** Rounded atSec of every caption line the user has bookmarked this session — drives the filled/ticked bookmark icon per line. */
   bookmarkedSecs: number[];
+  /** Rounded atSec → its bookmark row id, so a second tap (or the side panel's ×) can delete it. */
+  bookmarkIdsBySec: Record<number, string>;
+  /** Bumped on every bookmark add/remove so the side panel refetches its list. */
+  bookmarkRev: number;
   error?: string;
 }
 
@@ -114,6 +119,8 @@ function initialState(): RecordingState {
     clockSkewMs: 0,
     lines: [],
     bookmarkedSecs: [],
+    bookmarkIdsBySec: {},
+    bookmarkRev: 0,
     speakerMap: {},
     lineSpeaker: {},
     voiceAlias: {},
@@ -845,16 +852,47 @@ export class RecordingStore {
 
   /**
    * Bookmark ONE caption segment. `atSec` is that line's start (rounded); `quote`
-   * is a short snippet of its text. Toggling the same segment removes it. Falls
-   * back to the current elapsed time when called with no line (legacy footer button).
+   * is a short snippet of its text. Falls back to the current elapsed time when
+   * called with no line (legacy footer button). Re-adding a segment already
+   * bookmarked is a no-op — the caller toggles off via {@link removeBookmark}.
    */
   async addBookmark(atSec?: number, quote?: string): Promise<void> {
     if (!this.state.meetingId) return;
     const at = Math.round(atSec ?? this.state.elapsedSec);
     if (this.state.bookmarkedSecs.includes(at)) return; // already bookmarked this segment
     const snippet = quote ? quote.trim().slice(0, 140) : undefined;
-    await addBookmark(this.app, { meetingId: this.state.meetingId, atSec: at, createdBy: this.ctx.userId, quote: snippet });
-    this.setState({ bookmarkAtSec: at, bookmarkedSecs: [...this.state.bookmarkedSecs, at] });
+    const { bookmarkId } = await addBookmark(this.app, { meetingId: this.state.meetingId, atSec: at, createdBy: this.ctx.userId, quote: snippet });
+    this.setState({
+      bookmarkAtSec: at,
+      bookmarkedSecs: [...this.state.bookmarkedSecs, at],
+      bookmarkIdsBySec: { ...this.state.bookmarkIdsBySec, [at]: bookmarkId },
+      bookmarkRev: this.state.bookmarkRev + 1,
+    });
+  }
+
+  /**
+   * Remove the bookmark on a segment (a second tap of a ticked caption line, or
+   * the side panel's × button). Resolves the bookmark row id from the session
+   * map, falling back to a lookup for a bookmark made before this state tracked
+   * ids (e.g. a resumed session). Best-effort delete — the local state is
+   * cleared regardless so the UI reflects the user's intent immediately.
+   */
+  async removeBookmark(atSec: number): Promise<void> {
+    if (!this.state.meetingId) return;
+    const at = Math.round(atSec);
+    let id: string | undefined = this.state.bookmarkIdsBySec[at];
+    if (!id) {
+      const existing = await listBookmarks(this.app, this.state.meetingId).catch(() => []);
+      id = existing.find((b) => Math.round(b.atSec) === at)?.id;
+    }
+    if (id) await deleteBookmark(this.app, id).catch(() => undefined);
+    const remainingIds = { ...this.state.bookmarkIdsBySec };
+    delete remainingIds[at];
+    this.setState({
+      bookmarkedSecs: this.state.bookmarkedSecs.filter((s) => s !== at),
+      bookmarkIdsBySec: remainingIds,
+      bookmarkRev: this.state.bookmarkRev + 1,
+    });
   }
 
   // ------------------------------------------------------------------ end

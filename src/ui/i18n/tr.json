@@ -70,6 +70,7 @@
   "speaker.linePicker.applyToVoice": "Bu sesin her satırına uygula",
   "recording.bookmark.add": "Buraya yer imi ekle",
   "recording.bookmark.saved": "Yer imi eklendi",
+  "recording.bookmark.remove": "Yer imini kaldır",
   "recording.footer.mute": "Mikrofonu sustur/aç",
   "recording.footer.textSize": "Altyazı metin boyutu",
   "recording.footer.pause": "Duraklat",

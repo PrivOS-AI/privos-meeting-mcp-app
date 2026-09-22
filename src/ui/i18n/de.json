@@ -70,6 +70,7 @@
   "speaker.linePicker.applyToVoice": "Auf alle Zeilen dieser Stimme anwenden",
   "recording.bookmark.add": "Hier Lesezeichen setzen",
   "recording.bookmark.saved": "Als Lesezeichen gespeichert",
+  "recording.bookmark.remove": "Lesezeichen entfernen",
   "recording.footer.mute": "Mikrofon stummschalten/aktivieren",
   "recording.footer.textSize": "Textgröße der Untertitel",
   "recording.footer.pause": "Pause",

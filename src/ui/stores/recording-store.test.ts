@@ -207,3 +207,73 @@ describe('RecordingStore — manual naming survives the hand-over from label chi
     expect(resolveCalls[0]).toMatchObject({ assignments: [{ speakerId: 'B', displayName: 'Alice' }] }); // B has 15s of that label vs A's 5s
   });
 });
+
+describe('RecordingStore — bookmark toggle + side-panel removal keep bookmarkedSecs in sync', () => {
+  interface DbCall {
+    name: string;
+    arguments: Record<string, unknown>;
+  }
+
+  /** Routes mcpapp.db.* create/delete/query for the bookmark flow. */
+  function bookmarkStore(): { store: RecordingStore; calls: DbCall[]; queryResult: () => { records: Array<Record<string, unknown>>; total: number } } {
+    const calls: DbCall[] = [];
+    let created = 0;
+    let queryRecords: Array<Record<string, unknown>> = [];
+    const store = makeStore(async (params) => {
+      const call = params as DbCall;
+      calls.push(call);
+      if (call.name === 'mcpapp.db.create') return { _id: `bm-${++created}` };
+      if (call.name === 'mcpapp.db.delete') return null;
+      if (call.name === 'mcpapp.db.query') return { records: queryRecords, total: queryRecords.length };
+      return null;
+    });
+    return {
+      store,
+      calls,
+      queryResult: () => ({ records: queryRecords, total: queryRecords.length }),
+    };
+  }
+
+  it('adds a bookmark, records its id, and is idempotent for the same second', async () => {
+    const { store, calls } = bookmarkStore();
+    await store.addBookmark(12, 'hello there');
+    await store.addBookmark(12, 'hello there'); // same segment — no-op
+
+    expect(store.getState().bookmarkedSecs).toEqual([12]);
+    expect(store.getState().bookmarkIdsBySec).toEqual({ 12: 'bm-1' });
+    expect(store.getState().bookmarkRev).toBe(1);
+    expect(calls.filter((c) => c.name === 'mcpapp.db.create')).toHaveLength(1);
+  });
+
+  it('a second tap removes the bookmark via the tracked id and clears the segment', async () => {
+    const { store, calls } = bookmarkStore();
+    await store.addBookmark(30, 'x');
+    await store.removeBookmark(30);
+
+    const del = calls.find((c) => c.name === 'mcpapp.db.delete');
+    expect(del?.arguments).toEqual({ collection: 'bookmarks', id: 'bm-1' });
+    expect(store.getState().bookmarkedSecs).toEqual([]);
+    expect(store.getState().bookmarkIdsBySec).toEqual({});
+    expect(store.getState().bookmarkRev).toBe(2);
+    expect(calls.some((c) => c.name === 'mcpapp.db.query')).toBe(false); // id was tracked — no lookup needed
+  });
+
+  it('removal falls back to a lookup when the id was not tracked this session', async () => {
+    const calls: DbCall[] = [];
+    const store = makeStore(async (params) => {
+      const call = params as DbCall;
+      calls.push(call);
+      if (call.name === 'mcpapp.db.query') return { records: [{ _id: 'bm-old', meeting: 'meeting-1', atSec: 42 }], total: 1 };
+      return null;
+    });
+    // Simulate a bookmark present in state (e.g. resumed session) with no id map entry.
+    internals(store).state = { ...store.getState(), bookmarkedSecs: [42], bookmarkIdsBySec: {} };
+
+    await store.removeBookmark(42);
+
+    expect(calls.some((c) => c.name === 'mcpapp.db.query')).toBe(true);
+    const del = calls.find((c) => c.name === 'mcpapp.db.delete');
+    expect(del?.arguments).toEqual({ collection: 'bookmarks', id: 'bm-old' });
+    expect(store.getState().bookmarkedSecs).toEqual([]);
+  });
+});

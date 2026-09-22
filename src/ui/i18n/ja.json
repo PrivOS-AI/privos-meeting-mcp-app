@@ -70,6 +70,7 @@
   "speaker.linePicker.applyToVoice": "この声のすべての行に適用",
   "recording.bookmark.add": "ここにブックマークを追加",
   "recording.bookmark.saved": "ブックマークしました",
+  "recording.bookmark.remove": "ブックマークを解除",
   "recording.footer.mute": "マイクのミュート/ミュート解除",
   "recording.footer.textSize": "字幕の文字サイズ",
   "recording.footer.pause": "一時停止",

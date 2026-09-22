@@ -70,6 +70,7 @@
   "speaker.linePicker.applyToVoice": "Appliquer à toutes les lignes de cette voix",
   "recording.bookmark.add": "Ajouter un favori ici",
   "recording.bookmark.saved": "Ajouté aux favoris",
+  "recording.bookmark.remove": "Retirer le favori",
   "recording.footer.mute": "Activer/couper le microphone",
   "recording.footer.textSize": "Taille du texte des sous-titres",
   "recording.footer.pause": "Pause",

@@ -135,9 +135,8 @@ export function CaptionLine({ line, speaker, speakerKey, speakerIndex, roomId, s
         <button
           type="button"
           className={`ma-caption-line__bookmark${bookmarked ? ' ma-caption-line__bookmark--on' : ''}`}
-          aria-label={t(bookmarked ? 'recording.bookmark.saved' : 'recording.bookmark.add')}
+          aria-label={t(bookmarked ? 'recording.bookmark.remove' : 'recording.bookmark.add')}
           aria-pressed={bookmarked}
-          disabled={bookmarked}
           onClick={onBookmark}
         >
           <Icon name={bookmarked ? 'bookmark-check' : 'bookmark-add'} size={16} />
