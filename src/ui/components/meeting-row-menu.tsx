@@ -19,6 +19,7 @@ import { createPortal } from 'react-dom';
 
 import { useI18n } from '../i18n/i18n-provider.js';
 import { Icon } from './icon.js';
+import { computeRowMenuPosition, type RowMenuPosition } from './row-menu-position.js';
 
 const MENU_GAP = 4;
 // Estimated max height of the menu list (5 items × ~36 px + 16 px padding).
@@ -35,18 +36,10 @@ export interface MeetingRowMenuProps {
   onDelete(): void;
 }
 
-interface MenuCoords {
-  /** Set when opening downward. */
-  top?: number;
-  /** Set when opening upward (anchored to trigger's top edge). */
-  bottom?: number;
-  right: number;
-}
-
 export function MeetingRowMenu({ canDelete, isDeleting, onOpen, onRename, onExportSrt, onExportDocx, onDelete }: MeetingRowMenuProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const [coords, setCoords] = useState<MenuCoords | null>(null);
+  const [coords, setCoords] = useState<RowMenuPosition | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -57,14 +50,13 @@ export function MeetingRowMenu({ canDelete, isDeleting, onOpen, onRename, onExpo
       const el = triggerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const right = window.innerWidth - rect.right;
-      const spaceBelow = window.innerHeight - rect.bottom - MENU_GAP;
-      if (spaceBelow < MENU_MAX_HEIGHT) {
-        // Not enough room below — anchor to trigger's top edge and open upward.
-        setCoords({ bottom: window.innerHeight - rect.top + MENU_GAP, right });
-      } else {
-        setCoords({ top: rect.bottom + MENU_GAP, right });
-      }
+      setCoords(
+        computeRowMenuPosition(
+          { top: rect.top, bottom: rect.bottom, right: rect.right },
+          { width: window.innerWidth, height: window.innerHeight },
+          { gap: MENU_GAP, maxHeight: MENU_MAX_HEIGHT },
+        ),
+      );
     }
     reposition();
 

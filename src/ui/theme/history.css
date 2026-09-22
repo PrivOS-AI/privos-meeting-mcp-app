@@ -196,12 +196,12 @@
 }
 
 .ma-row-menu__list {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  /* Portaled to body and position:fixed. Must sit above the app chrome (rail /
-     mobile bars, z-index 40–60) so an upward-opening menu on a bottom row is
-     not hidden behind them; still below the confirm dialog overlay (100). */
+  /* Positioned entirely by inline style: portaled to body at position:fixed
+     with top/bottom/right computed in row-menu-position.ts. Do NOT add
+     top/right/position here — a stylesheet `top:100%` once leaked into the
+     upward-opening branch and pushed the fixed list below the viewport.
+     z-index sits above the app chrome (rail / mobile bars, 40–60) and below
+     the confirm dialog overlay (100). */
   z-index: 90;
   background: var(--ma-surface-raised);
   border: 1px solid var(--ma-border-1);
