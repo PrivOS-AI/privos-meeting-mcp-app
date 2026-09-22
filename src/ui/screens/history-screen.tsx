@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { ConfirmDialog } from '../components/confirm-dialog.js';
+import { PromptDialog } from '../components/prompt-dialog.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FilterChips, type FilterChipOption } from '../components/filter-chips.js';
 import { Icon } from '../components/icon.js';
@@ -61,6 +62,7 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
   // The id of the meeting currently being deleted — lets the row button show
   // "Deleting…" and stay disabled until the async operation settles.
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingRename, setPendingRename] = useState<MeetingReadModel | null>(null);
 
   const loadPage = useCallback(
     async (offset: number, replace: boolean) => {
@@ -100,11 +102,18 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
       .catch((err: unknown) => console.error('loadMeetingStats failed', err));
   }, [app, roomId, meetings.length]);
 
-  async function handleRename(meeting: MeetingReadModel): Promise<void> {
-    const next = window.prompt(t('history.renamePrompt'), meeting.title ?? '');
-    if (next == null || next.trim() === '') return;
-    await renameMeeting(app, meeting._id, next.trim());
-    setMeetings((prev) => prev.map((m) => (m._id === meeting._id ? { ...m, title: next.trim() } : m)));
+  // PromptDialog replaces window.prompt (silently ignored in the sandboxed
+  // iframe). It hands back an already-trimmed, non-empty value.
+  async function submitRename(next: string): Promise<void> {
+    const meeting = pendingRename;
+    if (!meeting) return;
+    setPendingRename(null);
+    try {
+      await renameMeeting(app, meeting._id, next);
+      setMeetings((prev) => prev.map((m) => (m._id === meeting._id ? { ...m, title: next } : m)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   async function confirmDelete(): Promise<void> {
@@ -194,7 +203,7 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
                 isOwner={meeting.ownerUserId === userId}
                 isDeleting={deletingId === meeting._id}
                 onOpen={() => onOpenMeeting(meeting._id)}
-                onRename={() => void handleRename(meeting)}
+                onRename={() => setPendingRename(meeting)}
                 onExportSrt={() => void runExport(() => downloadMeetingSrt(app, meeting))}
                 onExportDocx={() => void runExport(() => downloadMeetingDocx(app, meeting))}
                 onDelete={() => setPendingDelete(meeting)}
@@ -219,6 +228,18 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
           danger
           onConfirm={() => void confirmDelete()}
           onCancel={() => setPendingDelete(null)}
+        />
+      ) : null}
+
+      {pendingRename ? (
+        <PromptDialog
+          title={t('history.renamePrompt')}
+          initialValue={pendingRename.title ?? ''}
+          confirmLabel={t('history.renameConfirm')}
+          cancelLabel={t('history.deleteCancel')}
+          maxLength={200}
+          onSubmit={(value) => void submitRename(value)}
+          onCancel={() => setPendingRename(null)}
         />
       ) : null}
     </div>

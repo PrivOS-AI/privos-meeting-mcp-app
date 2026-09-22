@@ -68,6 +68,17 @@
   line-height: 1.5;
 }
 
+.ma-prompt-dialog__input {
+  width: 100%;
+  margin-top: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  background: var(--ma-bg-canvas);
+  color: var(--ma-fg-1);
+  font-size: var(--body-size);
+}
+
 .ma-confirm-dialog__actions {
   display: flex;
   justify-content: flex-end;

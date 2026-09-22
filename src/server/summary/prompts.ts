@@ -148,6 +148,11 @@ export const SUMMARY_MARKDOWN_LABELS: Record<SummaryLanguage, { summary: string;
     task: 'Aufgabe', owner: 'Verantwortlich', due: 'Fällig', at: 'Zeitstempel',
     meta: { startedAt: 'Beginn', duration: 'Dauer', speakers: 'Teilnehmer' },
   },
+  tr: {
+    summary: 'Özet', decisions: 'Kararlar', actionItems: 'Yapılacaklar', keyTopics: 'Ana konular',
+    task: 'Görev', owner: 'Sorumlu', due: 'Son tarih', at: 'Zaman damgası',
+    meta: { startedAt: 'Başlangıç', duration: 'Süre', speakers: 'Katılımcılar' },
+  },
 };
 
 export { escapeMarkdown };

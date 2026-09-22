@@ -10,7 +10,8 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 export interface ConfirmDialogProps {
-  title: string;
+  /** Optional heading; when omitted the message itself labels the dialog. */
+  title?: string;
   message: string;
   confirmLabel: string;
   cancelLabel: string;
@@ -35,13 +36,15 @@ export function ConfirmDialog({ title, message, confirmLabel, cancelLabel, dange
         className="ma-modal ma-confirm-dialog"
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="ma-confirm-dialog-title"
-        aria-describedby="ma-confirm-dialog-message"
+        aria-labelledby={title ? 'ma-confirm-dialog-title' : 'ma-confirm-dialog-message'}
+        aria-describedby={title ? 'ma-confirm-dialog-message' : undefined}
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 id="ma-confirm-dialog-title" className="ma-confirm-dialog__title">
-          {title}
-        </h2>
+        {title ? (
+          <h2 id="ma-confirm-dialog-title" className="ma-confirm-dialog__title">
+            {title}
+          </h2>
+        ) : null}
         <p id="ma-confirm-dialog-message" className="ma-confirm-dialog__message">
           {message}
         </p>

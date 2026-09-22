@@ -8,6 +8,7 @@
 import type { McpApp } from '@privos_ai/app-react';
 
 import { AppDbClient } from './app-db-client.js';
+import { unwrapRestBody } from './rest-body.js';
 
 export interface MeetingReadModel {
   _id: string;
@@ -101,20 +102,75 @@ export async function renameMeeting(app: McpApp, meetingId: string, title: strin
 }
 
 /**
- * Deletes a meeting's row and its stored Files artifacts. Child rows
- * (`meeting_speakers`, `action_items`, `bookmarks`) carry a `meeting`
- * reference field registered with `onDelete:'cascade'`
- * (`shared/app-db-schema.ts`), so the Hub removes them automatically — this
- * function does not delete them itself. File deletion is best-effort (a
- * file already gone, or storage the user lacks rights to, must not block the
- * record delete the user explicitly confirmed).
+ * Deletes a meeting's row plus everything it stored in Files: every file
+ * inside the meeting's folder (the tracked artifacts AND any leftover
+ * `audio.part-*` chunks from an interrupted/unprocessed session), then the
+ * now-empty folder itself.
+ *
+ * Child rows (`meeting_speakers`, `action_items`, `bookmarks`) carry a
+ * `meeting` reference field registered with `onDelete:'cascade'`
+ * (`shared/app-db-schema.ts`), so the Hub removes them automatically.
+ *
+ * All Files cleanup is best-effort — a file already gone, an unsupported
+ * folder-delete endpoint, or storage the user lacks rights to must never
+ * block the record delete the user explicitly confirmed. The DB row is
+ * removed last regardless.
  */
 export async function deleteMeeting(app: McpApp, meeting: MeetingReadModel): Promise<void> {
-  const fileIds = [meeting.audioFileId, meeting.transcriptJsonFileId, meeting.transcriptMdFileId, meeting.srtFileId, meeting.summaryFileId].filter(
+  // Remove every file still living in the meeting's folder — this is what
+  // clears untracked audio parts the tracked-id list below never knew about.
+  if (meeting.folderId && meeting.roomId) {
+    await deleteFolderFiles(app, meeting.roomId, meeting.folderId).catch(() => undefined);
+  }
+
+  // Belt-and-braces: always delete the known artifacts too, so a skipped or
+  // partial folder listing (missing folderId, permission hiccup) still removes
+  // them. Files already gone return 404, which is swallowed.
+  const trackedIds = [meeting.audioFileId, meeting.transcriptJsonFileId, meeting.transcriptMdFileId, meeting.srtFileId, meeting.summaryFileId].filter(
     (id): id is string => Boolean(id),
   );
-  await Promise.all(fileIds.map((id) => app.rest({ method: 'DELETE', path: `file-management.files/${id}` }).catch(() => undefined)));
+  await Promise.all(trackedIds.map((id) => app.rest({ method: 'DELETE', path: `file-management.files/${id}` }).catch(() => undefined)));
+
+  // Best-effort remove the emptied folder record. The Hub file API only ever
+  // exposes folder create/list to this app; a folder DELETE mirrors the
+  // `files/<id>` shape but may be unsupported — if so, an empty folder is left
+  // behind rather than failing the whole delete.
+  if (meeting.folderId) {
+    await app.rest({ method: 'DELETE', path: `file-management.folders/${meeting.folderId}` }).catch(() => undefined);
+  }
+
   await new AppDbClient(app).delete('meetings', meeting._id);
+}
+
+interface FolderFileRecord {
+  _id: string;
+}
+
+/**
+ * Delete every file directly inside `folderId`. Lists in passes of 100 and
+ * deletes what it lists, re-listing until the folder is empty. A pass that
+ * deletes nothing (undeletable file) or an iteration cap breaks the loop so a
+ * persistent failure can never spin forever.
+ */
+async function deleteFolderFiles(app: McpApp, roomId: string, folderId: string): Promise<void> {
+  for (let pass = 0; pass < 30; pass++) {
+    const listed = await app.rest({ method: 'GET', path: `file-management.files.channel/${roomId}`, query: { folderId, count: 100 } });
+    const { files } = unwrapRestBody<{ files?: unknown }>(listed);
+    const records = Array.isArray(files) ? (files as FolderFileRecord[]) : [];
+    if (records.length === 0) return;
+    let deleted = 0;
+    await Promise.all(
+      records.map(async (file) => {
+        try {
+          await app.rest({ method: 'DELETE', path: `file-management.files/${file._id}` });
+          deleted += 1;
+        } catch {
+          // best-effort — leave the file, the progress guard below bails out
+        }
+      }),
+    );
+    if (deleted === 0) return;
+  }
 }
 
 export interface MeetingSpeakerSummary {

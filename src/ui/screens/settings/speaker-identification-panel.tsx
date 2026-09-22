@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { usePrivosApp } from '@privos_ai/app-react';
 
 import { speakerProfileDelete, speakerProfileList, speakerProfileUpdate, type SpeakerProfileListItem } from '../../data/speaker-api.js';
+import { ConfirmDialog } from '../../components/confirm-dialog.js';
 import { SpeakerAvatar } from '../../components/speaker-avatar.js';
 import { useI18n } from '../../i18n/i18n-provider.js';
 
@@ -32,6 +33,9 @@ export function SpeakerIdentificationPanel() {
   const [renameDrafts, setRenameDrafts] = useState<Record<string, string>>({});
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
   const [thresholdNotice, setThresholdNotice] = useState<string | null>(null);
+  // Prune/delete both need confirmation; window.confirm is a no-op in the
+  // sandboxed iframe, so an in-app ConfirmDialog gates them instead.
+  const [pendingAction, setPendingAction] = useState<{ type: 'prune' | 'delete'; profileId: string } | null>(null);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -78,7 +82,6 @@ export function SpeakerIdentificationPanel() {
   }
 
   async function pruneOutliers(profileId: string): Promise<void> {
-    if (!window.confirm(t('speaker.settingsPanel.pruneConfirm'))) return;
     setBusyId(profileId);
     setRowError((prev) => ({ ...prev, [profileId]: '' }));
     try {
@@ -92,7 +95,6 @@ export function SpeakerIdentificationPanel() {
   }
 
   async function remove(profileId: string): Promise<void> {
-    if (!window.confirm(t('speaker.settingsPanel.deleteConfirm'))) return;
     setBusyId(profileId);
     setRowError((prev) => ({ ...prev, [profileId]: '' }));
     try {
@@ -103,6 +105,14 @@ export function SpeakerIdentificationPanel() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  async function confirmPending(): Promise<void> {
+    const action = pendingAction;
+    if (!action) return;
+    setPendingAction(null);
+    if (action.type === 'prune') await pruneOutliers(action.profileId);
+    else await remove(action.profileId);
   }
 
   async function saveThreshold(): Promise<void> {
@@ -188,11 +198,11 @@ export function SpeakerIdentificationPanel() {
                     {t('speaker.settingsPanel.actionReenrol')}
                   </button>
                   {p.health && p.health.outlierCount > 0 ? (
-                    <button type="button" disabled={busyId === p.id} onClick={() => void pruneOutliers(p.id)}>
+                    <button type="button" disabled={busyId === p.id} onClick={() => setPendingAction({ type: 'prune', profileId: p.id })}>
                       {t('speaker.settingsPanel.actionPrune')}
                     </button>
                   ) : null}
-                  <button type="button" disabled={busyId === p.id} onClick={() => void remove(p.id)}>
+                  <button type="button" disabled={busyId === p.id} onClick={() => setPendingAction({ type: 'delete', profileId: p.id })}>
                     {t('speaker.settingsPanel.actionDelete')}
                   </button>
                   {rowError[p.id] ? (
@@ -210,6 +220,17 @@ export function SpeakerIdentificationPanel() {
             ) : null}
           </tbody>
         </table>
+      ) : null}
+
+      {pendingAction ? (
+        <ConfirmDialog
+          message={t(pendingAction.type === 'prune' ? 'speaker.settingsPanel.pruneConfirm' : 'speaker.settingsPanel.deleteConfirm')}
+          confirmLabel={t(pendingAction.type === 'prune' ? 'speaker.settingsPanel.actionPrune' : 'speaker.settingsPanel.actionDelete')}
+          cancelLabel={t('speaker.settingsPanel.cancel')}
+          danger={pendingAction.type === 'delete'}
+          onConfirm={() => void confirmPending()}
+          onCancel={() => setPendingAction(null)}
+        />
       ) : null}
     </section>
   );
