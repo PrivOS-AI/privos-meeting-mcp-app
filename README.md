@@ -58,11 +58,11 @@ in the room's Files. The full data policy is declared in `privos-app.json`.
 The voiceprint store is encrypted with `VOICEPRINT_ENC_KEY`. Back that key up:
 losing it loses every stored voiceprint.
 
-## Deployment
+## Contributing
 
-Operator notes for a standalone production install (pm2, backups, key rotation,
-rollback) live in `docs/deployment-guide.md`. `PRIVOS.md` holds the working notes
-for contributors and AI coding agents.
+`PRIVOS.md` holds the working notes for contributors and AI coding agents
+(`CLAUDE.md`, `AGENTS.md` and `GEMINI.md` are symlinks to it). Run
+`npm run verify:fast-pr` before opening a pull request.
 
 ## License
 
