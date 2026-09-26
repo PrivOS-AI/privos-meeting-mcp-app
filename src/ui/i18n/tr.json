@@ -47,6 +47,7 @@
   "screen.new.provider": "Canlı altyazı sağlayıcısı: {provider}",
   "screen.new.start": "Kaydı başlat",
   "screen.new.starting": "Mikrofon erişimi isteniyor…",
+  "screen.new.previousEnding": "Önceki toplantı hâlâ sonlandırılıyor…",
   "screen.new.micDenied": "Tarayıcı mikrofon erişimini reddetti. Bu sayfa için mikrofon izni verin ve tekrar deneyin.",
   "screen.new.micError": "Mikrofona erişilemedi. Cihazınızı kontrol edin ve tekrar deneyin.",
   "screen.new.micNotFound": "Bu cihazda mikrofon bulunamadı. Bir mikrofon bağlayın ve tekrar deneyin.",

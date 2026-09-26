@@ -47,6 +47,7 @@
   "screen.new.provider": "Live caption provider: {provider}",
   "screen.new.start": "Start recording",
   "screen.new.starting": "Requesting microphone access…",
+  "screen.new.previousEnding": "The previous meeting is still finishing up…",
   "screen.new.micDenied": "The browser denied microphone access. Grant mic permission for this page and try again.",
   "screen.new.micError": "Could not access the microphone. Check your device and try again.",
   "screen.new.micNotFound": "No microphone found on this device. Connect a microphone and try again.",

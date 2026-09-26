@@ -11,7 +11,7 @@ import { useI18n } from '../i18n/i18n-provider.js';
 import { SUPPORTED_LANGUAGES, LANGUAGE_ENDONYMS, type Language } from '../i18n/languages.js';
 import { defaultTranslationTarget } from '../../shared/languages.js';
 import { loadLocalPreferences, saveLocalPreference } from '../data/local-preferences.js';
-import { useRecordingStore } from '../stores/recording-store.js';
+import { useRecordingState, useRecordingStore } from '../stores/recording-store.js';
 import { Icon } from '../components/icon.js';
 
 export interface NewMeetingScreenProps {
@@ -23,6 +23,7 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
   const app = usePrivosApp();
   const context = usePrivosContext();
   const store = useRecordingStore();
+  const previousEnding = useRecordingState().status === 'ending';
 
   const prefs = loadLocalPreferences();
   const [title, setTitle] = useState('');
@@ -137,8 +138,9 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
       </div>
 
       {micError ? <p className="ma-new-meeting__error">{micError}</p> : null}
+      {previousEnding ? <p className="ma-notice ma-notice--info">{t('screen.new.previousEnding')}</p> : null}
 
-      <button type="button" className="ma-new-meeting__start" disabled={starting} onClick={() => void handleStart()}>
+      <button type="button" className="ma-new-meeting__start" disabled={starting || previousEnding} onClick={() => void handleStart()}>
         <Icon name="record" size={18} />
         {starting ? t('screen.new.starting') : t('screen.new.start')}
       </button>

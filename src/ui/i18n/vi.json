@@ -47,6 +47,7 @@
   "screen.new.provider": "Nhà cung cấp phụ đề trực tiếp: {provider}",
   "screen.new.start": "Bắt đầu ghi",
   "screen.new.starting": "Đang xin quyền micro…",
+  "screen.new.previousEnding": "Cuộc họp trước vẫn đang kết thúc…",
   "screen.new.micDenied": "Trình duyệt từ chối quyền micro. Vui lòng cấp quyền micro cho trang này rồi thử lại.",
   "screen.new.micError": "Không thể truy cập micro. Kiểm tra thiết bị rồi thử lại.",
   "screen.new.micNotFound": "Không tìm thấy micro trên thiết bị này. Kết nối micro rồi thử lại.",

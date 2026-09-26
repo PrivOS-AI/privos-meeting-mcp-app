@@ -54,6 +54,8 @@ export interface LiveSpeakerBadge {
 export interface RecordingState {
   meetingId: string | null;
   title: string;
+  /** Primary spoken language picked when the meeting started — live summaries are written in it, not the UI locale. */
+  language: LanguageCode;
   folderId: string | null;
   status: RecordingStatus;
   provider: SttVendor | null;
@@ -105,6 +107,7 @@ function initialState(): RecordingState {
   return {
     meetingId: null,
     title: '',
+    language: 'vi',
     folderId: null,
     status: 'idle',
     provider: null,
@@ -487,6 +490,8 @@ export class RecordingStore {
   // ---------------------------------------------------------------- start
 
   async startRecording(input: StartRecordingInput): Promise<void> {
+    // The previous meeting's end flow still reads the shared recorder/queue/folder state.
+    if (this.state.status === 'ending') throw new Error('The previous meeting is still finishing up.');
     this.meetingLanguage = input.language;
     this.translationTarget = input.translationLang;
     try {
@@ -532,10 +537,17 @@ export class RecordingStore {
       this.clock = new MeetingClock(recorderEpochMs);
       this.nextPartSeq = 0;
       this.allTurns = [];
+      this.pendingAssignments.clear();
+      this.labelSpeechMsBySpeaker.clear();
 
+      // Start from a clean slate: the store is a mount-lived singleton, so a
+      // merge would carry the previous meeting's captions/speakers/bookmarks
+      // into this one. Only UI prefs and the just-acquired wake lock survive.
+      this.state = { ...initialState(), stageCaptionSize: this.state.stageCaptionSize, wakeLock: this.state.wakeLock };
       this.setState({
         meetingId,
         title: input.title,
+        language: input.language,
         folderId,
         status: 'recording',
         recorderEpochMs,

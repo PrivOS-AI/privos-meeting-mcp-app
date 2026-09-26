@@ -314,3 +314,18 @@ describe('RecordingStore — bookmark toggle + side-panel removal keep bookmarke
     expect(store.getState().bookmarkedSecs).toEqual([]);
   });
 });
+
+describe('RecordingStore — a new meeting cannot start while the previous one is still ending', () => {
+  it('rejects startRecording without touching the Hub while status is ending', async () => {
+    const calls: unknown[] = [];
+    const store = makeStore(async (params) => {
+      calls.push(params);
+      return {};
+    });
+    internals(store).state = { ...store.getState(), status: 'ending' };
+
+    await expect(store.startRecording({ title: 'Next', language: 'vi', translationLang: 'en', translationEnabled: false })).rejects.toThrow(/still finishing/);
+    expect(calls).toHaveLength(0);
+    expect(store.getState().meetingId).toBe('meeting-1');
+  });
+});

@@ -110,7 +110,9 @@ interface RoutedScreensProps {
 /** Inside the store provider so it can see whether a recording is running. */
 function RoutedScreens({ route, setRoute, selectedMeetingId, openMeeting }: RoutedScreensProps) {
   const recording = useRecordingState();
-  const recordingActive = recording.status === 'recording' || recording.status === 'paused' || recording.status === 'ending';
+  // An ENDING meeting is over for the user: "New meeting" must show the start
+  // form (start stays blocked until finalizing completes), not the old session.
+  const recordingActive = recording.status === 'recording' || recording.status === 'paused';
   // Keep a running meeting alive in the background: navigating away and back to
   // "New meeting" returns to the live session instead of a fresh start form.
   const showLive = route === 'live' || (route === 'new' && recordingActive);
@@ -119,7 +121,7 @@ function RoutedScreens({ route, setRoute, selectedMeetingId, openMeeting }: Rout
   return (
     <main className={showLive ? 'ma-body ma-body--live' : 'ma-body'}>
       {route === 'new' && !recordingActive ? <NewMeetingScreen onStarted={() => setRoute('live')} /> : null}
-      {showLive ? <LiveScreen onEnded={() => setRoute('processing')} /> : null}
+      {showLive ? <LiveScreen onEnding={() => setRoute('live')} onEnded={() => setRoute('processing')} /> : null}
       {route === 'processing' ? <ProcessingScreen onDone={() => setRoute('history')} onOpenMeeting={openMeeting} /> : null}
       {route === 'detail' && selectedMeetingId ? <MeetingDetailScreen meetingId={selectedMeetingId} onBack={() => setRoute('history')} /> : null}
       {route === 'history' ? <HistoryScreen onStartRecording={() => setRoute('new')} onOpenMeeting={openMeeting} /> : null}

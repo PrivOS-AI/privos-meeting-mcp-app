@@ -47,6 +47,7 @@
   "screen.new.provider": "实时字幕服务商：{provider}",
   "screen.new.start": "开始录制",
   "screen.new.starting": "正在请求麦克风权限…",
+  "screen.new.previousEnding": "上一场会议仍在收尾…",
   "screen.new.micDenied": "浏览器拒绝了麦克风访问权限。请为此页面授予麦克风权限后重试。",
   "screen.new.micError": "无法访问麦克风。请检查您的设备后重试。",
   "screen.new.micNotFound": "此设备未检测到麦克风。请连接麦克风后重试。",

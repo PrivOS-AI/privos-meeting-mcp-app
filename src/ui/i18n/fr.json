@@ -47,6 +47,7 @@
   "screen.new.provider": "Fournisseur de sous-titres en direct : {provider}",
   "screen.new.start": "Démarrer l'enregistrement",
   "screen.new.starting": "Demande d'accès au microphone…",
+  "screen.new.previousEnding": "La réunion précédente est encore en cours de finalisation…",
   "screen.new.micDenied": "Le navigateur a refusé l'accès au microphone. Autorisez l'accès au micro pour cette page et réessayez.",
   "screen.new.micError": "Impossible d'accéder au microphone. Vérifiez votre appareil et réessayez.",
   "screen.new.micNotFound": "Aucun microphone détecté sur cet appareil. Connectez un microphone et réessayez.",

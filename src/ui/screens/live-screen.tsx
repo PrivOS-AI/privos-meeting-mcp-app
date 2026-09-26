@@ -22,12 +22,14 @@ import { useI18n } from '../i18n/i18n-provider.js';
 import { resolveLineSpeakerKey, useRecordingState, useRecordingStore } from '../stores/recording-store.js';
 
 export interface LiveScreenProps {
+  /** Fired synchronously on End, before the store flips to `ending` — pins the route so a session reopened from "New meeting" stays on screen while it finishes. */
+  onEnding(): void;
   onEnded(): void;
 }
 
 type ViewMode = 'transcript' | 'stage';
 
-export function LiveScreen({ onEnded }: LiveScreenProps) {
+export function LiveScreen({ onEnding, onEnded }: LiveScreenProps) {
   const { t } = useI18n();
   const { roomId } = usePrivosContext();
   const store = useRecordingStore();
@@ -50,6 +52,13 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
     const el = linesRef.current;
     if (el && followRef.current) el.scrollTop = el.scrollHeight;
   }, [state.lines.length, lastLine?.text, lastLine?.translation]);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   // (hooks above must stay before the idle early-return below — Rules of Hooks)
 
   if (state.status === 'idle') {
@@ -64,8 +73,10 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
   const activeSpeakerKey = newestLine ? resolveLineSpeakerKey(state, newestLine) : undefined;
 
   async function handleEnd(): Promise<void> {
+    onEnding();
     await store.endAndSummarize();
-    onEnded();
+    // Ending takes a while (final uploads drain); if the user moved on meanwhile, don't yank them back.
+    if (mountedRef.current) onEnded();
   }
 
   const footer = (

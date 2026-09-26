@@ -47,6 +47,7 @@
   "screen.new.provider": "リアルタイム字幕プロバイダー: {provider}",
   "screen.new.start": "録音を開始",
   "screen.new.starting": "マイクへのアクセスを要求しています…",
+  "screen.new.previousEnding": "前の会議を終了処理中です…",
   "screen.new.micDenied": "ブラウザがマイクへのアクセスを拒否しました。このページにマイクの許可を与えてから再試行してください。",
   "screen.new.micError": "マイクにアクセスできません。デバイスを確認してから再試行してください。",
   "screen.new.micNotFound": "このデバイスにマイクが見つかりません。マイクを接続してから再試行してください。",

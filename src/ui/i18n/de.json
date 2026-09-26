@@ -47,6 +47,7 @@
   "screen.new.provider": "Anbieter für Live-Untertitel: {provider}",
   "screen.new.start": "Aufnahme starten",
   "screen.new.starting": "Mikrofonzugriff wird angefragt…",
+  "screen.new.previousEnding": "Die vorherige Besprechung wird noch abgeschlossen…",
   "screen.new.micDenied": "Der Browser hat den Mikrofonzugriff verweigert. Erteilen Sie dieser Seite die Mikrofonberechtigung und versuchen Sie es erneut.",
   "screen.new.micError": "Auf das Mikrofon konnte nicht zugegriffen werden. Überprüfen Sie Ihr Gerät und versuchen Sie es erneut.",
   "screen.new.micNotFound": "Auf diesem Gerät wurde kein Mikrofon gefunden. Schließen Sie ein Mikrofon an und versuchen Sie es erneut.",
