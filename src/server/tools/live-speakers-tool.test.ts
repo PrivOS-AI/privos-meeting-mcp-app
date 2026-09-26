@@ -178,9 +178,9 @@ describe('meeting_live_speakers', () => {
     it('reports a merge loser\'s turns under the winner id, including turns recorded before the merge happened', async () => {
       const registry = sessionRegistries.get('meeting-1');
       registry.observe('s0:1', new Float32Array([1, 0, 0, 0]), 20, seg('s0:1', 0)); // A: speechSec=20 (will win by speech)
-      registry.observe('s0:2', new Float32Array([0, 1, 0, 0]), 5, seg('s0:2', 30_000)); // B: distinct, brand new
-      registry.observe('s0:2', new Float32Array([0.6, 0.8, 0, 0]), 5, seg('s0:2', 36_000)); // converges toward A
-      registry.observe('s0:2', new Float32Array([1, 0, 0, 0]), 5, seg('s0:2', 42_000)); // merges in-memory
+      registry.observe('s1:2', new Float32Array([0, 1, 0, 0]), 5, seg('s1:2', 30_000)); // B: distinct, brand new
+      registry.observe('s1:2', new Float32Array([0.6, 0.8, 0, 0]), 5, seg('s1:2', 36_000)); // converges toward A
+      registry.observe('s1:2', new Float32Array([1, 0, 0, 0]), 5, seg('s1:2', 42_000)); // merges in-memory
 
       const winnerId = registry.snapshot().find((s) => !s.mergedInto)!.sessionSpeakerId;
       const loserId = registry.snapshot().find((s) => s.mergedInto)!.sessionSpeakerId;

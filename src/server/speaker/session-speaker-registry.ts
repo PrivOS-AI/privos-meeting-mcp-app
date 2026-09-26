@@ -19,7 +19,7 @@ import { randomUUID } from 'node:crypto';
 
 import { cosineSimilarity } from '../../shared/cosine.js';
 import { env, type SessionScoreMode } from '../env.js';
-import { canMerge, identityOutranks, isExplicitMergeRequest, mergePairKey, nextMergeStreak, type MergeBlockReason, type MergeCandidate, type MergeStreakEntry } from './session-speaker-merge-policy.js';
+import { canMerge, identityOutranks, isExplicitMergeRequest, mergePairKey, nextMergeStreak, splitByProvider, type MergeBlockReason, type MergeCandidate, type MergeStreakEntry } from './session-speaker-merge-policy.js';
 import { SessionSpeakerCentroid, type UpdateAction } from './session-speaker-centroid.js';
 import { configFromEnv, type SpeakerThresholds } from './speaker-thresholds.js';
 
@@ -538,7 +538,7 @@ export class MeetingSessionRegistry {
 
     let createdNew = false;
     if (!target) {
-      const hit = this.bestSessionMatch(embedding, scoreMode);
+      const hit = this.bestSessionMatch(embedding, scoreMode, label);
       target = hit?.speaker;
       assignScore = hit?.score;
       if (!target) {
@@ -598,10 +598,10 @@ export class MeetingSessionRegistry {
   }
 
   /** Best-scoring OTHER session speaker clearing ASSIGN, or `undefined` — session assignment's OWN match, replacing the old borrow of `speaker-matcher.ts#matchSpeaker` over pseudo-profiles (plan.md: "so phase 7's matcher change cannot silently alter session assignment"). Mirrors `matchSpeaker`'s best-over-candidates behaviour exactly under `scoreMode:'max'`. */
-  private bestSessionMatch(embedding: Float32Array, scoreMode: SessionScoreMode): { speaker: SessionSpeaker; score: number } | undefined {
+  private bestSessionMatch(embedding: Float32Array, scoreMode: SessionScoreMode, label: string): { speaker: SessionSpeaker; score: number } | undefined {
     let best: { speaker: SessionSpeaker; score: number } | undefined;
     for (const speaker of this.byId.values()) {
-      if (speaker.mergedInto) continue;
+      if (speaker.mergedInto || splitByProvider(speaker.sonioxLabels, label)) continue;
       const score = scoreAgainstSessionSpeaker(embedding, speaker, scoreMode);
       if (score >= this.thresholds.sessionMatchThreshold && (!best || score > best.score)) best = { speaker, score };
     }
@@ -617,6 +617,7 @@ export class MeetingSessionRegistry {
       displayName: speaker.displayName,
       profileId: speaker.profileId,
       nameSource: speaker.nameSource,
+      labels: speaker.sonioxLabels,
     };
   }
 

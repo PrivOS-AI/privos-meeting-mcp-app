@@ -174,8 +174,14 @@ export function resolveLineSpeakerKey(
   }
   const serverId = state.lineServerSpeaker[line.id];
   if (serverId) return resolveMergedSpeakerId(serverId, state.liveSpeakers);
+  // A fresh line (its turn not settled yet — up to a chunk behind) whose label a session speaker
+  // already owns shows THAT speaker, not a re-created unnamed label chip that flips back on the next poll.
+  // ponytail: no speech tally here, so a recycled label shows its first owner until the turn settles.
+  if (line.speakerKey) return ownerForLabel(line.speakerKey.split('@')[0], state.liveSpeakers, NO_TALLY)?.sessionSpeakerId ?? line.speakerKey;
   return line.speakerKey;
 }
+
+const NO_TALLY: ReadonlyMap<string, ReadonlyMap<string, number>> = new Map();
 
 /** A settled turn already newer than the previous poll's cursor plus the base label it was embedded under — the shape both `matchTurnsToLines` and `accumulateLabelSpeech`/`ownerForLabel` operate on. */
 type ResolvedTurn = ServerTurn;
@@ -306,7 +312,7 @@ export function foldSpeakerMap(
 }
 
 /** Merge one caption event into the line list: upsert by id, else promote the most recent still-draft line to final. */
-function applyCaption(lines: CaptionLine[], event: CaptionEvent, speakerMap: Record<string, LiveSpeakerBadge>): CaptionLine[] {
+function applyCaption(lines: CaptionLine[], event: CaptionEvent, speakerMap: Record<string, LiveSpeakerBadge>, liveSpeakers: readonly LiveSpeaker[]): CaptionLine[] {
   const existingIndex = lines.findIndex((l) => l.id === event.id);
   if (event.translationOf) {
     const target = lines.findIndex((l) => l.id === event.translationOf);
@@ -319,7 +325,8 @@ function applyCaption(lines: CaptionLine[], event: CaptionEvent, speakerMap: Rec
   }
   // Register a newly seen speaker BEFORE any early return below — otherwise a
   // line can render with a speaker the map does not know ("speaker 0").
-  if (event.speakerKey && !speakerMap[event.speakerKey]) {
+  // A label already folded into a session speaker's chip must not grow a second, unnamed chip.
+  if (event.speakerKey && !speakerMap[event.speakerKey] && !ownerForLabel(event.speakerKey.split('@')[0], liveSpeakers, NO_TALLY)) {
     speakerMap[event.speakerKey] = { colorKey: PALETTE[Object.keys(speakerMap).length % PALETTE.length], resolved: false };
   }
   const asLine = (): CaptionLine => ({
@@ -633,7 +640,7 @@ export class RecordingStore {
       },
       onCaption: (event) => {
         const speakerMap = { ...this.state.speakerMap };
-        const lines = applyCaption(this.state.lines, event, speakerMap);
+        const lines = applyCaption(this.state.lines, event, speakerMap, this.state.liveSpeakers);
         this.setState({ lines, speakerMap });
         if (this.translateBuffer && event.kind === 'final' && !event.translationOf) {
           this.translateBuffer.push({ id: event.id, text: event.text, lang: event.lang });

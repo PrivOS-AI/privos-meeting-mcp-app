@@ -11,7 +11,7 @@
  */
 import type { NameSource } from './session-speaker-registry.js';
 
-export type MergeBlockReason = 'identity' | 'min-speech' | 'streak';
+export type MergeBlockReason = 'identity' | 'provider-split' | 'min-speech' | 'streak';
 
 /** The subset of a session speaker's state this policy needs — never the full internal shape. */
 export interface MergeCandidate {
@@ -21,11 +21,33 @@ export interface MergeCandidate {
   displayName?: string;
   profileId?: string;
   nameSource?: NameSource;
+  /** Realtime provider labels this speaker holds (`s0:1`, `s0:1@2`, …). */
+  labels?: readonly string[];
 }
 
 export interface MergeGuardResult {
   ok: boolean;
-  blockedBy?: 'identity' | 'min-speech';
+  blockedBy?: 'identity' | 'provider-split' | 'min-speech';
+}
+
+/** Provider session of a realtime label (`s0:1@2` -> `s0`); `undefined` for an `unknown`/unlabelled key, which claims no distinct speaker. */
+export function labelSession(label: string): string | undefined {
+  const [session, speaker] = label.split('@')[0].split(':');
+  return speaker && speaker !== 'unknown' ? session : undefined;
+}
+
+/**
+ * True when `labels` already hold a DIFFERENT base label from `label`'s own
+ * provider session — the provider's diarizer already said those are two
+ * people, and embeddings from one room mic are not strong enough to overrule
+ * it (cos 0.4–0.6 between distinct voices collapsed a whole meeting into one
+ * speaker). Embeddings still link labels ACROSS sessions (a reconnect).
+ */
+export function splitByProvider(labels: readonly string[], label: string): boolean {
+  const session = labelSession(label);
+  if (!session) return false;
+  const base = label.split('@')[0];
+  return labels.some((l) => labelSession(l) === session && l.split('@')[0] !== base);
 }
 
 /** `sorted(idA, idB)` joined by a separator that can never appear in a UUID — stable regardless of call order; the registry's `mergeStreaks` map key. */
@@ -65,6 +87,7 @@ export function isExplicitMergeRequest(a: MergeCandidate, b: MergeCandidate): bo
  */
 export function canMerge(a: MergeCandidate, b: MergeCandidate, opts: { minSpeechSec: number }): MergeGuardResult {
   if (hasConflictingIdentity(a, b)) return { ok: false, blockedBy: 'identity' };
+  if (!isExplicitMergeRequest(a, b) && (a.labels ?? []).some((l) => splitByProvider(b.labels ?? [], l))) return { ok: false, blockedBy: 'provider-split' };
   if (opts.minSpeechSec > 0) {
     const enoughSpeech = a.speechSec >= opts.minSpeechSec && b.speechSec >= opts.minSpeechSec;
     const enoughEmbeddings = a.embeddingCount >= 3 && b.embeddingCount >= 3;

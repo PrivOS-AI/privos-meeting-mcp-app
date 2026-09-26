@@ -52,6 +52,23 @@ describe('canMerge — identity guard', () => {
   });
 });
 
+describe('canMerge — provider split guard', () => {
+  it('blocks two speakers holding different labels of the same provider session', () => {
+    expect(canMerge(candidate({ labels: ['s0:1'] }), candidate({ labels: ['s0:2'] }), { minSpeechSec: 0 })).toEqual({ ok: false, blockedBy: 'provider-split' });
+  });
+
+  it('allows labels from different sessions, a recycled instance of the same label, and unknown labels', () => {
+    expect(canMerge(candidate({ labels: ['s0:1'] }), candidate({ labels: ['s1:2'] }), { minSpeechSec: 0 }).ok).toBe(true);
+    expect(canMerge(candidate({ labels: ['s0:1'] }), candidate({ labels: ['s0:1@2'] }), { minSpeechSec: 0 }).ok).toBe(true);
+    expect(canMerge(candidate({ labels: ['s0:1'] }), candidate({ labels: ['s0:unknown'] }), { minSpeechSec: 0 }).ok).toBe(true);
+  });
+
+  it('the user giving both the same name still merges them', () => {
+    const named = { nameSource: 'user' as const, displayName: 'An' };
+    expect(canMerge(candidate({ labels: ['s0:1'], ...named }), candidate({ labels: ['s0:2'], ...named }), { minSpeechSec: 0 }).ok).toBe(true);
+  });
+});
+
 describe('canMerge — min speech gate', () => {
   it('disabled at minSpeechSec=0 (neutral default) regardless of speech/embedding counts', () => {
     const a = candidate({ speechSec: 0, embeddingCount: 0 });

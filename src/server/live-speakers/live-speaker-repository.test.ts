@@ -120,7 +120,7 @@ describe('live-speaker-repository', () => {
     const meetingId = `m-${Math.random()}`;
     const original = new MeetingSessionRegistry(meetingId);
     original.observe('s0:1', new Float32Array([1, 0, 0, 0]), 20, seg('s0:1', 0)); // A: speechSec=20
-    original.observe('s0:2', new Float32Array([0, 1, 0, 0]), 5, seg('s0:2', 30_000)); // B: distinct, speechSec=5, brand new
+    original.observe('s1:2', new Float32Array([0, 1, 0, 0]), 5, seg('s1:2', 30_000)); // B: distinct, speechSec=5, brand new
     await upsertAll(db(), meetingId, original); // both rows persisted independently
     expect(store.meeting_speakers).toHaveLength(2);
 
@@ -128,8 +128,8 @@ describe('live-speaker-repository', () => {
     // per-turn fold-verify check (cos to B's best held vector: 0.8, then 0.6;
     // "verify non-sticky folds too" runs on every turn now, so a single big
     // jump straight from B's first turn would instead open a fresh instance).
-    original.observe('s0:2', new Float32Array([0.6, 0.8, 0, 0]), 5, seg('s0:2', 36_000));
-    original.observe('s0:2', new Float32Array([1, 0, 0, 0]), 5, seg('s0:2', 42_000)); // merges in-memory (default streak=1, no identity conflict)
+    original.observe('s1:2', new Float32Array([0.6, 0.8, 0, 0]), 5, seg('s1:2', 36_000));
+    original.observe('s1:2', new Float32Array([1, 0, 0, 0]), 5, seg('s1:2', 42_000)); // merges in-memory (default streak=1, no identity conflict)
     const active = original.snapshot().filter((s) => !s.mergedInto);
     expect(active).toHaveLength(1);
     const winnerId = active[0].sessionSpeakerId;
@@ -143,7 +143,7 @@ describe('live-speaker-repository', () => {
     const rebuilt = await ensureRegistry(db(), meetingId);
     const rebuiltSnap = rebuilt.snapshot();
     expect(rebuiltSnap).toHaveLength(1); // never reloads as two overlapping speakers
-    expect(rebuiltSnap[0].sonioxLabels.sort()).toEqual(['s0:1', 's0:2']);
+    expect(rebuiltSnap[0].sonioxLabels.sort()).toEqual(['s0:1', 's1:2']);
     expect(rebuiltSnap[0].liveSpeechSec).toBeCloseTo(35);
   });
 

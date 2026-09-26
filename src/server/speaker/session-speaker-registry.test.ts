@@ -32,14 +32,32 @@ describe('MeetingSessionRegistry', () => {
     expect(snap[0].liveSpeechSec).toBeCloseTo(6);
   });
 
-  it('(b) the provider renaming a label for the SAME voice attaches the new label to the same session speaker', () => {
+  it('(b) a new label from a NEW provider session (reconnect) attaches to the same session speaker by voice', () => {
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
-    // Different label, near-identical embedding -> matches the existing session speaker via centroid, not label.
-    reg.observe('s0:3', vec(0.99, 0.14), 5, seg('s0:3', 8000));
+    reg.observe('s1:3', vec(0.99, 0.14), 5, seg('s1:3', 8000));
     const snap = reg.snapshot();
     expect(snap).toHaveLength(1);
-    expect(snap[0].sonioxLabels.sort()).toEqual(['s0:1', 's0:3']);
+    expect(snap[0].sonioxLabels.sort()).toEqual(['s0:1', 's1:3']);
+  });
+
+  it('(b2) two labels of the SAME provider session stay two speakers, however similar the embeddings', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
+    reg.observe('s0:1', vec(0.98, 0.2), 5, seg('s0:1', 6000));
+    // Production: a second person scored 0.4-0.63 against the first and the whole meeting collapsed into one speaker.
+    reg.observe('s0:2', vec(0.99, 0.14), 5, seg('s0:2', 12000));
+    reg.observe('s0:2', vec(0.97, 0.24), 5, seg('s0:2', 18000));
+    const snap = reg.snapshot().filter((s) => !s.mergedInto);
+    expect(snap).toHaveLength(2);
+    expect(snap.map((s) => s.sonioxLabels).sort()).toEqual([['s0:1'], ['s0:2']]);
+  });
+
+  it('(b3) an unknown-speaker label never counts as a distinct provider speaker', () => {
+    const reg = new MeetingSessionRegistry('m1');
+    reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
+    reg.observe('s0:unknown', vec(0.99, 0.14), 5, seg('s0:unknown', 8000));
+    expect(reg.snapshot()).toHaveLength(1);
   });
 
   it('(c) a label reused for a DIFFERENT voice opens label@2 and leaves the original centroid untouched', () => {
@@ -69,21 +87,21 @@ describe('MeetingSessionRegistry', () => {
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // speaker A: speechSec=5
 
     // speaker B starts distinctly different (cosine 0.3 < match threshold 0.4; brand new -> no fold-check yet)...
-    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000));
+    reg.observe('s1:2', vec(0.3, 0.9539), 5, seg('s1:2', 10000));
     // ...then walks toward A in two more turns, each clearing the per-turn
     // fold-verify check against its OWN best held vector (0.81, then 0.8 —
     // "verify non-sticky folds too" now runs on every turn, not just once
     // sticky, so a single blind jump like the old fixture used would instead
     // open a fresh instance; see the diagnostics test below for that case).
-    reg.observe('s0:2', vec(0.8, 0.6), 5, seg('s0:2', 16000));
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000)); // B's centroid (speechSec=15) now clears the 0.6 merge threshold with A (cos~0.804)
+    reg.observe('s1:2', vec(0.8, 0.6), 5, seg('s1:2', 16000));
+    reg.observe('s1:2', vec(1, 0), 5, seg('s1:2', 22000)); // B's centroid (speechSec=15) now clears the 0.6 merge threshold with A (cos~0.804)
 
     const snap = reg.snapshot();
     const active = snap.filter((s) => !s.mergedInto);
     const merged = snap.filter((s) => s.mergedInto);
     expect(active).toHaveLength(1);
     expect(merged).toHaveLength(1);
-    expect(active[0].sonioxLabels.sort()).toEqual(['s0:1', 's0:2']);
+    expect(active[0].sonioxLabels.sort()).toEqual(['s0:1', 's1:2']);
     expect(active[0].liveSpeechSec).toBeCloseTo(20); // A(5) + B(15)
     expect(merged[0].mergedInto).toBe(active[0].sessionSpeakerId);
   });
@@ -91,7 +109,7 @@ describe('MeetingSessionRegistry', () => {
   it('(e) two genuinely different voices never merge', () => {
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
-    reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 10000));
+    reg.observe('s1:2', vec(0, 1), 5, seg('s1:2', 10000));
     const snap = reg.snapshot();
     expect(snap.filter((s) => !s.mergedInto)).toHaveLength(2);
   });
@@ -194,7 +212,7 @@ describe('MeetingSessionRegistry', () => {
     expect(reg.snapshotChanged()).toBe(true);
     reg.markPersisted(reg.snapshotHash());
     expect(reg.snapshotChanged()).toBe(false);
-    reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 10_000));
+    reg.observe('s1:2', vec(0, 1), 5, seg('s1:2', 10_000));
     expect(reg.snapshotChanged()).toBe(true);
   });
 
@@ -238,9 +256,9 @@ describe('diagnostics facts (onFact)', () => {
 
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0), onFact); // no candidates yet -> new
     // Different (never-before-seen) label, near-identical embedding -> matched via matchSpeaker, not direct label ownership.
-    reg.observe('s0:3', vec(0.99, 0.14), 5, seg('s0:3', 8000), onFact);
+    reg.observe('s1:3', vec(0.99, 0.14), 5, seg('s1:3', 8000), onFact);
     // A genuinely different voice on another brand-new label -> no candidate clears the threshold.
-    reg.observe('s0:9', vec(0, 1), 5, seg('s0:9', 20000), onFact);
+    reg.observe('s1:9', vec(0, 1), 5, seg('s1:9', 20000), onFact);
 
     const observeFacts = facts.filter((f): f is Extract<SpeakerRegistryFact, { kind: 'observe' }> => f.kind === 'observe');
     expect(observeFacts).toHaveLength(3);
@@ -276,9 +294,9 @@ describe('diagnostics facts (onFact)', () => {
     const { facts, onFact } = collectFacts();
 
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0), onFact); // speaker A: speechSec=5
-    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000), onFact); // speaker B starts distinct, brand new
-    reg.observe('s0:2', vec(0.8, 0.6), 5, seg('s0:2', 16000), onFact); // folds (cos to B's own held vector = 0.81 >= ASSIGN)
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000), onFact); // folds (cos = 0.8 >= ASSIGN) -> B's centroid converges onto A -> triggers the merge
+    reg.observe('s1:2', vec(0.3, 0.9539), 5, seg('s1:2', 10000), onFact); // speaker B starts distinct, brand new
+    reg.observe('s1:2', vec(0.8, 0.6), 5, seg('s1:2', 16000), onFact); // folds (cos to B's own held vector = 0.81 >= ASSIGN)
+    reg.observe('s1:2', vec(1, 0), 5, seg('s1:2', 22000), onFact); // folds (cos = 0.8 >= ASSIGN) -> B's centroid converges onto A -> triggers the merge
 
     const mergeFact = facts.find((f): f is Extract<SpeakerRegistryFact, { kind: 'merge' }> => f.kind === 'merge');
     expect(mergeFact).toBeDefined();
@@ -400,15 +418,15 @@ describe('merge hardening', () => {
     reg.applyUserIdentity(idA, { displayName: 'An' });
 
     // B starts orthogonal (cos 0 with A) so naming it carries no merge risk yet.
-    reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 20000), onFact);
+    reg.observe('s1:2', vec(0, 1), 5, seg('s1:2', 20000), onFact);
     const idB = reg.snapshot().find((s) => s.sessionSpeakerId !== idA)!.sessionSpeakerId;
     reg.applyUserIdentity(idB, { displayName: 'Binh' });
 
     // Two more A-ward embeddings walk B's centroid toward A's, each clearing
     // its own per-turn fold-verify check (cos to B's best held vector: 0.8,
     // then 0.6) — well above the 0.6 merge threshold once folded in.
-    reg.observe('s0:2', vec(0.6, 0.8), 5, seg('s0:2', 26000), onFact);
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 32000), onFact);
+    reg.observe('s1:2', vec(0.6, 0.8), 5, seg('s1:2', 26000), onFact);
+    reg.observe('s1:2', vec(1, 0), 5, seg('s1:2', 32000), onFact);
 
     const snap = reg.snapshot();
     expect(snap.filter((s) => !s.mergedInto)).toHaveLength(2);
@@ -424,9 +442,9 @@ describe('merge hardening', () => {
     env.speakerSessionMergeStreak = 3;
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // A: speechSec=5
-    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000)); // B turn 1: brand new, cos(A,B)=0.3 < threshold
-    reg.observe('s0:2', vec(0.8, 0.6), 5, seg('s0:2', 16000)); // B turn 2: folds (cos to turn 1 = 0.81 >= ASSIGN); mean cos to A ~0.58, still < merge threshold
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000)); // B turn 3: folds (cos to turn 2 = 0.8 >= ASSIGN); mean cos to A ~0.80 crosses the 0.6 merge threshold — but that's only streak=1
+    reg.observe('s1:2', vec(0.3, 0.9539), 5, seg('s1:2', 10000)); // B turn 1: brand new, cos(A,B)=0.3 < threshold
+    reg.observe('s1:2', vec(0.8, 0.6), 5, seg('s1:2', 16000)); // B turn 2: folds (cos to turn 1 = 0.81 >= ASSIGN); mean cos to A ~0.58, still < merge threshold
+    reg.observe('s1:2', vec(1, 0), 5, seg('s1:2', 22000)); // B turn 3: folds (cos to turn 2 = 0.8 >= ASSIGN); mean cos to A ~0.80 crosses the 0.6 merge threshold — but that's only streak=1
 
     expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
   });
@@ -436,17 +454,17 @@ describe('merge hardening', () => {
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // A: speechSec=5, centroid=(1,0)
 
-    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000)); // B turn 1: brand new, cos(A,B)=0.3 < merge threshold — no check counted
-    reg.observe('s0:2', vec(0.8, 0.6), 5, seg('s0:2', 16000)); // B turn 2 (priming): folds (cos to turn 1 = 0.81 >= ASSIGN); mean cos to A ~0.58 < merge threshold — still no check counted
+    reg.observe('s1:2', vec(0.3, 0.9539), 5, seg('s1:2', 10000)); // B turn 1: brand new, cos(A,B)=0.3 < merge threshold — no check counted
+    reg.observe('s1:2', vec(0.8, 0.6), 5, seg('s1:2', 16000)); // B turn 2 (priming): folds (cos to turn 1 = 0.81 >= ASSIGN); mean cos to A ~0.58 < merge threshold — still no check counted
     expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
 
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000)); // B turn 3: folds (cos to turn 2 = 0.8 >= ASSIGN); mean cos to A ~0.80 >= threshold, streak=1 (changed from "no prior")
+    reg.observe('s1:2', vec(1, 0), 5, seg('s1:2', 22000)); // B turn 3: folds (cos to turn 2 = 0.8 >= ASSIGN); mean cos to A ~0.80 >= threshold, streak=1 (changed from "no prior")
     expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
 
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 28000)); // B turn 4: mean changes again, cos ~0.89, streak=2
+    reg.observe('s1:2', vec(1, 0), 5, seg('s1:2', 28000)); // B turn 4: mean changes again, cos ~0.89, streak=2
     expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
 
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 34000)); // B turn 5: mean changes again, cos ~0.94, streak=3 -> merges
+    reg.observe('s1:2', vec(1, 0), 5, seg('s1:2', 34000)); // B turn 5: mean changes again, cos ~0.94, streak=3 -> merges
     const snap = reg.snapshot();
     expect(snap.filter((s) => !s.mergedInto)).toHaveLength(1);
   });
@@ -471,15 +489,15 @@ describe('merge hardening', () => {
     const idBig = reg.snapshot()[0].sessionSpeakerId;
 
     // The SMALLER speaker gets a user-confirmed name.
-    reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 30000));
+    reg.observe('s1:2', vec(0, 1), 5, seg('s1:2', 30000));
     const idSmall = reg.snapshot().find((s) => s.sessionSpeakerId !== idBig)!.sessionSpeakerId;
     reg.applyUserIdentity(idSmall, { displayName: 'An', privosUserId: 'user-1' });
 
     // Walk the smaller speaker's centroid onto the bigger one's in two more
     // turns, each clearing its own per-turn fold-verify check (cos to its best
     // held vector: 0.8, then 0.6) — one side named, no identity conflict.
-    reg.observe('s0:2', vec(0.6, 0.8), 5, seg('s0:2', 36000));
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 42000));
+    reg.observe('s1:2', vec(0.6, 0.8), 5, seg('s1:2', 36000));
+    reg.observe('s1:2', vec(1, 0), 5, seg('s1:2', 42000));
 
     const active = reg.snapshot().filter((s) => !s.mergedInto);
     expect(active).toHaveLength(1);
@@ -496,13 +514,13 @@ describe('merge hardening', () => {
     const winnerId = reg.snapshot()[0].sessionSpeakerId;
     reg.applyProfileMatch(winnerId, { profileId: 'profile-1', displayName: 'Live Guess', confidence: 0.7 });
 
-    reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 30000));
+    reg.observe('s1:2', vec(0, 1), 5, seg('s1:2', 30000));
     const loserId = reg.snapshot().find((s) => s.sessionSpeakerId !== winnerId)!.sessionSpeakerId;
     reg.applyUserIdentity(loserId, { displayName: 'Confirmed Name' });
 
     // Two-step ramp — each turn clears its own per-turn fold-verify check.
-    reg.observe('s0:2', vec(0.6, 0.8), 5, seg('s0:2', 36000));
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 42000));
+    reg.observe('s1:2', vec(0.6, 0.8), 5, seg('s1:2', 36000));
+    reg.observe('s1:2', vec(1, 0), 5, seg('s1:2', 42000));
 
     const active = reg.snapshot().filter((s) => !s.mergedInto);
     expect(active).toHaveLength(1);
@@ -514,9 +532,9 @@ describe('merge hardening', () => {
     env.speakerSessionMergeMinSpeechSec = 15;
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0)); // A: speechSec=5 < 15
-    reg.observe('s0:2', vec(0.3, 0.9539), 5, seg('s0:2', 10000)); // B turn 1: brand new
-    reg.observe('s0:2', vec(0.8, 0.6), 5, seg('s0:2', 16000)); // B turn 2: folds (cos to turn 1 = 0.81 >= ASSIGN)
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000)); // B turn 3: folds (cos to turn 2 = 0.8 >= ASSIGN); B crosses the merge threshold, but A hasn't spoken enough
+    reg.observe('s1:2', vec(0.3, 0.9539), 5, seg('s1:2', 10000)); // B turn 1: brand new
+    reg.observe('s1:2', vec(0.8, 0.6), 5, seg('s1:2', 16000)); // B turn 2: folds (cos to turn 1 = 0.81 >= ASSIGN)
+    reg.observe('s1:2', vec(1, 0), 5, seg('s1:2', 22000)); // B turn 3: folds (cos to turn 2 = 0.8 >= ASSIGN); B crosses the merge threshold, but A hasn't spoken enough
 
     expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(2);
   });
@@ -528,7 +546,7 @@ describe('merge hardening', () => {
     const idA = reg.snapshot()[0].sessionSpeakerId;
     reg.applyUserIdentity(idA, { displayName: 'An' });
 
-    reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 10000));
+    reg.observe('s1:2', vec(0, 1), 5, seg('s1:2', 10000));
     const idB = reg.snapshot().find((s) => s.sessionSpeakerId !== idA)!.sessionSpeakerId;
     reg.applyUserIdentity(idB, { displayName: 'An' }); // SAME name -> explicit merge request
 
@@ -536,8 +554,8 @@ describe('merge hardening', () => {
     // check (cos to B's best held vector: 0.8, then 0.6). The FIRST check that
     // clears the merge threshold (turn 3, cos~0.66) is enough despite streak=5,
     // because it's explicit.
-    reg.observe('s0:2', vec(0.6, 0.8), 5, seg('s0:2', 16000));
-    reg.observe('s0:2', vec(1, 0), 5, seg('s0:2', 22000));
+    reg.observe('s1:2', vec(0.6, 0.8), 5, seg('s1:2', 16000));
+    reg.observe('s1:2', vec(1, 0), 5, seg('s1:2', 22000));
 
     expect(reg.snapshot().filter((s) => !s.mergedInto)).toHaveLength(1);
   });
@@ -659,8 +677,8 @@ describe('centroid update gating (UPDATE threshold, duration gate, anchors)', ()
     // replayed with the diagnostics hook attached.
     reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0), onFact);
     reg.observe('s0:1', vec(0.95, 0.31), 5, seg('s0:1', 6000), onFact);
-    reg.observe('s0:2', vec(0, 1), 5, seg('s0:2', 12_000), onFact);
-    reg.observe('s0:3', vec(0.99, 0.14), 5, seg('s0:3', 18_000), onFact); // matches s0:1's speaker via bestSessionMatch
+    reg.observe('s1:2', vec(0, 1), 5, seg('s1:2', 12_000), onFact);
+    reg.observe('s1:3', vec(0.99, 0.14), 5, seg('s1:3', 18_000), onFact); // matches s0:1's speaker via bestSessionMatch
 
     // Under neutral defaults, nothing is ever rejected for update — every held
     // turn is either the brand-new exemption (`provisional`) or folds straight
@@ -682,7 +700,7 @@ describe('injectable thresholds (SpeakerThresholds)', () => {
     const withExplicitEnvConfig = new MeetingSessionRegistry('m-explicit', configFromEnv());
     for (const reg of [withDefault, withExplicitEnvConfig]) {
       reg.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
-      reg.observe('s0:3', vec(0.99, 0.14), 5, seg('s0:3', 8000));
+      reg.observe('s1:3', vec(0.99, 0.14), 5, seg('s1:3', 8000));
     }
     expect(withExplicitEnvConfig.snapshot().map((s) => s.sonioxLabels.sort())).toEqual(withDefault.snapshot().map((s) => s.sonioxLabels.sort()));
   });
@@ -693,7 +711,7 @@ describe('injectable thresholds (SpeakerThresholds)', () => {
     // test (b) above, cos(target, held) = 0.99).
     const withDefault = new MeetingSessionRegistry('m-default-2');
     withDefault.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
-    withDefault.observe('s0:3', vec(0.99, 0.14), 5, seg('s0:3', 8000));
+    withDefault.observe('s1:3', vec(0.99, 0.14), 5, seg('s1:3', 8000));
     expect(withDefault.snapshot()).toHaveLength(1);
 
     // The SAME two turns against an INJECTED config whose sessionMatchThreshold
@@ -703,7 +721,7 @@ describe('injectable thresholds (SpeakerThresholds)', () => {
     const stricter = { ...configFromEnv(), sessionMatchThreshold: 0.999 };
     const withInjected = new MeetingSessionRegistry('m-injected', stricter);
     withInjected.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
-    withInjected.observe('s0:3', vec(0.99, 0.14), 5, seg('s0:3', 8000));
+    withInjected.observe('s1:3', vec(0.99, 0.14), 5, seg('s1:3', 8000));
     expect(withInjected.snapshot()).toHaveLength(2);
   });
 });

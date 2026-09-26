@@ -60,7 +60,7 @@ export interface MergeEvent extends EventEnvelope {
   /** The sustained-evidence streak count at the time of this check (0 when blocked by a guard, not by streak). */
   streak: number;
   /** Absent when this pair actually merged; set to why it did NOT when the pair cleared the merge threshold but was blocked. */
-  blockedBy?: 'identity' | 'min-speech' | 'streak';
+  blockedBy?: 'identity' | 'provider-split' | 'min-speech' | 'streak';
 }
 
 export interface CentroidsEvent extends EventEnvelope {
