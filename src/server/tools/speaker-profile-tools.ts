@@ -61,11 +61,9 @@ export const speakerProfileListTool: AppTool = {
   async execute(_args, context) {
     const actor = requireVerifiedActor(context);
     const db = new AppDbBotClient(actor.roomId ?? context.roomId);
-    // Profile health uses the workspace-default match threshold, not this
-    // room's tuned value: profiles are workspace-global and `pruneOutliers`
-    // (a room-less tool) removes outliers on that same workspace-default
-    // basis, so the displayed outlier count matches what a prune would drop.
-    const [profiles, threshold] = await Promise.all([profileStore.listProfiles(db), readMatchThreshold(new AppDbBotClient())]);
+    // A room-less client has no permission context on the Hub ("Insufficient scope: requires db:read").
+    // Health uses the same room-bound threshold `pruneOutliers` reads, so the outlier count matches a prune.
+    const [profiles, threshold] = await Promise.all([profileStore.listProfiles(db), readMatchThreshold(db)]);
     return { profiles: profiles.map((p) => toListItem(p, canEditProfile(p, actor) ? profileStore.profileHealth(p, threshold) : undefined)) };
   },
 };
@@ -98,7 +96,7 @@ export const speakerProfileUpdateTool: AppTool = {
     const profileId = asString(args.profileId);
     if (!profileId) throw new AppError('profileId is required.');
 
-    const db = new AppDbBotClient();
+    const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     const profile = await profileStore.getProfile(db, profileId);
     if (!profile) throw new AppError('Voiceprint profile not found.');
     if (!canEditProfile(profile, actor)) {
