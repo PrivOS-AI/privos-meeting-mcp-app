@@ -206,6 +206,36 @@ describe('RecordingStore — manual naming survives the hand-over from label chi
     expect(resolveCalls).toHaveLength(1);
     expect(resolveCalls[0]).toMatchObject({ assignments: [{ speakerId: 'B', displayName: 'Alice' }] }); // B has 15s of that label vs A's 5s
   });
+
+  it('renaming an already-folded session-speaker chip persists it and is not overwritten by the server voiceprint guess', async () => {
+    const resolveCalls: Array<{ assignments: Array<{ speakerId: string; displayName?: string }> }> = [];
+    let resolveResult: unknown = { resolved: [{ speakerId: 'ss-1', reason: 'not_found' }] };
+    const store = makeStore(async (params) => {
+      resolveCalls.push(params.arguments as (typeof resolveCalls)[number]);
+      return resolveResult;
+    });
+    const guessed = [{ sessionSpeakerId: 'ss-1', sonioxLabels: ['s0:1'], displayName: 'Bob', colorKey: 'blue', resolved: true, liveSpeechSec: 20 }];
+    internals(store).applyPollUpdate(guessed, [], { degraded: false, labelsSupported: true });
+
+    store.assignRealtimeSpeaker('ss-1', { mode: 'name', displayName: 'Alice' }); // the line's effective key is the session speaker
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(resolveCalls[0]).toMatchObject({ assignments: [{ speakerId: 'ss-1', displayName: 'Alice' }] });
+
+    // Still pending (not_found) — the next poll's server guess must not clobber the user's name.
+    internals(store).applyPollUpdate(guessed, [], { degraded: false, labelsSupported: true });
+    expect(store.getState().speakerMap['ss-1']?.displayName).toBe('Alice');
+  });
+
+  it('naming a local manual speaker never calls speaker_resolve', async () => {
+    const store = makeStore(async () => {
+      throw new Error('unexpected server call');
+    });
+    const key = store.addManualSpeaker();
+    store.assignRealtimeSpeaker(key, { mode: 'name', displayName: 'Carol' });
+    await Promise.resolve();
+    expect(store.getState().speakerMap[key]?.displayName).toBe('Carol');
+  });
 });
 
 describe('RecordingStore — bookmark toggle + side-panel removal keep bookmarkedSecs in sync', () => {

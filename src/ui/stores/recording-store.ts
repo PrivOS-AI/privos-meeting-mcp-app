@@ -258,6 +258,17 @@ export function ownerForLabel(baseLabel: string, speakers: readonly LiveSpeaker[
 }
 
 /**
+ * The live session speaker a rename/assign key points at. A caption line's
+ * effective key is often ALREADY a `sessionSpeakerId` (once the server matched
+ * its turn), not a realtime label — treating it as a label found no owner, so
+ * the name never reached the server and every poll's fold overwrote it.
+ */
+export function sessionSpeakerForKey(key: string, speakers: readonly LiveSpeaker[], tally: ReadonlyMap<string, ReadonlyMap<string, number>>): LiveSpeaker | undefined {
+  const id = resolveMergedSpeakerId(key, speakers);
+  return speakers.find((s) => s.sessionSpeakerId === id && !s.mergedInto) ?? ownerForLabel(key, speakers, tally);
+}
+
+/**
  * Folds each realtime label's chip into its OWNING session speaker's own chip
  * (name/colour/`resolved` carried over), re-keyed from now on by
  * `sessionSpeakerId` — the server-confirmed `displayName`/`colorKey`/
@@ -654,6 +665,12 @@ export class RecordingStore {
     accumulateLabelSpeech(this.labelSpeechMsBySpeaker, turns);
     const lineServerSpeakerPatch = matchTurnsToLines(this.state.lines, turns);
     const speakerMap = foldSpeakerMap(this.state.speakerMap, speakers, this.labelSpeechMsBySpeaker);
+    // A name the user gave that the server has not persisted yet outranks the server's voiceprint guess.
+    for (const [key, choice] of this.pendingAssignments) {
+      const target = sessionSpeakerForKey(key, speakers, this.labelSpeechMsBySpeaker)?.sessionSpeakerId ?? key;
+      const name = choice.displayName?.trim();
+      if (name && speakerMap[target]) speakerMap[target] = { ...speakerMap[target], displayName: name, resolved: true };
+    }
     this.setState({
       liveSpeakers: speakers,
       liveSpeakersDegraded: meta.degraded,
@@ -714,7 +731,8 @@ export class RecordingStore {
     speakerMap[speakerKey] = { ...prev, displayName: label || prev.displayName, resolved: choice.mode !== 'skip' };
     this.setState({ speakerMap });
 
-    if (choice.mode === 'skip') {
+    if (choice.mode === 'skip' || speakerKey.startsWith('manual:')) {
+      // Skip clears it; a manual speaker is local-only (no voice to enrol against).
       this.pendingAssignments.delete(speakerKey);
       return;
     }
@@ -724,7 +742,7 @@ export class RecordingStore {
 
   /**
    * For every pending manual assignment, find the session speaker that
-   * CURRENTLY owns that realtime key ({@link ownerForLabel} — the majority-
+   * key points at ({@link sessionSpeakerForKey}: the session speaker itself, else the majority-
    * speech owner when the label has recycled into two session speakers) and
    * persist the identity via `speaker_resolve` (enrolling the voiceprint).
    * Runs after each live-speaker poll and right after a manual assignment;
@@ -737,7 +755,7 @@ export class RecordingStore {
     this.reconciling = true;
     try {
       for (const [speakerKey, choice] of [...this.pendingAssignments]) {
-        const session = ownerForLabel(speakerKey, this.state.liveSpeakers, this.labelSpeechMsBySpeaker);
+        const session = sessionSpeakerForKey(speakerKey, this.state.liveSpeakers, this.labelSpeechMsBySpeaker);
         if (!session) continue; // no session speaker yet — keep it pending
         try {
           const [result] = await speakerResolve(this.app, this.ctx.roomId, this.state.meetingId, [
