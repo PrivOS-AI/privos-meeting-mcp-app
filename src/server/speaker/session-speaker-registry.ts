@@ -806,7 +806,7 @@ export class MeetingSessionRegistry {
     speaker.displayName = identity.displayName;
     speaker.nameSource = 'user';
     speaker.privosUserId = identity.privosUserId;
-    if (identity.profileId) speaker.profileId = identity.profileId;
+    speaker.profileId = identity.profileId; // the user's identity replaces any guessed profile (undefined until enrolled)
     return true;
   }
 

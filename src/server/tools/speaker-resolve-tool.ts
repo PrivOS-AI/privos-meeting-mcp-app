@@ -162,9 +162,14 @@ export const speakerResolveTool: AppTool = {
       if (!row) {
         return { speakerId: assignment.speakerId, enrolled: false, reason: 'not_found' };
       }
-      // Only a row that ALSO enrolled a voiceprint short-circuits — a named-but-not-yet-enrolled row stays open to a later attempt.
-      if (row.resolved === true && typeof row.profileId === 'string' && row.profileId) {
-        return { speakerId: assignment.speakerId, enrolled: true, profileId: row.profileId, reason: 'already_resolved' };
+      // Only a row the USER already confirmed as this same identity (and enrolled) short-circuits. A profile
+      // the system GUESSED (live/async match) must never swallow the user's correction — it used to return
+      // `already_resolved` untouched, so the UI showed the new name for one poll and then snapped back.
+      const existingProfileId = typeof row.profileId === 'string' ? row.profileId : '';
+      const sameIdentity =
+        assignment.mode === 'merge' ? assignment.profileId === existingProfileId : sanitizeDisplayName(assignment.displayName ?? '') === row.displayName;
+      if (row.resolved === true && existingProfileId && row.nameSource === 'user' && sameIdentity) {
+        return { speakerId: assignment.speakerId, enrolled: true, profileId: existingProfileId, reason: 'already_resolved' };
       }
 
       if (assignment.mode === 'skip') {
@@ -210,7 +215,9 @@ export const speakerResolveTool: AppTool = {
         identity = { displayName, profileId: target.id, createdByUserId: actor.userId, createdInRoomId: roomId };
       }
 
-      const identityPatch: Record<string, unknown> = { displayName, nameSource: 'user', resolved: true };
+      // Replaces any guessed profile: the profile the user picked (merge), else none until an enrol below sets one.
+      const confirmedProfileId = identity.profileId ?? '';
+      const identityPatch: Record<string, unknown> = { displayName, nameSource: 'user', resolved: true, profileId: confirmedProfileId };
       if (privosUserId) identityPatch.privosUserId = privosUserId;
 
       if (pending && coherent) {
@@ -224,7 +231,7 @@ export const speakerResolveTool: AppTool = {
         if (!enrolResult) {
           // mode 'merge' pointed at a profile that vanished between the read above and here — extremely rare, never silently drop the identity.
           await db.update('meeting_speakers', 'room', row._id, identityPatch);
-          applyRegistryIdentity(meetingId, rowKey, { displayName: displayName!, privosUserId });
+          applyRegistryIdentity(meetingId, rowKey, { displayName: displayName!, privosUserId, profileId: confirmedProfileId || undefined });
           return { speakerId: assignment.speakerId, enrolled: false, displayName, reason: 'profile_not_found' };
         }
         identityPatch.profileId = enrolResult.profile.id;
@@ -237,7 +244,7 @@ export const speakerResolveTool: AppTool = {
       }
 
       await db.update('meeting_speakers', 'room', row._id, identityPatch);
-      applyRegistryIdentity(meetingId, rowKey, { displayName: displayName!, privosUserId });
+      applyRegistryIdentity(meetingId, rowKey, { displayName: displayName!, privosUserId, profileId: confirmedProfileId || undefined });
       const reason = isLive ? 'enrol_deferred' : pending ? 'cluster_not_coherent' : 'no_pending_embedding';
       return { speakerId: assignment.speakerId, enrolled: false, displayName, reason };
     }

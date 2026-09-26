@@ -144,15 +144,27 @@ describe('speaker_resolve', () => {
     expect(store.speaker_profiles[0].sampleCount).toBe(1);
   });
 
-  it('is idempotent — resolving an already-resolved speaker again is a no-op', async () => {
-    store.meeting_speakers[0].resolved = true;
-    store.meeting_speakers[0].profileId = 'profile-y';
+  it('is idempotent — re-confirming the SAME user identity on an enrolled speaker is a no-op', async () => {
+    Object.assign(store.meeting_speakers[0], { resolved: true, profileId: 'profile-y', nameSource: 'user', displayName: 'An' });
     const result = (await speakerResolveTool.execute(
-      { roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'name', displayName: 'Other' }] },
+      { roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'name', displayName: 'An' }] },
       ctx(),
       {} as never,
     )) as { resolved: Array<{ enrolled: boolean; reason?: string; profileId?: string }> };
     expect(result.resolved[0]).toEqual({ speakerId: 'spk1', enrolled: true, profileId: 'profile-y', reason: 'already_resolved' });
+  });
+
+  it('a user name overrides a profile the system only GUESSED (live match), dropping the guessed profile', async () => {
+    Object.assign(store.meeting_speakers[0], { resolved: true, profileId: 'profile-y', nameSource: 'live', displayName: 'Giọng nữ' });
+    const result = (await speakerResolveTool.execute(
+      { roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'name', displayName: 'Anh Dinh' }] },
+      ctx(),
+      {} as never,
+    )) as { resolved: Array<{ reason?: string; profileId?: string; displayName?: string }> };
+    expect(result.resolved[0].reason).not.toBe('already_resolved');
+    expect(result.resolved[0].displayName).toBe('Anh Dinh');
+    expect(store.meeting_speakers[0]).toMatchObject({ displayName: 'Anh Dinh', nameSource: 'user', resolved: true });
+    expect(store.meeting_speakers[0].profileId).not.toBe('profile-y');
   });
 
   it('never clears pendingEmbedding on the row (kept until the async job clears it, not at resolve time)', async () => {
