@@ -98,7 +98,7 @@ export const chunkReadyTool: AppTool = {
     if (segments.length !== segmentsRaw.length) {
       throw new AppError('Some turns contain invalid data.');
     }
-    const structuralError = assertStructuralSpans(segments, durationMs);
+    const structuralError = assertStructuralSpans(segments, durationMs, partStartMs);
     if (structuralError) throw new AppError(structuralError);
 
     const folderId = typeof meeting.folderId === 'string' && meeting.folderId ? meeting.folderId : '';

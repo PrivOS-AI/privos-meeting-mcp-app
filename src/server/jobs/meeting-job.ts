@@ -100,11 +100,25 @@ export function computeAsyncToLiveMap(segments: readonly Segment[], liveTurns: r
     overlapMsBySpeaker.set(a.speakerId, bySession);
   }
 
+  const overlapMsByMapped = new Map<string, number>();
   for (const [speakerId, bySession] of overlapMsBySpeaker) {
     if (bySession.size === 0) continue;
     const [sessionSpeakerId, overlapMs] = [...bySession.entries()].sort((x, y) => y[1] - x[1])[0];
     const totalMs = totalMsBySpeaker.get(speakerId) ?? 0;
     mapped.set(speakerId, { sessionSpeakerId, overlapFraction: totalMs > 0 ? overlapMs / totalMs : 0 });
+    overlapMsByMapped.set(speakerId, overlapMs);
+  }
+  // One live speaker is one person: when several async speakers claim the same
+  // session speaker (live under-segmented), only the one sharing the most time
+  // with it keeps the mapping — the others stay unmapped rather than all
+  // inheriting one identity.
+  const bestBySession = new Map<string, string>();
+  for (const [speakerId, { sessionSpeakerId }] of mapped) {
+    const current = bestBySession.get(sessionSpeakerId);
+    if (!current || (overlapMsByMapped.get(speakerId) ?? 0) > (overlapMsByMapped.get(current) ?? 0)) bestBySession.set(sessionSpeakerId, speakerId);
+  }
+  for (const [speakerId, { sessionSpeakerId }] of mapped) {
+    if (bestBySession.get(sessionSpeakerId) !== speakerId) mapped.delete(speakerId);
   }
   return mapped;
 }

@@ -110,7 +110,9 @@ export async function mergeLiveIntoAsyncSpeaker(db: AppDbBotClient, meetingId: s
   const rows = extractDbRecords(result);
   const asyncRow = rows.find((r) => r.speakerId === speakerId);
   if (!asyncRow) return;
-  const liveRow = rows.find((r) => r.sessionSpeakerId === sessionSpeakerId && r._id !== asyncRow._id);
+  // Only a LIVE-only row may be folded and deleted — an async row that already absorbed this live
+  // speaker is a different person's row, never something to merge away.
+  const liveRow = rows.find((r) => r.sessionSpeakerId === sessionSpeakerId && !(typeof r.speakerId === 'string' && r.speakerId));
 
   const patch: Record<string, unknown> = { sessionSpeakerId };
   if (liveRow) {

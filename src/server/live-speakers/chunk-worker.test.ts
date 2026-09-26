@@ -183,6 +183,23 @@ describe('chunk-worker processChunk', () => {
     expect(snapshot[0].liveSpeechSec).toBeCloseTo(5); // 63s - 58s, counted once
   });
 
+  it('embeds a turn that started before this part but inside the overlap ring (the re-sent final form of a boundary-crossing turn)', async () => {
+    const meetingId = `m-${Math.random()}`;
+    currentChunkPcm = toneChunk(60);
+    await processChunk(ctx(), { roomId: 'room-1', meetingId, seq: 0, durationMs: 60_000, segments: [] }, new AbortController().signal);
+
+    // Started 5s before part 1 (beyond the 1.5s edge tolerance, within the 8s ring) and ends inside part 1.
+    currentChunkPcm = toneChunk(60);
+    await processChunk(
+      ctx(),
+      { roomId: 'room-1', meetingId, seq: 1, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 55_000, endMs: 62_000, final: true }] },
+      new AbortController().signal,
+    );
+
+    expect(embeddingCallCount).toBe(1);
+    expect(sessionRegistries.get(meetingId).snapshot()[0].liveSpeechSec).toBeCloseTo(7);
+  });
+
   it('a chunk that fails to decode does not throw, and the clock still advances for the chunk after it', async () => {
     const meetingId = `m-${Math.random()}`;
     currentChunkPcm = toneChunk(60);

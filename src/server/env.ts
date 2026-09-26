@@ -77,6 +77,7 @@ export interface AppEnv {
   /** Both sides' accumulated speech (seconds) required before a merge is even considered; 0 disables the gate (today's behaviour). Once >0, both sides also need >=3 held embeddings. */
   speakerSessionMergeMinSpeechSec: number;
   liveMinSpeechSec: number;
+  /** Seconds of the previous part's audio kept for turns that cross a part boundary — must cover the longest caption line the client can emit (~30s), else those turns are lost. */
   liveChunkOverlapSec: number;
   /** One-shot live enrolment bar (speaker_resolve time): minimum accumulated speech before a live centroid is trusted enough to enrol as `user-live`. */
   liveEnrolMinSpeechSec: number;
@@ -142,7 +143,7 @@ export function loadEnv(): AppEnv {
     speakerSessionMergeStreak: num('SPEAKER_SESSION_MERGE_STREAK', 1),
     speakerSessionMergeMinSpeechSec: num('SPEAKER_SESSION_MERGE_MIN_SPEECH_SEC', 0),
     liveMinSpeechSec: num('LIVE_MIN_SPEECH_SEC', 8),
-    liveChunkOverlapSec: num('LIVE_CHUNK_OVERLAP_SEC', 8),
+    liveChunkOverlapSec: num('LIVE_CHUNK_OVERLAP_SEC', 40),
     liveEnrolMinSpeechSec: num('LIVE_ENROL_MIN_SPEECH_SEC', 20),
     speakerLiveEnrolCoherence: num('SPEAKER_LIVE_ENROL_COHERENCE', 0.5),
     voiceprintEncKey: str('VOICEPRINT_ENC_KEY'),

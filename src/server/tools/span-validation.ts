@@ -42,17 +42,23 @@ export function asChunkSegment(value: unknown): ChunkSegment | null {
  * speech time not wildly exceeding the part's own declared `durationMs`
  * (anti-abuse bound, not a precise physical claim — legitimate turns from
  * different simultaneous speakers can overlap a little, hence the
- * tolerance). Throws `message` via the caller on any violation; a malformed
+ * tolerance). With `partStartMs` known, each turn is clipped to the part
+ * window first; without it (older client) the whole turn counts. Throws `message` via the caller on any violation; a malformed
  * payload rejects the WHOLE call rather than silently dropping segments,
  * matching the P2 contract this phase keeps.
  */
-export function assertStructuralSpans(segments: readonly ChunkSegment[], durationMs: number): string | null {
+export function assertStructuralSpans(segments: readonly ChunkSegment[], durationMs: number, partStartMs?: number): string | null {
   if (segments.length > MAX_SEGMENTS_PER_CHUNK) return 'Too many turns in one recording part.';
 
   const bySpeaker = new Map<string, ChunkSegment[]>();
   let totalDurationMs = 0;
   for (const seg of segments) {
-    totalDurationMs += seg.endMs - seg.startMs;
+    // A turn re-sent from an earlier part (S2-03) only counts for the portion
+    // inside THIS part's window — summing its whole length would reject any
+    // part that follows a long turn, which is what a monologue looks like.
+    const start = partStartMs === undefined ? seg.startMs : Math.max(seg.startMs, partStartMs);
+    const end = partStartMs === undefined ? seg.endMs : Math.min(seg.endMs, partStartMs + durationMs);
+    totalDurationMs += Math.max(0, end - start);
     const list = bySpeaker.get(seg.speaker) ?? [];
     list.push(seg);
     bySpeaker.set(seg.speaker, list);

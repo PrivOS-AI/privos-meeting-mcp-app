@@ -269,6 +269,17 @@ describe('computeAsyncToLiveMap', () => {
     expect(map.get('spkA')).toEqual({ sessionSpeakerId: 'ss-1', overlapFraction: 8000 / 20000 }); // 8s overlap / 20s total speech
   });
 
+  it('maps one live speaker to at most one async speaker — the one sharing the most time with it', () => {
+    const segments = [
+      { id: 's1', speakerId: 'spkA', startSec: 0, endSec: 10, text: 'x', lang: 'vi', tokenCount: 1 },
+      { id: 's2', speakerId: 'spkB', startSec: 10, endSec: 30, text: 'y', lang: 'vi', tokenCount: 1 },
+    ];
+    const liveTurns = [{ id: 't1', speakerKey: 'ss-1', startMs: 0, endMs: 30000, text: '', sessionIndex: 0 }]; // live under-segmented: one speaker over both
+    const map = computeAsyncToLiveMap(segments, liveTurns);
+    expect(map.get('spkB')?.sessionSpeakerId).toBe('ss-1');
+    expect(map.has('spkA')).toBe(false);
+  });
+
   it('returns an empty map when there are no live turns at all', () => {
     const segments = [{ id: 's1', speakerId: 'spkA', startSec: 0, endSec: 10, text: 'x', lang: 'vi', tokenCount: 1 }];
     expect(computeAsyncToLiveMap(segments, []).size).toBe(0);

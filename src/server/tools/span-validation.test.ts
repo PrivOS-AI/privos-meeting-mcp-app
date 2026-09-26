@@ -66,6 +66,17 @@ describe('assertStructuralSpans', () => {
     const segments = [{ speaker: 's0:1', startMs: 0, endMs: 120_000, final: true }];
     expect(assertStructuralSpans(segments, 60_000)).toMatch(/exceeds/);
   });
+
+  it('counts only the in-window portion of a turn carried over from the previous part', () => {
+    // A 35s turn that started in the previous part, re-sent with this one, plus 45s of fresh speech:
+    // 80s claimed in total, but only 15s of the carried turn lies inside this 60s part.
+    const segments = [
+      { speaker: 's0:1', startMs: 40_000, endMs: 75_000, final: true },
+      { speaker: 's0:2', startMs: 75_000, endMs: 120_000, final: true },
+    ];
+    expect(assertStructuralSpans(segments, 60_000, 60_000)).toBeNull();
+    expect(assertStructuralSpans(segments, 60_000)).toMatch(/exceeds/); // older client without a stamp: whole turns still count
+  });
 });
 
 describe('isWithinPartWindow', () => {

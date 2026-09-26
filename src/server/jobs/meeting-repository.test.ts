@@ -44,6 +44,21 @@ describe('mergeLiveIntoAsyncSpeaker', () => {
     expect(merged.nameSource).toBe('async');
   });
 
+  it('never folds another async row: two async speakers mapped to one live speaker keep both rows', async () => {
+    store.meeting_speakers.push(
+      { _id: 'async-1', meeting: 'm1', speakerId: 'spkA', displayName: 'Speaker 1', nameSource: 'async', resolved: false },
+      { _id: 'async-2', meeting: 'm1', speakerId: 'spkB', displayName: 'Speaker 2', nameSource: 'async', resolved: false },
+      { _id: 'live-1', meeting: 'm1', sessionSpeakerId: 'ss-1', sonioxLabels: ['s0:1'], liveSpeechSec: 12, nameSource: 'live', resolved: false },
+    );
+
+    await mergeLiveIntoAsyncSpeaker(db(), 'm1', 'spkA', 'ss-1');
+    await mergeLiveIntoAsyncSpeaker(db(), 'm1', 'spkB', 'ss-1');
+
+    const rows = extractDbRecords(await db().query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: 'm1' }] }));
+    expect(rows.map((r) => r.speakerId).sort()).toEqual(['spkA', 'spkB']);
+    expect(rows.every((r) => r.sessionSpeakerId === 'ss-1')).toBe(true);
+  });
+
   it("adopts the live row's user-confirmed name when the async row is still unresolved", async () => {
     store.meeting_speakers.push(
       { _id: 'async-1', meeting: 'm1', speakerId: 'spkA', displayName: 'Speaker 1', nameSource: undefined, resolved: false },

@@ -259,6 +259,7 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
     // OLDER client (no `partStartMs`) falls back to the registry's cumulative
     // decoded-duration clock, unchanged from before this stamp existed.
     const partStartMs = req.partStartMs ?? registry.decodedSecBefore(req.seq) * 1000;
+    const overlapMs = (overlap.length / 16000) * 1000;
     const chunkStartSec = partStartMs / 1000 - overlap.length / 16000;
 
     /**
@@ -267,13 +268,17 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
      * check back when they were first seen — their own `startMs` legitimately
      * belongs to the PREVIOUS chunk's window, not this one, so re-checking it
      * here against `partStartMs` would wrongly reject them. Only turns fresh
-     * off THIS request get that check.
+     * off THIS request get that check, and its window starts where the audio
+     * actually starts — the overlap ring included — because the client
+     * re-sends a turn that crossed the part boundary in its final, grown
+     * form with the NEXT part (S2-03), and that copy is the one worth
+     * embedding.
      */
     async function handleSegment(seg: ChunkSegment, checkWindow: boolean): Promise<void> {
       if (signal.aborted) throw new AppError('Chunk was cancelled while processing the turn.');
       if (registry.alreadyProcessed(seg)) return;
 
-      if (checkWindow && !isWithinPartWindow(seg, partStartMs, req.durationMs)) {
+      if (checkWindow && !isWithinPartWindow(seg, partStartMs - overlapMs, req.durationMs + overlapMs)) {
         console.warn('[chunk-worker] span outside part window — skipping (security event).', {
           meetingId: req.meetingId,
           seq: req.seq,
@@ -309,8 +314,11 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
       registry.observe(seg.speaker, embedding, toSec - fromSec, seg, (fact) => append(registry, toDiagnosticEvent(req.meetingId, req.seq, fact)));
     }
 
-    for (const seg of registry.takeDeferred()) await handleSegment(seg, false);
+    // Fresh copies first: the client's re-sent final form of a boundary-crossing
+    // turn is longer than the draft deferred last part; `alreadyProcessed` then
+    // drops the draft instead of the other way round.
     for (const seg of req.segments) await handleSegment(seg, true);
+    for (const seg of registry.takeDeferred()) await handleSegment(seg, false);
 
     const tailStart = Math.max(0, pcm.length - env.liveChunkOverlapSec * 16000);
     registry.ringSet(pcm.subarray(tailStart));
