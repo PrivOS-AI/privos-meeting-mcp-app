@@ -94,7 +94,8 @@ export async function fetchFileReadable(hub: RoomBoundHubClient, fileId: string,
 /** Streams a whole file to `destPath` on local disk. */
 export async function downloadRoomFile(hub: RoomBoundHubClient, fileId: string, destPath: string, signal?: AbortSignal): Promise<void> {
   const source = await fetchFileReadable(hub, fileId, signal);
-  await pipeline(source, createWriteStream(destPath), signal ? { signal } : undefined);
+  // `pipeline(a, b, undefined)` treats the trailing undefined as a stream and throws — always pass an options object.
+  await pipeline(source, createWriteStream(destPath), { signal });
 }
 
 /** Deletes one file. Throws on failure — callers that consider this best-effort (part/audio cleanup) must catch. */
