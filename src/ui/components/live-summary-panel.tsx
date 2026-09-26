@@ -10,7 +10,6 @@ import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { fetchLiveSummary, type LiveSummaryResult, type LiveSummaryLine } from '../data/live-summary-api.js';
 import { useI18n } from '../i18n/i18n-provider.js';
-import { asLanguageCode } from '../../shared/languages.js';
 import { resolveLineSpeakerKey, useRecordingState, type RecordingState } from '../stores/recording-store.js';
 
 /** Auto-refresh cadence — the first summary lands ~10 min in, then every 10 min. */
@@ -69,7 +68,7 @@ export function LiveSummaryPanel() {
         roomId,
         meetingId: current.meetingId,
         title: current.title,
-        language: asLanguageCode(language),
+        language: current.language,
         segments,
       });
       setResult(next);
@@ -81,7 +80,7 @@ export function LiveSummaryPanel() {
     } finally {
       runningRef.current = false;
     }
-  }, [app, roomId, language, t]);
+  }, [app, roomId, t]);
 
   // Keep `run` in a ref so the 10-min interval is created ONCE per status change.
   // (The panel re-renders every second as the elapsed clock ticks; depending on
