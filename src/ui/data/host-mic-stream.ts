@@ -26,8 +26,28 @@ export interface HostMicOptions {
   onEnded?: (reason: string) => void;
 }
 
+/** A reopened capture feeds the same stream; anything else is the host's denial reason. */
+export type HostMicRestartResult = { ok: true } | { ok: false; reason: string };
+
+export interface HostMicStream {
+  kind: 'stream';
+  stream: MediaStream;
+  sampleRate: number;
+  stop: () => void;
+  /**
+   * Reopen the host capture into the SAME `stream` (recorder and realtime STT
+   * keep running untouched). Needs a fresh click in the app — the host refuses
+   * without one (`user_activation_required`).
+   */
+  restart: () => Promise<HostMicRestartResult>;
+  /** `Date.now()` of the last PCM frame — a stall means the capture died silently (e.g. after the machine slept). */
+  lastFrameAt: () => number;
+  /** Resume the local audio graph if the browser suspended it (no gesture needed once the frame was activated). */
+  resumeContext: () => void;
+}
+
 export type HostMicResult =
-  | { kind: 'stream'; stream: MediaStream; sampleRate: number; stop: () => void }
+  | HostMicStream
   /** Host predates brokered devices — caller should fall back to `navigator.mediaDevices.getUserMedia`. */
   | { kind: 'unsupported' }
   /** Host refused; `reason` is a `MicrophoneDenialReason` (not_declared | user_activation_required | denied | unavailable). */
@@ -41,23 +61,34 @@ export type HostMicResult =
  */
 export async function startHostMicStream(app: McpApp, options: HostMicOptions = {}): Promise<HostMicResult> {
   if (typeof app.startMicrophone !== 'function') return { kind: 'unsupported' };
+  const startMicrophone = app.startMicrophone.bind(app);
 
   // The granted sample rate is only known after the grant resolves, but frames
   // can arrive before then — buffer early frames and flush once the audio graph
   // is built at the granted rate (mismatched rates would pitch-shift the audio).
   const pending: Int16Array[] = [];
   let schedule: (chunk: Int16Array) => void = (chunk) => pending.push(chunk);
+  let lastFrameAt = Date.now();
+  // Each capture tags its frames with the rate the host granted it; a restart may be granted a different one.
+  let captureRate = 0;
 
-  const result = await app.startMicrophone({
-    sampleRate: options.sampleRate ?? 16000,
-    echoCancellation: options.echoCancellation,
-    noiseSuppression: options.noiseSuppression,
-    autoGainControl: options.autoGainControl,
-    onData: (chunk) => schedule(chunk),
-    onEnded: options.onEnded,
-  });
+  const open = () =>
+    startMicrophone({
+      sampleRate: options.sampleRate ?? 16000,
+      echoCancellation: options.echoCancellation,
+      noiseSuppression: options.noiseSuppression,
+      autoGainControl: options.autoGainControl,
+      onData: (chunk) => {
+        lastFrameAt = Date.now();
+        schedule(chunk);
+      },
+      onEnded: options.onEnded,
+    });
 
+  const result = await open();
   if (!result.granted) return { kind: 'denied', reason: result.reason };
+  let current = result;
+  captureRate = result.sampleRate;
 
   const ctx = new AudioContext({ sampleRate: result.sampleRate });
   // A click gesture drives this call, so resume() is allowed; ignore the promise.
@@ -69,7 +100,8 @@ export async function startHostMicStream(app: McpApp, options: HostMicOptions = 
 
   schedule = (chunk: Int16Array) => {
     if (chunk.length === 0) return;
-    const buffer = ctx.createBuffer(1, chunk.length, ctx.sampleRate);
+    // Web Audio resamples a buffer whose rate differs from the context's.
+    const buffer = ctx.createBuffer(1, chunk.length, captureRate);
     const channel = buffer.getChannelData(0);
     for (let i = 0; i < chunk.length; i++) channel[i] = chunk[i] / 0x8000;
     const source = ctx.createBufferSource();
@@ -82,14 +114,41 @@ export async function startHostMicStream(app: McpApp, options: HostMicOptions = 
   for (const chunk of pending) schedule(chunk);
   pending.length = 0;
 
-  const stop = (): void => {
+  const stopCurrent = (): void => {
     try {
-      result.stop();
+      current.stop();
     } catch {
-      // Host frame may already be gone — closing the context below is enough.
+      // Host frame may already be gone.
     }
+  };
+
+  const stop = (): void => {
+    stopCurrent();
     void ctx.close();
   };
 
-  return { kind: 'stream', stream: dest.stream, sampleRate: result.sampleRate, stop };
+  const restart = async (): Promise<HostMicRestartResult> => {
+    // The host ends the previous capture itself when a new one starts; stopping it
+    // first would only race that. Resume here, inside the click, in case the
+    // browser suspended the graph while the machine slept.
+    void ctx.resume();
+    const next = await open();
+    if (!next.granted) return { ok: false, reason: next.reason };
+    current = next;
+    captureRate = next.sampleRate;
+    lastFrameAt = Date.now();
+    return { ok: true };
+  };
+
+  return {
+    kind: 'stream',
+    stream: dest.stream,
+    sampleRate: result.sampleRate,
+    stop,
+    restart,
+    lastFrameAt: () => lastFrameAt,
+    resumeContext: () => {
+      if (ctx.state !== 'running' && ctx.state !== 'closed') void ctx.resume();
+    },
+  };
 }

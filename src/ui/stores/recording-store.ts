@@ -18,7 +18,7 @@ import { addBookmark, createMeeting, updateRecordingMeeting } from '../data/meet
 import { ensureMeetingFolder } from '../data/meeting-folder.js';
 import { MeetingClock } from '../data/meeting-clock.js';
 import { MediaRecorderService } from '../data/media-recorder-service.js';
-import { startHostMicStream } from '../data/host-mic-stream.js';
+import { startHostMicStream, type HostMicStream } from '../data/host-mic-stream.js';
 import { listParts, notifyChunkReady, uploadPart } from '../data/meeting-part-upload.js';
 import { uploadLiveCaptions, type CaptionExportLine } from '../data/meeting-caption-upload.js';
 import { PartUploadQueue } from '../data/part-upload-queue.js';
@@ -90,8 +90,26 @@ export interface RecordingState {
   bookmarkIdsBySec: Record<number, string>;
   /** Bumped on every bookmark add/remove so the side panel refetches its list. */
   bookmarkRev: number;
+  /**
+   * Wall-clock spans (`Date.now()` ms) with no audio captured — the machine
+   * slept or the mic capture died. The last one is open (`toMs` unset) while
+   * the mic is still down and the user has not resumed it.
+   */
+  interruptions: MicInterruption[];
+  /** Why the last "Resume recording" attempt failed (host denial reason, or `restart-unsupported`). */
+  micResumeError?: string;
   error?: string;
 }
+
+export interface MicInterruption {
+  fromMs: number;
+  toMs?: number;
+}
+
+/** A 1 s ticker that fires this late means the page (or the whole machine) was suspended. */
+const SUSPEND_GAP_MS = 10_000;
+/** No PCM frame for this long while recording means the capture died silently. */
+const MIC_STALL_MS = 5_000;
 
 export interface StartRecordingInput {
   title: string;
@@ -99,6 +117,28 @@ export interface StartRecordingInput {
   /** Bilingual-translation target language (only used when `translationEnabled`). */
   translationLang: LanguageCode;
   translationEnabled: boolean;
+}
+
+/** Append a closed gap (a frozen page), merging it into the last one when they touch. An open last gap stays open — only resuming the mic closes it. */
+export function withClosedGap(list: readonly MicInterruption[], gap: Required<MicInterruption>): MicInterruption[] {
+  const last = list[list.length - 1];
+  if (!last || (last.toMs !== undefined && last.toMs < gap.fromMs)) return [...list, gap];
+  const merged = { fromMs: Math.min(last.fromMs, gap.fromMs), toMs: last.toMs === undefined ? undefined : Math.max(last.toMs, gap.toMs) };
+  return [...list.slice(0, -1), merged];
+}
+
+/** Open a gap from `fromMs` (mic went silent), re-opening a just-closed gap it overlaps — the sleep that killed the mic. */
+export function withOpenGap(list: readonly MicInterruption[], fromMs: number): MicInterruption[] {
+  const last = list[list.length - 1];
+  if (last?.toMs !== undefined && last.toMs >= fromMs) return [...list.slice(0, -1), { fromMs: Math.min(last.fromMs, fromMs) }];
+  return [...list, { fromMs }];
+}
+
+/** Close the open gap (mic resumed) at `toMs`. */
+export function closeOpenGap(list: readonly MicInterruption[], toMs: number): MicInterruption[] {
+  const last = list[list.length - 1];
+  if (!last || last.toMs !== undefined) return [...list];
+  return [...list.slice(0, -1), { ...last, toMs }];
 }
 
 const PALETTE = ['blue', 'gold', 'green', 'purple', 'red', 'teal'];
@@ -124,6 +164,7 @@ function initialState(): RecordingState {
     bookmarkedSecs: [],
     bookmarkIdsBySec: {},
     bookmarkRev: 0,
+    interruptions: [],
     speakerMap: {},
     lineSpeaker: {},
     voiceAlias: {},
@@ -372,6 +413,9 @@ export class RecordingStore {
   private stream: MediaStream | null = null;
   /** Releases the active capture (host-brokered stop, or getUserMedia track stop). */
   private micStop: (() => void) | null = null;
+  /** The host-brokered capture, when used — the only kind that can be reopened mid-meeting. */
+  private hostMic: HostMicStream | null = null;
+  private lastTickAt = 0;
   private recorder: MediaRecorderService | null = null;
   private uploadQueue: PartUploadQueue | null = null;
   private clock: MeetingClock | null = null;
@@ -420,8 +464,17 @@ export class RecordingStore {
    * DOMException whose `name` the start screen maps to a user-facing message.
    */
   private async acquireMicStream(): Promise<MediaStream> {
-    const host = await startHostMicStream(this.app, { sampleRate: 16000, echoCancellation: true, noiseSuppression: true });
+    const host = await startHostMicStream(this.app, {
+      sampleRate: 16000,
+      echoCancellation: true,
+      noiseSuppression: true,
+      // `replaced` is our own resumeMic() superseding the old capture — not a loss.
+      onEnded: (reason) => {
+        if (reason !== 'replaced') this.markMicInterrupted(Date.now());
+      },
+    });
     if (host.kind === 'stream') {
+      this.hostMic = host;
       this.micStop = host.stop;
       return host.stream;
     }
@@ -448,9 +501,15 @@ export class RecordingStore {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
     });
+    this.hostMic = null;
     this.micStop = () => {
       for (const track of stream.getTracks()) track.stop();
     };
+    for (const track of stream.getAudioTracks()) {
+      track.addEventListener('ended', () => {
+        if (this.micStop) this.markMicInterrupted(Date.now());
+      });
+    }
     return stream;
   }
 
@@ -577,7 +636,11 @@ export class RecordingStore {
       );
       this.recorder.start();
 
+      this.lastTickAt = Date.now();
       this.timer = setInterval(() => this.tickElapsed(), 1000);
+      document.addEventListener('visibilitychange', this.onVisibilityChange);
+      window.addEventListener('pagehide', this.onPageHide);
+      window.addEventListener('beforeunload', this.onBeforeUnload);
 
       await this.startRealtime(meetingId, input.translationEnabled);
     } catch (error) {
@@ -585,14 +648,85 @@ export class RecordingStore {
       // host capture (and its browser indicator) does not leak.
       this.micStop?.();
       this.micStop = null;
+      this.hostMic = null;
+      this.removePageListeners();
       this.setState({ status: 'error', error: error instanceof Error ? error.message : String(error) });
       throw error;
     }
   }
 
   private tickElapsed(): void {
+    const now = Date.now();
+    const sinceLastTick = now - this.lastTickAt;
+    this.lastTickAt = now;
+    const live = this.state.status === 'recording' || this.state.status === 'paused';
+    if (live && sinceLastTick > SUSPEND_GAP_MS) {
+      // Nothing was captured while the page was frozen. Record the hole, and wake
+      // the local audio graph in case the browser suspended it meanwhile.
+      this.addInterruption({ fromMs: now - sinceLastTick, toMs: now });
+      this.hostMic?.resumeContext();
+    }
+    if (live && this.hostMic && now - this.hostMic.lastFrameAt() > MIC_STALL_MS) {
+      this.markMicInterrupted(this.hostMic.lastFrameAt());
+    }
     if (this.state.status !== 'recording') return;
     this.setState({ elapsedSec: Math.floor((performance.now() - this.state.recorderEpochMs) / 1000) });
+  }
+
+  /** True while the mic is down and the user has not resumed it. */
+  private get micDown(): boolean {
+    const last = this.state.interruptions[this.state.interruptions.length - 1];
+    return Boolean(last && last.toMs === undefined);
+  }
+
+  private addInterruption(gap: Required<MicInterruption>): void {
+    this.setState({ interruptions: withClosedGap(this.state.interruptions, gap) });
+  }
+
+  private markMicInterrupted(fromMs: number): void {
+    if (this.micDown || !this.micStop) return;
+    this.setState({ interruptions: withOpenGap(this.state.interruptions, fromMs), micResumeError: undefined });
+  }
+
+  /**
+   * Reopen the mic into the running recording after it died (machine slept,
+   * device unplugged). Must be called from a click — the host requires one.
+   * The recorder, upload queue and realtime captions keep their stream, so the
+   * meeting continues in the same file with a silent stretch for the gap.
+   */
+  async resumeMic(): Promise<void> {
+    if (!this.hostMic) {
+      this.setState({ micResumeError: 'restart-unsupported' });
+      return;
+    }
+    const result = await this.hostMic.restart();
+    if (!result.ok) {
+      this.setState({ micResumeError: result.reason });
+      return;
+    }
+    this.setState({ interruptions: closeOpenGap(this.state.interruptions, Date.now()), micResumeError: undefined });
+  }
+
+  private onVisibilityChange = (): void => {
+    if (document.visibilityState === 'hidden') this.recorder?.flush();
+  };
+
+  private onPageHide = (): void => {
+    this.recorder?.flush();
+  };
+
+  /** Ask before a reload or tab close drops the meeting mid-recording. */
+  private onBeforeUnload = (event: BeforeUnloadEvent): void => {
+    if (this.state.status !== 'recording' && this.state.status !== 'paused' && this.state.status !== 'ending') return;
+    this.recorder?.flush();
+    event.preventDefault();
+    event.returnValue = '';
+  };
+
+  private removePageListeners(): void {
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
+    window.removeEventListener('pagehide', this.onPageHide);
+    window.removeEventListener('beforeunload', this.onBeforeUnload);
   }
 
   // ------------------------------------------------------------ realtime
@@ -947,6 +1081,7 @@ export class RecordingStore {
     await this.wakeLock?.release();
     this.micStop?.(); // release the host capture (or getUserMedia tracks)
     this.micStop = null;
+    this.hostMic = null;
 
     // Give the upload queue a chance to drain the final part(s) before moving on.
     this.uploadQueue?.retry();
@@ -976,6 +1111,7 @@ export class RecordingStore {
       console.warn('meeting_process failed (retry is available on the processing screen):', error);
     }
 
+    this.removePageListeners();
     this.setState({ status: 'done' });
   }
 }

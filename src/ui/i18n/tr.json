@@ -57,6 +57,11 @@
 
   "recording.keepAwake.notice": "Kayıt sırasında ekran otomatik kilidini/uykusunu kapatın — Hub bu uygulamaya henüz ekran uyanık tutma iznini vermedi.",
   "recording.capacity.notice": "Sistem eşzamanlı kayıtlarda azami sayıda, canlı altyazılar geçici olarak kullanılamıyor — kayıt sürüyor ve konuşmacı adları işlemeden sonra gelecek.",
+  "recording.micLost.notice": "{from} saatinden beri ses kaydedilmiyor — bilgisayar uyku moduna geçmiş veya mikrofonun bağlantısı kesilmiş olabilir.",
+  "recording.micLost.resume": "Kayda devam et",
+  "recording.micLost.failed": "Mikrofon yeniden açılamadı — mikrofonu kontrol edip tekrar deneyin.",
+  "recording.micLost.unsupported": "Bu Hub mikrofonu yeniden açamıyor — bu toplantıyı bitirip yeni bir toplantı başlatın.",
+  "recording.micLost.gaps": "Şu aralıklarda ses kaydedilmedi: {ranges}. Kayıt sırasında bilgisayarı uyanık ve şarja takılı tutun.",
   "recording.degradedLabels.notice": "Konuşmacı etiketleri işlemeden sonra kullanılabilir olacak.",
   "recording.editTitle": "Toplantıyı yeniden adlandır",
   "recording.speakerBadge.numbered": "Konuşmacı {n}",
@@ -271,6 +276,8 @@
   "detail.backToHistory": "Geçmişe dön",
   "detail.savedOnPrivos": "Metin dökümü PrivOS'ta saklanıyor",
   "detail.audioDeleted": "Orijinal ses, depolama ayarı gereği silindi",
+  "detail.audioPending": "Ses hâlâ işleniyor — bu toplantıyı birazdan yeniden açın.",
+  "detail.audioMissing": "Bu toplantı için kaydedilmiş bir ses dosyası yok.",
   "detail.saveToFiles": "Dosyalar'a kaydet",
   "detail.share": "Paylaş",
 

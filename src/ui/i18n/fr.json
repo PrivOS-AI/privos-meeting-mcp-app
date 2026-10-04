@@ -57,6 +57,11 @@
 
   "recording.keepAwake.notice": "Désactivez la mise en veille automatique de l'écran pendant l'enregistrement — le Hub n'a pas encore accordé à cette application l'autorisation de verrouillage d'écran actif.",
   "recording.capacity.notice": "Le système a atteint son nombre maximal d'enregistrements simultanés, les sous-titres en direct sont temporairement indisponibles — l'enregistrement se poursuit et les noms des intervenants arriveront après le traitement.",
+  "recording.micLost.notice": "Aucun son n'est enregistré depuis {from} — l'ordinateur s'est probablement mis en veille ou le micro s'est déconnecté.",
+  "recording.micLost.resume": "Reprendre l'enregistrement",
+  "recording.micLost.failed": "Impossible de rouvrir le micro — vérifiez-le et réessayez.",
+  "recording.micLost.unsupported": "Ce Hub ne peut pas rouvrir le micro — terminez cette réunion et démarrez-en une nouvelle.",
+  "recording.micLost.gaps": "Aucun son n'a été capté pendant : {ranges}. Gardez l'ordinateur éveillé et branché pendant l'enregistrement.",
   "recording.degradedLabels.notice": "Les étiquettes des intervenants seront disponibles après le traitement.",
   "recording.editTitle": "Renommer la réunion",
   "recording.speakerBadge.numbered": "Intervenant {n}",
@@ -269,6 +274,8 @@
   "detail.speakers": "intervenants",
   "detail.savedOnPrivos": "Transcription stockée sur PrivOS",
   "detail.audioDeleted": "L'audio original a été supprimé conformément au paramètre de stockage",
+  "detail.audioPending": "L'audio est encore en cours de traitement — rouvrez cette réunion dans un instant.",
+  "detail.audioMissing": "Aucun fichier audio n'a été enregistré pour cette réunion.",
   "detail.saveToFiles": "Enregistrer dans Files",
   "detail.share": "Partager",
 

@@ -57,6 +57,11 @@
 
   "recording.keepAwake.notice": "녹음 중에는 화면 자동 잠금/절전 모드를 꺼주세요 — Hub가 아직 이 앱에 화면 잠금 방지 권한을 부여하지 않았습니다.",
   "recording.capacity.notice": "시스템이 최대 동시 녹음 수에 도달하여 실시간 자막을 일시적으로 사용할 수 없습니다 — 녹음은 계속되며 화자 이름은 처리 후 제공됩니다.",
+  "recording.micLost.notice": "{from} 이후로 소리가 녹음되지 않았습니다. 컴퓨터가 절전 모드로 전환되었거나 마이크 연결이 끊긴 것 같습니다.",
+  "recording.micLost.resume": "녹음 계속하기",
+  "recording.micLost.failed": "마이크를 다시 열 수 없습니다. 마이크를 확인한 후 다시 시도하세요.",
+  "recording.micLost.unsupported": "이 Hub에서는 마이크를 다시 열 수 없습니다. 이 회의를 종료하고 새 회의를 시작하세요.",
+  "recording.micLost.gaps": "다음 구간에는 소리가 녹음되지 않았습니다: {ranges}. 녹음 중에는 컴퓨터가 절전 모드로 전환되지 않게 하고 전원을 연결해 두세요.",
   "recording.degradedLabels.notice": "화자 라벨은 처리 후 제공됩니다.",
   "recording.editTitle": "회의 이름 변경",
   "recording.speakerBadge.numbered": "화자 {n}",
@@ -269,6 +274,8 @@
   "detail.speakers": "명의 화자",
   "detail.savedOnPrivos": "대화록이 PrivOS에 저장됨",
   "detail.audioDeleted": "저장 설정에 따라 원본 오디오가 삭제되었습니다",
+  "detail.audioPending": "오디오를 아직 처리하는 중입니다. 잠시 후 이 회의를 다시 열어 주세요.",
+  "detail.audioMissing": "이 회의에는 저장된 오디오 파일이 없습니다.",
   "detail.saveToFiles": "Files에 저장",
   "detail.share": "공유",
 

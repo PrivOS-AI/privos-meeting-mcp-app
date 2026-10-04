@@ -57,6 +57,11 @@
 
   "recording.keepAwake.notice": "Deaktivieren Sie die automatische Bildschirmsperre während der Aufnahme — der Hub hat dieser App noch nicht die Berechtigung zum Wachhalten des Bildschirms erteilt.",
   "recording.capacity.notice": "Das System hat die maximale Anzahl gleichzeitiger Aufnahmen erreicht, Live-Untertitel sind vorübergehend nicht verfügbar — die Aufnahme läuft weiter, und die Sprechernamen werden nach der Verarbeitung angezeigt.",
+  "recording.micLost.notice": "Seit {from} wurde kein Ton aufgenommen — der Computer ist vermutlich in den Ruhezustand gegangen oder das Mikrofon wurde getrennt.",
+  "recording.micLost.resume": "Aufnahme fortsetzen",
+  "recording.micLost.failed": "Das Mikrofon konnte nicht wieder geöffnet werden — Mikrofon prüfen und erneut versuchen.",
+  "recording.micLost.unsupported": "Dieser Hub kann das Mikrofon nicht wieder öffnen — beenden Sie dieses Meeting und starten Sie ein neues.",
+  "recording.micLost.gaps": "In diesen Zeiträumen wurde kein Ton aufgenommen: {ranges}. Halten Sie den Computer während der Aufnahme wach und am Strom.",
   "recording.degradedLabels.notice": "Sprecherbezeichnungen stehen nach der Verarbeitung zur Verfügung.",
   "recording.editTitle": "Besprechung umbenennen",
   "recording.speakerBadge.numbered": "Sprecher {n}",
@@ -271,6 +276,8 @@
   "detail.backToHistory": "Zurück zum Verlauf",
   "detail.savedOnPrivos": "Transkript auf PrivOS gespeichert",
   "detail.audioDeleted": "Das Originalaudio wurde gemäß der Speichereinstellung gelöscht",
+  "detail.audioPending": "Das Audio wird noch verarbeitet — öffnen Sie dieses Meeting gleich noch einmal.",
+  "detail.audioMissing": "Für dieses Meeting wurde keine Audiodatei gespeichert.",
   "detail.saveToFiles": "In Files speichern",
   "detail.share": "Teilen",
 

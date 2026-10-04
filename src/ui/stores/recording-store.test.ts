@@ -3,7 +3,10 @@ import type { McpApp } from '@privos_ai/app-react';
 
 import {
   RecordingStore,
+  closeOpenGap,
   resolveLineSpeakerKey,
+  withClosedGap,
+  withOpenGap,
   matchTurnsToLines,
   ownerForLabel,
   foldSpeakerMap,
@@ -327,5 +330,32 @@ describe('RecordingStore — a new meeting cannot start while the previous one i
     await expect(store.startRecording({ title: 'Next', language: 'vi', translationLang: 'en', translationEnabled: false })).rejects.toThrow(/still finishing/);
     expect(calls).toHaveLength(0);
     expect(store.getState().meetingId).toBe('meeting-1');
+  });
+});
+
+describe('mic interruption gaps', () => {
+  it('turns a sleep into one gap that stays open until the mic is resumed', () => {
+    // Machine slept 100..1000; on wake the mic is dead (last frame at 95).
+    let gaps = withClosedGap([], { fromMs: 100, toMs: 1_000 });
+    gaps = withOpenGap(gaps, 95);
+    expect(gaps).toEqual([{ fromMs: 95 }]);
+
+    // A second freeze while still down must not close the open gap.
+    gaps = withClosedGap(gaps, { fromMs: 2_000, toMs: 3_000 });
+    expect(gaps).toEqual([{ fromMs: 95 }]);
+
+    gaps = closeOpenGap(gaps, 4_000);
+    expect(gaps).toEqual([{ fromMs: 95, toMs: 4_000 }]);
+  });
+
+  it('keeps separate freezes separate and merges touching ones', () => {
+    let gaps = withClosedGap([], { fromMs: 0, toMs: 100 });
+    gaps = withClosedGap(gaps, { fromMs: 500, toMs: 600 });
+    gaps = withClosedGap(gaps, { fromMs: 550, toMs: 700 });
+    expect(gaps).toEqual([{ fromMs: 0, toMs: 100 }, { fromMs: 500, toMs: 700 }]);
+    // A mic that dies later than the last freeze opens a new gap.
+    expect(withOpenGap(gaps, 900)).toEqual([...gaps, { fromMs: 900 }]);
+    // Nothing open → closing is a no-op.
+    expect(closeOpenGap(gaps, 1_000)).toEqual(gaps);
   });
 });

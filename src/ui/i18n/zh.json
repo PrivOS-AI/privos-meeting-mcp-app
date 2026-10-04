@@ -57,6 +57,11 @@
 
   "recording.keepAwake.notice": "录制期间请关闭屏幕自动锁定/休眠 — Hub 尚未授予此应用屏幕唤醒锁定权限。",
   "recording.capacity.notice": "系统已达到最大并发录制数，实时字幕暂时不可用 — 录制将继续，发言人姓名将在处理完成后提供。",
+  "recording.micLost.notice": "自 {from} 起未录到声音——电脑可能已进入睡眠，或麦克风已断开。",
+  "recording.micLost.resume": "继续录音",
+  "recording.micLost.failed": "无法重新打开麦克风——请检查麦克风后重试。",
+  "recording.micLost.unsupported": "此 Hub 无法重新打开麦克风——请结束本次会议并开始新的会议。",
+  "recording.micLost.gaps": "以下时间段未录到声音：{ranges}。录音时请保持电脑唤醒并接通电源。",
   "recording.degradedLabels.notice": "发言人标签将在处理完成后提供。",
   "recording.editTitle": "重命名会议",
   "recording.speakerBadge.numbered": "发言人 {n}",
@@ -269,6 +274,8 @@
   "detail.speakers": "位发言人",
   "detail.savedOnPrivos": "转录文本已存储在 PrivOS",
   "detail.audioDeleted": "原始音频已根据存储设置被删除",
+  "detail.audioPending": "音频仍在处理中——请稍后重新打开此会议。",
+  "detail.audioMissing": "此会议没有保存音频文件。",
   "detail.saveToFiles": "保存到 Files",
   "detail.share": "分享",
 

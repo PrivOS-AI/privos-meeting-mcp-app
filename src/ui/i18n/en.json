@@ -57,6 +57,11 @@
 
   "recording.keepAwake.notice": "Turn off screen auto-lock/sleep while recording — the Hub has not granted this app the screen-wake-lock permission yet.",
   "recording.capacity.notice": "The system is at its maximum concurrent recordings, live captions are temporarily unavailable — recording continues and speaker names will arrive after processing.",
+  "recording.micLost.notice": "No sound has been recorded since {from} — the computer probably went to sleep or the microphone disconnected.",
+  "recording.micLost.resume": "Resume recording",
+  "recording.micLost.failed": "Could not reopen the microphone — check the mic and try again.",
+  "recording.micLost.unsupported": "This Hub cannot reopen the microphone — end this meeting and start a new one.",
+  "recording.micLost.gaps": "No audio was captured during: {ranges}. Keep the computer awake and plugged in while recording.",
   "recording.degradedLabels.notice": "Speaker labels will be available after processing.",
   "recording.editTitle": "Rename meeting",
   "recording.speakerBadge.numbered": "Speaker {n}",
@@ -271,6 +276,8 @@
   "detail.backToHistory": "Back to history",
   "detail.savedOnPrivos": "Transcript stored on PrivOS",
   "detail.audioDeleted": "The original audio was deleted per the storage setting",
+  "detail.audioPending": "The audio is still being processed — reopen this meeting in a moment.",
+  "detail.audioMissing": "No audio file was saved for this meeting.",
   "detail.saveToFiles": "Save to Files",
   "detail.share": "Share",
 

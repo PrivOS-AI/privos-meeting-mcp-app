@@ -107,6 +107,32 @@
   background: var(--status-warning-bg);
 }
 
+.ma-notice--danger {
+  color: var(--ma-status-danger);
+  background: var(--ma-status-danger-bg);
+}
+
+.ma-notice__action {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: none;
+  border-radius: var(--ma-radius-pill);
+  background: var(--ma-status-danger);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ma-notice__action:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .ma-notice--info {
   color: var(--ma-fg-2);
   background: var(--bg-sunken);

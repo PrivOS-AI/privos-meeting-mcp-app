@@ -13,6 +13,7 @@ import { EmptyState } from '../components/empty-state.js';
 import { Icon } from '../components/icon.js';
 import { KeepAwakeNotice } from '../components/keep-awake-notice.js';
 import { LiveSummaryPanel } from '../components/live-summary-panel.js';
+import { MicInterruptionNotice } from '../components/mic-interruption-notice.js';
 import { VoiceWaveform } from '../components/voice-waveform.js';
 import { RecIndicator } from '../components/rec-indicator.js';
 import { RecordingFooter } from '../components/recording-footer.js';
@@ -93,6 +94,7 @@ export function LiveScreen({ onEnding, onEnded }: LiveScreenProps) {
 
   const notices = (
     <>
+      <MicInterruptionNotice interruptions={state.interruptions} resumeError={state.micResumeError} onResume={() => store.resumeMic()} />
       {!state.wakeLock.supported || state.wakeLock.error ? <KeepAwakeNotice /> : null}
       {state.captionStatus === 'capacity' ? <CapacityNotice /> : null}
       {state.capabilities && !state.capabilities.speakerLabels ? <DegradedLabelsNotice /> : null}

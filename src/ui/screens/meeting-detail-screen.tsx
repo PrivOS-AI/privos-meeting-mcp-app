@@ -46,6 +46,17 @@ const SAVE_TO_FILES_ARTIFACTS: Array<{ labelKey: string; key: keyof MeetingReadM
   { labelKey: 'saveToFiles.summary', key: 'summaryFileId' },
 ];
 
+/**
+ * Why there is no player: only a stamped `audioDeletedAt` means the storage
+ * setting removed it. A meeting still finishing has simply not merged its audio
+ * yet — calling that "deleted" made users believe the recording was gone.
+ */
+function audioNoteKey(meeting: MeetingReadModel): string | null {
+  if (meeting.audioDeletedAt) return 'detail.audioDeleted';
+  if (meeting.audioFileId) return null; // the player is still resolving its URL
+  return meeting.status === 'summarized' || meeting.status === 'failed' ? 'detail.audioMissing' : 'detail.audioPending';
+}
+
 export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenProps) {
   const app = usePrivosApp();
   const { roomId } = usePrivosContext();
@@ -89,7 +100,7 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
       setActionItems(items);
       setBookmarks(bookmarkRows);
       if (record?.transcriptJsonFileId) setTranscript(await loadTranscript(app, record.transcriptJsonFileId));
-      if (record?.audioFileId) {
+      if (record?.audioFileId && !record.audioDeletedAt) {
         setAudioErrored(false);
         setAudioUrl(await resolveAudioUrl(app, record.audioFileId));
       }
@@ -328,9 +339,9 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
               onError={() => void retryAudioUrl()}
             />
           </div>
-        ) : meeting.audioFileId ? null : (
-          <p className="ma-detail__no-audio">{t('detail.audioDeleted')}</p>
-        )}
+        ) : audioNoteKey(meeting) ? (
+          <p className="ma-detail__no-audio">{t(audioNoteKey(meeting)!)}</p>
+        ) : null}
       </div>
 
       {sideOpen ? <button type="button" className="ma-live__side-scrim" aria-label={t('recording.side.close')} onClick={() => setSideOpen(false)} /> : null}

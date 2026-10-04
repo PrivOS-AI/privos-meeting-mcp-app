@@ -57,6 +57,11 @@
 
   "recording.keepAwake.notice": "Tắt tự động tắt màn hình/sleep trong lúc ghi — Hub chưa cấp quyền giữ màn hình sáng cho ứng dụng này.",
   "recording.capacity.notice": "Hệ thống đang ghi tối đa số cuộc họp cho phép, phụ đề trực tiếp tạm không khả dụng — bản ghi vẫn chạy và tên người nói sẽ có sau khi xử lý.",
+  "recording.micLost.notice": "Không thu được âm thanh từ {from} — có thể máy đã ngủ hoặc micro bị ngắt.",
+  "recording.micLost.resume": "Tiếp tục ghi",
+  "recording.micLost.failed": "Không mở lại được micro — kiểm tra micro rồi thử lại.",
+  "recording.micLost.unsupported": "Hub này không mở lại được micro — hãy kết thúc cuộc họp này và bắt đầu cuộc họp mới.",
+  "recording.micLost.gaps": "Không thu được âm thanh trong khoảng: {ranges}. Hãy giữ máy không ngủ và cắm sạc khi ghi.",
   "recording.degradedLabels.notice": "Nhãn người nói sẽ có sau khi xử lý.",
   "recording.editTitle": "Đổi tên cuộc họp",
   "recording.speakerBadge.numbered": "Người nói {n}",
@@ -271,6 +276,8 @@
   "detail.backToHistory": "Quay lại lịch sử",
   "detail.savedOnPrivos": "Transcript lưu trên PrivOS",
   "detail.audioDeleted": "Audio gốc đã xoá theo cài đặt lưu trữ",
+  "detail.audioPending": "Audio vẫn đang được xử lý — mở lại cuộc họp này sau ít phút.",
+  "detail.audioMissing": "Cuộc họp này không có file audio được lưu.",
   "detail.saveToFiles": "Lưu vào Files",
   "detail.share": "Chia sẻ",
 

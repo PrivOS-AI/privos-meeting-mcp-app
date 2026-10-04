@@ -118,6 +118,19 @@ export class MediaRecorderService {
     this.phase = 'recording';
   }
 
+  /**
+   * Emit the audio buffered so far as an early (short) part, so it is uploaded
+   * now rather than at the next 60 s boundary — called when the page is hidden,
+   * because a machine that sleeps next keeps that audio in memory until it wakes
+   * (or loses it if it never does). Skipped within 5 s of the last boundary so
+   * tab flicking does not spray tiny parts.
+   */
+  flush(): void {
+    if (!this.recorder || this.recorder.state !== 'recording') return;
+    if (performance.now() - this.recorderEpochMs - this.lastBoundaryMs < 5_000) return;
+    this.recorder.requestData();
+  }
+
   /** Flushes the final (possibly short) part, then stops. Resolves once `onstop` fires. */
   stop(): Promise<void> {
     const recorder = this.recorder;

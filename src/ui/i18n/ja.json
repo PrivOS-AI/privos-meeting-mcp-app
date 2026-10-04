@@ -57,6 +57,11 @@
 
   "recording.keepAwake.notice": "録音中は画面の自動ロック/スリープをオフにしてください — Hubはまだこのアプリに画面スリープ防止の権限を付与していません。",
   "recording.capacity.notice": "システムが同時録音数の上限に達しているため、リアルタイム字幕は一時的に利用できません — 録音は続行され、話者名は処理後に表示されます。",
+  "recording.micLost.notice": "{from} 以降、音声が録音されていません。PC がスリープしたか、マイクが切断された可能性があります。",
+  "recording.micLost.resume": "録音を再開",
+  "recording.micLost.failed": "マイクを再開できませんでした。マイクを確認してもう一度お試しください。",
+  "recording.micLost.unsupported": "この Hub ではマイクを再開できません。この会議を終了し、新しい会議を開始してください。",
+  "recording.micLost.gaps": "次の時間帯は音声が録音されていません: {ranges}。録音中は PC をスリープさせず、電源に接続してください。",
   "recording.degradedLabels.notice": "話者ラベルは処理後に利用可能になります。",
   "recording.editTitle": "会議名を変更",
   "recording.speakerBadge.numbered": "話者 {n}",
@@ -269,6 +274,8 @@
   "detail.speakers": "人の話者",
   "detail.savedOnPrivos": "文字起こしはPrivOSに保存されています",
   "detail.audioDeleted": "保存設定に従い、元の音声は削除されました",
+  "detail.audioPending": "音声はまだ処理中です。しばらくしてからこの会議を開き直してください。",
+  "detail.audioMissing": "この会議の音声ファイルは保存されていません。",
   "detail.saveToFiles": "Filesに保存",
   "detail.share": "共有",
 

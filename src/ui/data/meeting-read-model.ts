@@ -23,6 +23,8 @@ export interface MeetingReadModel {
   language?: string;
   translationEnabled?: boolean;
   audioFileId?: string;
+  /** Stamped when the audio was actually deleted (keepAudio off, or the retention sweep) — `audioFileId` stays set. */
+  audioDeletedAt?: string;
   transcriptJsonFileId?: string;
   transcriptMdFileId?: string;
   srtFileId?: string;
@@ -48,6 +50,7 @@ function asMeetingReadModel(record: { _id: string; [key: string]: unknown }): Me
     language: typeof record.language === 'string' ? record.language : undefined,
     translationEnabled: typeof record.translationEnabled === 'boolean' ? record.translationEnabled : undefined,
     audioFileId: typeof record.audioFileId === 'string' ? record.audioFileId : undefined,
+    audioDeletedAt: typeof record.audioDeletedAt === 'string' && record.audioDeletedAt ? record.audioDeletedAt : undefined,
     transcriptJsonFileId: typeof record.transcriptJsonFileId === 'string' ? record.transcriptJsonFileId : undefined,
     transcriptMdFileId: typeof record.transcriptMdFileId === 'string' ? record.transcriptMdFileId : undefined,
     srtFileId: typeof record.srtFileId === 'string' ? record.srtFileId : undefined,
