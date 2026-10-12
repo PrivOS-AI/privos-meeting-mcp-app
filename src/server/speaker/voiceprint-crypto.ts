@@ -18,7 +18,7 @@
  */
 import { createCipheriv, createDecipheriv, createHash, createHmac, hkdfSync, randomBytes, timingSafeEqual } from 'node:crypto';
 
-import { env } from '../env.js';
+import { env, isDevelopmentRuntime } from '../env.js';
 
 export interface SealedEmbedding {
   /** Ciphertext, base64. */
@@ -41,9 +41,10 @@ const HKDF_HASH_BYTES = 32;
 let cachedKeyMaterial: { encKeyB64: string; key: Buffer; macKey: Buffer } | undefined;
 
 /**
- * A fixed PrivOS default so voiceprints work with zero configuration. It is
- * PUBLIC (it ships in the source), so it provides obfuscation, not real secrecy
- * — set `VOICEPRINT_ENC_KEY` to your own secret for genuine protection.
+ * Development-only fallback so a local checkout works with zero configuration.
+ * It is PUBLIC (it ships in the source), so it provides obfuscation, not real
+ * secrecy — outside development `VOICEPRINT_ENC_KEY` is mandatory and this
+ * value is never used.
  */
 const DEFAULT_VOICEPRINT_KEY = 'privos:meeting-agent:voiceprint:v1:default';
 
@@ -51,11 +52,16 @@ const DEFAULT_VOICEPRINT_KEY = 'privos:meeting-agent:voiceprint:v1:default';
  * Lazily derives (and caches) the AES key + HMAC key from `VOICEPRINT_ENC_KEY`.
  * AES-256 needs EXACTLY 32 bytes (a crypto requirement, not our own rule), so
  * we accept a key of any length — or none — and derive the 32 bytes via SHA-256,
- * falling back to {@link DEFAULT_VOICEPRINT_KEY} when unset. Re-derives if the
+ * falling back to {@link DEFAULT_VOICEPRINT_KEY} when unset in development and
+ * throwing when unset anywhere else. Re-derives if the
  * configured value changes within the process (tests swap it).
  */
 function keyMaterial(): { key: Buffer; macKey: Buffer } {
-  const source = env.voiceprintEncKey?.trim() || DEFAULT_VOICEPRINT_KEY;
+  const configured = env.voiceprintEncKey?.trim();
+  if (!configured && !isDevelopmentRuntime()) {
+    throw new Error('VOICEPRINT_ENC_KEY is required outside development; refusing to use the built-in default key.');
+  }
+  const source = configured || DEFAULT_VOICEPRINT_KEY;
   if (cachedKeyMaterial && cachedKeyMaterial.encKeyB64 === source) {
     return cachedKeyMaterial;
   }

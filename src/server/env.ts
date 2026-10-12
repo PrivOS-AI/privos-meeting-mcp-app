@@ -183,7 +183,7 @@ function keyForProvider(config: AppEnv, provider: SttVendor): string | undefined
 
 /**
  * Fail-fast at boot IN PRODUCTION when the selected realtime/async provider has
- * no key, or when the voiceprint key is missing. The message names the setting
+ * no key, or when `VOICEPRINT_ENC_KEY` is missing. The message names the setting
  * that points at the provider so the operator knows which key to add. Returns a
  * list of warnings (non-fatal in dev) rather than throwing there.
  */
@@ -198,6 +198,9 @@ export function assertProviderKeysAtBoot(config: AppEnv = env): string[] {
     problems.push(
       `STT_ASYNC_PROVIDER=${config.asyncProvider} but missing ${config.asyncProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'}.`,
     );
+  }
+  if (!config.voiceprintEncKey) {
+    problems.push('missing VOICEPRINT_ENC_KEY (required outside development; voiceprints are encrypted with it).');
   }
   if (problems.length && !isDevelopmentRuntime()) {
     throw new Error(`Invalid configuration at boot:\n- ${problems.join('\n- ')}`);
