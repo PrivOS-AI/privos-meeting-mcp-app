@@ -55,7 +55,8 @@ Attendee audio is streamed to the speech-to-text provider selected in Settings.
 Transcripts and summaries are processed by Hub AI inside your workspace and stored
 in the room's Files. The full data policy is declared in `privos-app.json`.
 
-The voiceprint store is encrypted with `VOICEPRINT_ENC_KEY`. Back that key up:
+The voiceprint store is encrypted with `VOICEPRINT_ENC_KEY`, which is required
+outside development (the server refuses to start without it). Back that key up:
 losing it loses every stored voiceprint.
 
 ## Contributing
