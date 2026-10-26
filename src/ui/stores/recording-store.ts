@@ -28,6 +28,7 @@ import { speakerResolve, type RealtimeAssignChoice } from '../data/speaker-api.j
 import { ScreenWakeLock, type WakeLockState } from '../data/screen-wake-lock.js';
 import type { RealtimeCapabilities, RealtimeToken, SttVendor } from '../data/stt-types.js';
 import { TranslateBuffer } from '../data/translate-buffer.js';
+import { loadLocalPreferences } from '../data/local-preferences.js';
 import { parseToolResultOrThrow, toolErrorCode } from '../data/tool-error.js';
 import type { LanguageCode } from '../../shared/languages.js';
 
@@ -84,6 +85,8 @@ export interface RecordingState {
   /** True once any chunk for this meeting was dropped/failed (S2-08) — "some segments could not be identified". */
   liveSpeakersDegraded: boolean;
   stageCaptionSize: StageCaptionSize;
+  /** Stage view speaker chip (local preference, read when recording starts). */
+  showSpeakerLabels: boolean;
   showTranslation: boolean;
   wakeLock: WakeLockState;
   bookmarkAtSec?: number;
@@ -134,6 +137,7 @@ function initialState(): RecordingState {
     liveSpeakers: [],
     liveSpeakersDegraded: false,
     stageCaptionSize: 'medium',
+    showSpeakerLabels: true,
     showTranslation: false,
     wakeLock: { supported: false, active: false },
   };
@@ -430,8 +434,9 @@ export class RecordingStore {
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new DOMException('Microphone API unavailable in this context', 'NotSupportedError');
     }
+    const { preferredMicDeviceId } = loadLocalPreferences();
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
+      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1, ...(preferredMicDeviceId ? { deviceId: { ideal: preferredMicDeviceId } } : {}) },
     });
     this.micStop = () => {
       for (const track of stream.getTracks()) track.stop();
@@ -519,6 +524,7 @@ export class RecordingStore {
       this.clock = new MeetingClock(recorderEpochMs);
       this.nextPartSeq = 0;
       this.allTurns = [];
+      const prefs = loadLocalPreferences();
 
       this.setState({
         meetingId,
@@ -528,6 +534,8 @@ export class RecordingStore {
         recorderEpochMs,
         startedAt: Date.now(),
         showTranslation: input.translationEnabled,
+        stageCaptionSize: prefs.stageCaptionSize,
+        showSpeakerLabels: prefs.showLiveSpeakerLabels,
       });
 
       this.uploadQueue = new PartUploadQueue(

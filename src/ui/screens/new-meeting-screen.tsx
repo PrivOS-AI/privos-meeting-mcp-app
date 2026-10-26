@@ -29,7 +29,7 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
   const [language, setLanguage] = useState<Language>(prefs.meetingLanguage);
   const [translationLang, setTranslationLang] = useState<Language>(prefs.translationLang);
   // Bilingual captions add latency + Hub-AI cost, so start unchecked; the user opts in per meeting.
-  const [translationEnabled, setTranslationEnabled] = useState(false);
+  const [translationEnabled, setTranslationEnabled] = useState(prefs.showTranslation);
   const [provider, setProvider] = useState<string | null>(null);
   const [micError, setMicError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);

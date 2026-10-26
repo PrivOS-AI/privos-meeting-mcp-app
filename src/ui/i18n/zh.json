@@ -346,6 +346,7 @@
   "settings.aiSummary.lengthNormal": "标准",
   "settings.aiSummary.lengthDetailed": "详细",
   "settings.aiSummary.language": "摘要语言",
+  "settings.aiSummary.languageAuto": "与会议相同",
 
   "settings.privacy.title": "隐私与存储",
   "settings.privacy.keepAudio": "保留原始音频（默认关闭）",
@@ -365,6 +366,5 @@
   "settings.captionDisplay.sizeMedium": "中",
   "settings.captionDisplay.sizeLarge": "大",
   "settings.captionDisplay.showTranslation": "显示翻译",
-  "settings.captionDisplay.showLiveSpeakerLabels": "显示实时发言人标签",
-  "settings.captionDisplay.revealDelay": "非最终词元显示延迟：{value} 毫秒"
+  "settings.captionDisplay.showLiveSpeakerLabels": "显示实时发言人标签"
 }

@@ -348,6 +348,7 @@
   "settings.aiSummary.lengthNormal": "Normal",
   "settings.aiSummary.lengthDetailed": "Detailed",
   "settings.aiSummary.language": "Summary language",
+  "settings.aiSummary.languageAuto": "Same as the meeting",
 
   "settings.privacy.title": "Privacy & storage",
   "settings.privacy.keepAudio": "Keep original audio (off by default)",
@@ -367,6 +368,5 @@
   "settings.captionDisplay.sizeMedium": "Medium",
   "settings.captionDisplay.sizeLarge": "Large",
   "settings.captionDisplay.showTranslation": "Show translation",
-  "settings.captionDisplay.showLiveSpeakerLabels": "Show live speaker labels",
-  "settings.captionDisplay.revealDelay": "Non-final token reveal delay: {value} ms"
+  "settings.captionDisplay.showLiveSpeakerLabels": "Show live speaker labels"
 }

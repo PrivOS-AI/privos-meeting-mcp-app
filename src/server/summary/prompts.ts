@@ -9,6 +9,13 @@ import { escapeMarkdown, fenceUntrusted, sanitizeDisplayName } from './sanitize.
 import { LANGUAGE_ENGLISH_NAMES, type LanguageCode } from '../../shared/languages.js';
 
 export type SummaryLanguage = LanguageCode;
+export type SummaryLength = 'short' | 'normal' | 'detailed';
+
+const LENGTH_INSTRUCTION: Record<SummaryLength, string> = {
+  short: 'Keep the summary to 2-3 sentences and list only the most important decisions and action items.',
+  normal: 'Write the summary as one or two short paragraphs.',
+  detailed: 'Write a thorough summary covering every topic discussed, in several paragraphs.',
+};
 
 /** Fixed system context for both map and reduce calls — no user data, ever. */
 export const SUMMARY_SYSTEM_CONTEXT = [
@@ -53,6 +60,7 @@ export function buildReducePrompt(input: {
   title: string;
   speakerNames: readonly string[];
   language: SummaryLanguage;
+  length?: SummaryLength;
   notesWithTimestamps: readonly { startLabel: string; endLabel: string; notes: string; decisions: string[]; actionItems: unknown[] }[];
 }): string {
   const languageName = LANGUAGE_ENGLISH_NAMES[input.language];
@@ -66,6 +74,7 @@ export function buildReducePrompt(input: {
 
   return [
     `Meeting minutes. Output language MUST BE: ${languageName}.`,
+    LENGTH_INSTRUCTION[input.length ?? 'normal'],
     'Merge duplicate points across segments, keep the speaker names that appear in the data, and do not invent owner/due/at not present in the data.',
     fenceUntrusted(untrusted),
     '',

@@ -104,3 +104,13 @@ describe('summarizeTranscript', () => {
     ).rejects.toThrow(/transcript/);
   });
 });
+
+describe('buildReducePrompt length', () => {
+  it('asks for the room\'s summary length', async () => {
+    const { buildReducePrompt } = await import('./prompts.js');
+    const base = { title: 'T', speakerNames: [], language: 'en' as const, notesWithTimestamps: [] };
+    expect(buildReducePrompt({ ...base, length: 'short' })).toContain('2-3 sentences');
+    expect(buildReducePrompt({ ...base, length: 'detailed' })).toContain('thorough');
+    expect(buildReducePrompt(base)).toContain('one or two short paragraphs');
+  });
+});

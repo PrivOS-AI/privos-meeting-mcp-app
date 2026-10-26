@@ -348,6 +348,7 @@
   "settings.aiSummary.lengthNormal": "Normal",
   "settings.aiSummary.lengthDetailed": "Ausführlich",
   "settings.aiSummary.language": "Sprache der Zusammenfassung",
+  "settings.aiSummary.languageAuto": "Wie das Meeting",
 
   "settings.privacy.title": "Datenschutz & Speicherung",
   "settings.privacy.keepAudio": "Originalaudio behalten (standardmäßig deaktiviert)",
@@ -367,6 +368,5 @@
   "settings.captionDisplay.sizeMedium": "Mittel",
   "settings.captionDisplay.sizeLarge": "Groß",
   "settings.captionDisplay.showTranslation": "Übersetzung anzeigen",
-  "settings.captionDisplay.showLiveSpeakerLabels": "Live-Sprecherbezeichnungen anzeigen",
-  "settings.captionDisplay.revealDelay": "Anzeigeverzögerung für nicht endgültige Token: {value} ms"
+  "settings.captionDisplay.showLiveSpeakerLabels": "Live-Sprecherbezeichnungen anzeigen"
 }

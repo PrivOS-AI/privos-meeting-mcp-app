@@ -14,15 +14,14 @@ import { SUPPORTED_LANGUAGES, type LanguageCode } from './languages.js';
 
 export type SttVendor = 'soniox' | 'elevenlabs';
 export type SummaryLength = 'short' | 'normal' | 'detailed';
-export type SettingsLanguage = LanguageCode;
+/** `auto` = the meeting's own spoken language. */
+export type SettingsLanguage = LanguageCode | 'auto';
 
 /** Every key `meeting_settings_set` accepts, exactly plan.md's `app_settings` row (minus `knownRooms`, which is bootstrap-internal, never admin-tunable). */
 export interface WorkspaceAppSettings {
   sttRealtimeProvider: SttVendor;
   sttAsyncProvider: SttVendor;
   speakerMatchThreshold: number;
-  speakerSessionMatchThreshold: number;
-  speakerSessionMergeThreshold: number;
   summaryLength: SummaryLength;
   summaryLanguage: SettingsLanguage;
   keepOriginalAudio: boolean;
@@ -47,10 +46,8 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceAppSettings = {
   sttRealtimeProvider: 'soniox',
   sttAsyncProvider: 'soniox',
   speakerMatchThreshold: 0.5,
-  speakerSessionMatchThreshold: 0.4,
-  speakerSessionMergeThreshold: 0.6,
   summaryLength: 'normal',
-  summaryLanguage: 'vi',
+  summaryLanguage: 'auto',
   keepOriginalAudio: false,
   autoDeleteAudioDays: 90,
   interruptedPartsRetentionDays: 7,
@@ -99,10 +96,8 @@ export const WORKSPACE_SETTING_VALIDATORS: Record<keyof WorkspaceAppSettings, Va
   sttRealtimeProvider: enumValidator('sttRealtimeProvider', ['soniox', 'elevenlabs']),
   sttAsyncProvider: enumValidator('sttAsyncProvider', ['soniox', 'elevenlabs']),
   speakerMatchThreshold: unitFractionValidator('speakerMatchThreshold'),
-  speakerSessionMatchThreshold: unitFractionValidator('speakerSessionMatchThreshold'),
-  speakerSessionMergeThreshold: unitFractionValidator('speakerSessionMergeThreshold'),
   summaryLength: enumValidator('summaryLength', ['short', 'normal', 'detailed']),
-  summaryLanguage: enumValidator('summaryLanguage', SUPPORTED_LANGUAGES),
+  summaryLanguage: enumValidator('summaryLanguage', ['auto', ...SUPPORTED_LANGUAGES]),
   autoDeleteAudioDays: nonNegativeIntValidator('autoDeleteAudioDays'),
   interruptedPartsRetentionDays: nonNegativeIntValidator('interruptedPartsRetentionDays'),
   keepOriginalAudio: booleanValidator('keepOriginalAudio'),

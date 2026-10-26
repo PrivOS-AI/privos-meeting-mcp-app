@@ -14,15 +14,23 @@ import {
   DEFAULT_WORKSPACE_SETTINGS,
   isWorkspaceSettingKey,
   parseRoomSettingKey,
+  roomSettingKey,
   WORKSPACE_SETTING_KEYS,
   type WorkspaceAppSettings,
 } from '../../shared/app-settings.js';
 import { AppDbClient } from './app-db-client.js';
 
-/** DEFAULTS merged with whatever rows exist in `app_settings` — an unset key silently keeps its default. */
+/**
+ * DEFAULTS merged with this room's rows in `app_settings` — an unset key keeps its default.
+ * One exact-key query per setting: the collection is shared by every room, so a single
+ * page of it can miss this room's rows once the workspace has enough rooms.
+ */
 export async function loadWorkspaceSettings(app: McpApp, roomId: string): Promise<WorkspaceAppSettings> {
   const db = new AppDbClient(app);
-  const { records } = await db.query({ collection: 'app_settings', limit: 200 });
+  const pages = await Promise.all(
+    WORKSPACE_SETTING_KEYS.map((key) => db.query({ collection: 'app_settings', where: [{ field: 'key', op: '==', value: roomSettingKey(roomId, key) }], limit: 1 })),
+  );
+  const records = pages.flatMap((page) => page.records);
   const settings: WorkspaceAppSettings = { ...DEFAULT_WORKSPACE_SETTINGS };
   for (const row of records) {
     // Settings are per room: only rows keyed `room:<this room>:<key>` apply here.

@@ -6,11 +6,12 @@
  * not change the room's settings (the server refuses them anyway).
  */
 import { useCallback, useEffect, useState } from 'react';
-import { usePrivosApp } from '@privos_ai/app-react';
+import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { speakerProfileDelete, speakerProfileList, speakerProfileUpdate, type SpeakerProfileListItem } from '../../data/speaker-api.js';
 import { ConfirmDialog } from '../../components/confirm-dialog.js';
 import { SpeakerAvatar } from '../../components/speaker-avatar.js';
+import { loadWorkspaceSettings } from '../../data/settings-store.js';
 import { useI18n } from '../../i18n/i18n-provider.js';
 import { useCanManageRoomSettings } from './use-can-manage-room-settings.js';
 
@@ -21,6 +22,7 @@ const DEFAULT_THRESHOLD = 0.5;
 
 export function SpeakerIdentificationPanel() {
   const app = usePrivosApp();
+  const { roomId } = usePrivosContext();
   const { t } = useI18n();
   const { canManage } = useCanManageRoomSettings();
   const [profiles, setProfiles] = useState<SpeakerProfileListItem[]>([]);
@@ -50,6 +52,14 @@ export function SpeakerIdentificationPanel() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // Start the slider at the room's saved threshold, not the default.
+  useEffect(() => {
+    if (!roomId) return;
+    loadWorkspaceSettings(app, roomId)
+      .then((settings) => setThreshold(settings.speakerMatchThreshold))
+      .catch(() => undefined);
+  }, [app, roomId]);
 
   async function rename(profileId: string): Promise<void> {
     const displayName = (renameDrafts[profileId] ?? '').trim();

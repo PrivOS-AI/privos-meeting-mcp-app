@@ -346,6 +346,7 @@
   "settings.aiSummary.lengthNormal": "標準",
   "settings.aiSummary.lengthDetailed": "詳細",
   "settings.aiSummary.language": "要約の言語",
+  "settings.aiSummary.languageAuto": "会議と同じ",
 
   "settings.privacy.title": "プライバシーと保存",
   "settings.privacy.keepAudio": "元の音声を保持する（デフォルトはオフ）",
@@ -365,6 +366,5 @@
   "settings.captionDisplay.sizeMedium": "中",
   "settings.captionDisplay.sizeLarge": "大",
   "settings.captionDisplay.showTranslation": "翻訳を表示",
-  "settings.captionDisplay.showLiveSpeakerLabels": "リアルタイム話者ラベルを表示",
-  "settings.captionDisplay.revealDelay": "未確定トークンの表示遅延: {value} ms"
+  "settings.captionDisplay.showLiveSpeakerLabels": "リアルタイム話者ラベルを表示"
 }

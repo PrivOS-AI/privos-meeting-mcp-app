@@ -346,6 +346,7 @@
   "settings.aiSummary.lengthNormal": "Normal",
   "settings.aiSummary.lengthDetailed": "Détaillé",
   "settings.aiSummary.language": "Langue du résumé",
+  "settings.aiSummary.languageAuto": "Comme la réunion",
 
   "settings.privacy.title": "Confidentialité et stockage",
   "settings.privacy.keepAudio": "Conserver l'audio original (désactivé par défaut)",
@@ -365,6 +366,5 @@
   "settings.captionDisplay.sizeMedium": "Moyenne",
   "settings.captionDisplay.sizeLarge": "Grande",
   "settings.captionDisplay.showTranslation": "Afficher la traduction",
-  "settings.captionDisplay.showLiveSpeakerLabels": "Afficher les étiquettes d'intervenants en direct",
-  "settings.captionDisplay.revealDelay": "Délai d'affichage des tokens non définitifs : {value} ms"
+  "settings.captionDisplay.showLiveSpeakerLabels": "Afficher les étiquettes d'intervenants en direct"
 }

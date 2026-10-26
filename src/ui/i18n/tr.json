@@ -348,6 +348,7 @@
   "settings.aiSummary.lengthNormal": "Normal",
   "settings.aiSummary.lengthDetailed": "Ayrıntılı",
   "settings.aiSummary.language": "Özet dili",
+  "settings.aiSummary.languageAuto": "Toplantıyla aynı",
 
   "settings.privacy.title": "Gizlilik ve depolama",
   "settings.privacy.keepAudio": "Orijinal sesi sakla (varsayılan olarak kapalı)",
@@ -367,6 +368,5 @@
   "settings.captionDisplay.sizeMedium": "Orta",
   "settings.captionDisplay.sizeLarge": "Büyük",
   "settings.captionDisplay.showTranslation": "Çeviriyi göster",
-  "settings.captionDisplay.showLiveSpeakerLabels": "Canlı konuşmacı etiketlerini göster",
-  "settings.captionDisplay.revealDelay": "Kesin olmayan belirteç gösterme gecikmesi: {value} ms"
+  "settings.captionDisplay.showLiveSpeakerLabels": "Canlı konuşmacı etiketlerini göster"
 }

@@ -21,7 +21,7 @@ import type { RoomBoundHubClient } from '@privos_ai/app-server';
 import { AppError } from '../../shared/app-error.js';
 import { generateAsyncWithHubAi } from '../hub/hub-ai-client.js';
 import type { TranscriptChunk } from './chunker.js';
-import { buildMapPrompt, buildReducePrompt, buildSchemaFixPrompt, SUMMARY_SYSTEM_CONTEXT, type SummaryLanguage } from './prompts.js';
+import { buildMapPrompt, buildReducePrompt, buildSchemaFixPrompt, SUMMARY_SYSTEM_CONTEXT, type SummaryLanguage, type SummaryLength } from './prompts.js';
 import { sanitizeDisplayName } from './sanitize.js';
 
 const actionItemSchema = z.object({
@@ -51,6 +51,8 @@ export interface SummarizeTranscriptInput {
   roomId: string;
   chunks: readonly TranscriptChunk[];
   language: SummaryLanguage;
+  /** The room's `summaryLength` setting; `normal` when unset. */
+  length?: SummaryLength;
   title: string;
   speakerNames: readonly string[];
 }
@@ -165,6 +167,7 @@ export async function summarizeTranscript(
     title: input.title,
     speakerNames: input.speakerNames,
     language: input.language,
+    length: input.length,
     notesWithTimestamps: input.chunks.map((chunk, i) => ({
       startLabel: formatTimestamp(chunk.startSec),
       endLabel: formatTimestamp(chunk.endSec),

@@ -55,6 +55,15 @@ Marketplace packaging.
 - The live screen says when recording audio is at risk: parts waiting to
   upload, parts lost after the 15-minute retry window, too many parts queued,
   or the browser recorder stopping. These were recorded in state and never shown.
+- Settings that were saved but never read now take effect or are gone: the
+  post-meeting summary follows the room's `summaryLength` and `summaryLanguage`
+  (new default `auto` = the meeting's language, all 8 languages offered); the
+  recording uses the Stage caption size, the Stage speaker-label toggle, the
+  default bilingual choice and (on the getUserMedia fallback) the chosen mic;
+  the speaker-threshold slider starts at the saved value. Removed: the
+  `speakerSession*` keys (env-only) and the caption reveal-delay slider.
+- Room settings are read by exact key; one 200-row page of the shared
+  `app_settings` collection missed a room's rows once a workspace had enough rooms.
 - Data policy rewritten to match actual behaviour, including what is not
   deleted automatically (transcripts, summaries, data left after uninstall).
 - Dependencies: `@privos_ai/app-server` 0.12, `@privos_ai/app-react` 0.8, `zod` 4,

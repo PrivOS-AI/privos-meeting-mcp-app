@@ -348,6 +348,7 @@
   "settings.aiSummary.lengthNormal": "Vừa",
   "settings.aiSummary.lengthDetailed": "Chi tiết",
   "settings.aiSummary.language": "Ngôn ngữ tóm tắt",
+  "settings.aiSummary.languageAuto": "Theo ngôn ngữ cuộc họp",
 
   "settings.privacy.title": "Riêng tư & lưu trữ",
   "settings.privacy.keepAudio": "Giữ audio gốc (mặc định tắt)",
@@ -367,6 +368,5 @@
   "settings.captionDisplay.sizeMedium": "Vừa",
   "settings.captionDisplay.sizeLarge": "Lớn",
   "settings.captionDisplay.showTranslation": "Bật/tắt hiện bản dịch",
-  "settings.captionDisplay.showLiveSpeakerLabels": "Hiện nhãn người nói trực tiếp",
-  "settings.captionDisplay.revealDelay": "Độ trễ hiển thị token chưa chốt: {value} ms"
+  "settings.captionDisplay.showLiveSpeakerLabels": "Hiện nhãn người nói trực tiếp"
 }

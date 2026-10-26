@@ -17,6 +17,7 @@ import type { RoomBoundHubClient } from '@privos_ai/app-server';
 import { AppError } from '../../shared/app-error.js';
 import { env } from '../env.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
+import { getSetting } from '../hub/app-settings.js';
 import { uploadBotFile } from '../files/hub-file-upload.js';
 import { concatParts, deletePartFiles, type PartRef } from '../media/concat-parts.js';
 import { decodeToWav16k } from '../media/decode-audio.js';
@@ -28,6 +29,7 @@ import { resolveSpeakers as resolveSpeakersEmbed, type UserIdentity } from '../s
 import { sessionRegistries } from '../speaker/session-speaker-registry.js';
 import { uploadRoomCopy } from '../speaker/speaker-diagnostics-log.js';
 import { chunkTranscript } from '../summary/chunker.js';
+import type { SummaryLength } from '../summary/prompts.js';
 import { renderSummaryMarkdown } from '../summary/summary-markdown.js';
 import { summarizeTranscript as runSummarizer, type SummaryPayload } from '../summary/summarizer.js';
 import { translateSegmentsBatch } from '../summary/translator.js';
@@ -234,9 +236,14 @@ export async function summarizeTranscript(input: {
     }
   }
 
-  const summaryLanguage = asLanguageCode(input.language);
+  // The room's settings: `summaryLanguage` `auto` (default) keeps the meeting's own language.
+  const settingsDb = new AppDbBotClient(roomId);
+  const languageSetting = await getSetting<string>(settingsDb, 'summaryLanguage');
+  const summaryLanguage = asLanguageCode(languageSetting && languageSetting !== 'auto' && isLanguageCode(languageSetting) ? languageSetting : input.language);
+  const lengthSetting = await getSetting<SummaryLength>(settingsDb, 'summaryLength');
+  const length: SummaryLength = lengthSetting === 'short' || lengthSetting === 'detailed' ? lengthSetting : 'normal';
   const chunks = chunkTranscript(translatedSegments, displayNameBySpeaker);
-  const payload = await runSummarizer(hub, { roomId, chunks, language: summaryLanguage, title, speakerNames }, signal);
+  const payload = await runSummarizer(hub, { roomId, chunks, language: summaryLanguage, length, title, speakerNames }, signal);
 
   const markdown = renderSummaryMarkdown({ title, startedAt, durationSec, speakers: speakerNames, payload, language: summaryLanguage });
   const summaryUpload = await uploadBotFile({

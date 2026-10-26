@@ -104,7 +104,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
           </button>
         </div>
         {notices}
-        <StageCaption lines={state.lines} speakerMap={state.speakerMap} size={state.stageCaptionSize} resolveSpeakerKey={(line) => resolveLineSpeakerKey(state, line)} />
+        <StageCaption lines={state.lines} speakerMap={state.speakerMap} size={state.stageCaptionSize} showSpeaker={state.showSpeakerLabels} resolveSpeakerKey={(line) => resolveLineSpeakerKey(state, line)} />
         <div className="ma-stage__footer">{footer}</div>
       </div>
     );

@@ -19,9 +19,9 @@ export interface LocalPreferences {
   /** Default "show translation" toggle for a new meeting / Stage caption. */
   showTranslation: boolean;
   stageCaptionSize: StageCaptionSize;
+  /** Whether the Stage view shows the speaker name chip on the current caption. */
   showLiveSpeakerLabels: boolean;
-  /** How long (ms) a non-final caption token is held before it can be shown — smooths jitter from a provider revising a draft token. */
-  captionRevealDelayMs: number;
+  /** Used only when the host cannot broker the microphone (direct getUserMedia); the host-brokered capture picks its own device. */
   preferredMicDeviceId: string;
 }
 
@@ -31,7 +31,6 @@ export const DEFAULT_LOCAL_PREFERENCES: LocalPreferences = {
   showTranslation: false,
   stageCaptionSize: 'medium',
   showLiveSpeakerLabels: true,
-  captionRevealDelayMs: 400,
   preferredMicDeviceId: '',
 };
 

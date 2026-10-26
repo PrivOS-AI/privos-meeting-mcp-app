@@ -2,12 +2,15 @@
  * Settings › AI summary (plan.md § Settings item 5). Provider (Hub AI) and
  * model (`SUMMARY_MODEL`) are backend env config — read-only, no tool exposes
  * the model name to the iframe so this only states where it is configured.
- * `summaryLength`/`summaryLanguage` are real `app_settings` writes, admin-only.
+ * `summaryLength`/`summaryLanguage` are per-room `app_settings` writes (room
+ * owners, moderators, workspace admins) read by the post-meeting summary;
+ * language `auto` keeps the meeting's own language.
  */
 import { useEffect, useState } from 'react';
 import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { useI18n } from '../../i18n/i18n-provider.js';
+import { LANGUAGE_ENDONYMS, SUPPORTED_LANGUAGES } from '../../i18n/languages.js';
 import { loadWorkspaceSettings, saveWorkspaceSetting } from '../../data/settings-store.js';
 import type { WorkspaceAppSettings } from '../../../shared/app-settings.js';
 import { useCanManageRoomSettings } from './use-can-manage-room-settings.js';
@@ -63,12 +66,16 @@ export function AiSummaryPanel() {
       <label className="ma-settings-field">
         <span>{t('settings.aiSummary.language')}</span>
         <select
-          value={settings?.summaryLanguage ?? 'vi'}
+          value={settings?.summaryLanguage ?? 'auto'}
           disabled={!canManage || !settings}
           onChange={(e) => void change('summaryLanguage', e.target.value as WorkspaceAppSettings['summaryLanguage'])}
         >
-          <option value="vi">Tiếng Việt</option>
-          <option value="en">English</option>
+          <option value="auto">{t('settings.aiSummary.languageAuto')}</option>
+          {SUPPORTED_LANGUAGES.map((code) => (
+            <option key={code} value={code}>
+              {LANGUAGE_ENDONYMS[code]}
+            </option>
+          ))}
         </select>
       </label>
 

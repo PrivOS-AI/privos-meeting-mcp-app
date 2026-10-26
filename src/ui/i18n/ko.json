@@ -346,6 +346,7 @@
   "settings.aiSummary.lengthNormal": "보통",
   "settings.aiSummary.lengthDetailed": "상세",
   "settings.aiSummary.language": "요약 언어",
+  "settings.aiSummary.languageAuto": "회의와 동일",
 
   "settings.privacy.title": "개인정보 및 저장소",
   "settings.privacy.keepAudio": "원본 오디오 보관 (기본값: 꺼짐)",
@@ -365,6 +366,5 @@
   "settings.captionDisplay.sizeMedium": "보통",
   "settings.captionDisplay.sizeLarge": "크게",
   "settings.captionDisplay.showTranslation": "번역 표시",
-  "settings.captionDisplay.showLiveSpeakerLabels": "실시간 화자 라벨 표시",
-  "settings.captionDisplay.revealDelay": "미확정 토큰 표시 지연: {value}ms"
+  "settings.captionDisplay.showLiveSpeakerLabels": "실시간 화자 라벨 표시"
 }
