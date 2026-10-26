@@ -61,6 +61,18 @@ describe('purgeExpiredAudio', () => {
     expect(store.meetings[0].audioDeletedAt).toBeTruthy();
   });
 
+  it('also deletes audio a keepAudio:false meeting left behind because its summary failed', async () => {
+    store.app_settings = [{ _id: 's1', key: 'room:room-1:autoDeleteAudioDays', valueJson: JSON.stringify(1) }];
+    store.meetings = [
+      { _id: 'm1', roomId: 'room-1', status: 'summarized', keepAudio: false, endedAt: oldIso(10), audioFileId: 'audio-1', summaryError: 'Hub AI unavailable' },
+      { _id: 'm2', roomId: 'room-1', status: 'summarized', keepAudio: false, endedAt: oldIso(0), audioFileId: 'audio-2' },
+    ];
+    const hub = buildHub();
+    const result = await purgeExpiredAudio(hub, 'room-1');
+    expect(result.audioDeleted).toBe(1);
+    expect(deletedFileIds).toEqual(['audio-1']);
+  });
+
   it('does not touch audio when autoDeleteAudioDays is 0 (disabled)', async () => {
     store.app_settings = [{ _id: 's1', key: 'room:room-1:autoDeleteAudioDays', valueJson: JSON.stringify(0) }];
     store.meetings = [

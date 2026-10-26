@@ -2,12 +2,13 @@
  * Retention sweep, single source of configuration = `app_settings` (never an
  * env var — plan.md § cleanup job: "no more MEETING_AUDIO_RETENTION_DAYS env var"):
  *
- *  1. Kept audio past `autoDeleteAudioDays` (default 90, `0` = disabled): a
- *     `summarized` meeting with `keepAudio` whose `endedAt` is old enough and
- *     not yet `audioDeletedAt` gets its `audioFileId` deleted from Files, then
- *     `audioDeletedAt` is stamped — audio of a `keepAudio:false` meeting was
- *     already deleted right after summarization (P3/P6), this only ever
- *     touches audio that was deliberately kept.
+ *  1. Remaining audio past `autoDeleteAudioDays` (default 90, `0` = disabled): a
+ *     `summarized` meeting whose `endedAt` is old enough and not yet
+ *     `audioDeletedAt` gets its `audioFileId` deleted from Files, then
+ *     `audioDeletedAt` is stamped. That covers audio kept on purpose
+ *     (`keepOriginalAudio`) and audio of a `keepAudio:false` meeting the job
+ *     could not delete because its summary failed, which would otherwise
+ *     stay forever.
  *  2. Orphaned parts of an `interrupted` meeting past
  *     `interruptedPartsRetentionDays` (default 7): every `audio.part-*` file
  *     still in the meeting's folder gets deleted (best-effort per file).
@@ -44,14 +45,13 @@ function daysAgoIso(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
-/** Kept audio past `autoDeleteAudioDays` — `days <= 0` disables this branch entirely. */
+/** Remaining audio past `autoDeleteAudioDays`, kept or left behind by a failed summary — `days <= 0` disables this branch entirely. */
 async function purgeKeptAudio(hub: RoomBoundHubClient, roomId: string, days: number): Promise<number> {
   if (days <= 0) return 0;
   const db = new AppDbBotClient(roomId);
   const result = await db.query('meetings', 'room', {
     where: [
       { field: 'status', op: '==', value: 'summarized' },
-      { field: 'keepAudio', op: '==', value: true },
       { field: 'endedAt', op: '<', value: daysAgoIso(days) },
     ],
     limit: 1000,

@@ -9,7 +9,10 @@
  */
 import { AppError } from '../../shared/app-error.js';
 import { meetingId8 } from '../../shared/meeting-slug.js';
+import { DEFAULT_WORKSPACE_SETTINGS } from '../../shared/app-settings.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
+import { getSetting } from '../hub/app-settings.js';
+import { upsertMeeting } from '../jobs/meeting-repository.js';
 import type { PartRef } from '../media/concat-parts.js';
 import { listRoomFolderFiles } from '../media/hub-file-download.js';
 import { JobRepository } from '../jobs/job-repository.js';
@@ -85,6 +88,9 @@ export const processTool: AppTool = {
 
     const asyncVendor = await resolveAsyncVendor(db);
     const sttProvider = asyncVendor === 'elevenlabs' ? ('elevenlabs-batch' as const) : ('soniox-async' as const);
+    // The room's setting decides, read here on the server: the `keepAudio` the iframe wrote on the meeting row is ignored.
+    const keepAudio = (await getSetting<boolean>(db, 'keepOriginalAudio')) ?? DEFAULT_WORKSPACE_SETTINGS.keepOriginalAudio;
+    await upsertMeeting(db, meetingId, { keepAudio });
 
     const job = await jobRepo.claim({
       meetingId,
@@ -93,7 +99,7 @@ export const processTool: AppTool = {
       sttProvider,
       language: typeof meeting.language === 'string' && meeting.language ? meeting.language : 'vi',
       title: typeof meeting.title === 'string' ? meeting.title : '',
-      keepAudio: meeting.keepAudio !== false,
+      keepAudio,
     });
 
     void meetingQueue

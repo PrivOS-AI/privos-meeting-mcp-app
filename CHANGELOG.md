@@ -15,6 +15,14 @@ Marketplace packaging.
   destinations and voiceprint retention, no `PORT` declaration, and
   `PRIVOS_FILES_ORIGIN` renamed to `FILES_ORIGIN` (the old name is still read).
 - `meeting_settings_set` describes its actual policy (any verified room member).
+- The room's "Keep original audio" setting now takes effect: `meeting_process`
+  reads `keepOriginalAudio` on the server and stamps `keepAudio` on the meeting
+  (the iframe no longer writes it, and used to hard-code `true`). Merged audio
+  is deleted after processing by default.
+- The retention sweep also deletes audio that a failed summary left behind,
+  after the room's auto-delete period; before, that audio was never deleted.
+- Data policy rewritten to match actual behaviour, including what is not
+  deleted automatically (transcripts, summaries, data left after uninstall).
 - Dependencies: `@privos_ai/app-server` 0.12, `@privos_ai/app-react` 0.8, `zod` 4,
   patched `body-parser`.
 - `SCOPES.md` maps every permission to its call sites and degraded behaviour.

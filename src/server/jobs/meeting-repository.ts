@@ -19,6 +19,8 @@ export interface MeetingPatch {
   sentToChatAt?: string;
   summaryError?: string;
   durationSec?: number;
+  /** Backend-owned: stamped by `meeting_process` from the room's `keepOriginalAudio` setting, never trusted from the iframe. */
+  keepAudio?: boolean;
 }
 
 /** Backend-owned `meetings` fields only — see plan.md's field-ownership table for what the iframe writes instead. */

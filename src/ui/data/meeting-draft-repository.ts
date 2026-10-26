@@ -18,7 +18,6 @@ export interface CreateMeetingInput {
   language: string;
   translationEnabled: boolean;
   translationLang?: string;
-  keepAudio: boolean;
   ownerUserId: string;
   startedAt: string;
 }
@@ -34,7 +33,7 @@ export async function createMeeting(app: McpApp, input: CreateMeetingInput): Pro
     language: input.language,
     translationEnabled: input.translationEnabled,
     translationLang: input.translationLang,
-    keepAudio: input.keepAudio,
+    // No `keepAudio`: `meeting_process` stamps it from the room's `keepOriginalAudio` setting.
     ownerUserId: input.ownerUserId,
     startedAt: input.startedAt,
     status: 'recording',

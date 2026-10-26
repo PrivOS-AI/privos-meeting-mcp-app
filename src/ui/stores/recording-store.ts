@@ -501,7 +501,6 @@ export class RecordingStore {
         language: input.language,
         translationEnabled: input.translationEnabled,
         translationLang: input.translationLang,
-        keepAudio: true,
         ownerUserId: this.ctx.userId,
         startedAt: startedAtIso,
       });
