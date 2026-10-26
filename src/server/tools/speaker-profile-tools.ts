@@ -16,7 +16,7 @@ import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { readKnownRooms } from '../jobs/known-rooms-store.js';
 import * as profileStore from '../speaker/profile-store.js';
-import { readMatchThreshold } from '../speaker/resolve-speakers.js';
+import { workspaceMatchThreshold } from '../speaker/resolve-speakers.js';
 import { logEvent } from '../speaker/speaker-diagnostics-log.js';
 import { isWorkspaceAdmin, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
@@ -64,9 +64,9 @@ export const speakerProfileListTool: AppTool = {
     const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     // Profile health uses the workspace-default match threshold, not this
     // room's tuned value: profiles are workspace-global and `pruneOutliers`
-    // (a room-less tool) removes outliers on that same workspace-default
+    // (workspace-wide) removes outliers on that same workspace-default
     // basis, so the displayed outlier count matches what a prune would drop.
-    const [profiles, threshold] = await Promise.all([profileStore.listProfiles(db), readMatchThreshold(new AppDbBotClient())]);
+    const [profiles, threshold] = await Promise.all([profileStore.listProfiles(db), workspaceMatchThreshold()]);
     return { profiles: profiles.map((p) => toListItem(p, canEditProfile(p, actor) ? profileStore.profileHealth(p, threshold) : undefined)) };
   },
 };
@@ -99,7 +99,8 @@ export const speakerProfileUpdateTool: AppTool = {
     const profileId = asString(args.profileId);
     if (!profileId) throw new AppError('profileId is required.');
 
-    const db = new AppDbBotClient();
+    // Bound to the caller's room: a room-less client resolves to the `workspace` permission context, which this app is never granted.
+    const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     const profile = await profileStore.getProfile(db, profileId);
     if (!profile) throw new AppError('Voiceprint profile not found.');
     if (!canEditProfile(profile, actor)) {
@@ -116,7 +117,7 @@ export const speakerProfileUpdateTool: AppTool = {
 
     let pruned: number | undefined;
     if (args.action === 'pruneOutliers') {
-      const threshold = await readMatchThreshold(db);
+      const threshold = workspaceMatchThreshold();
       const result = await profileStore.pruneOutlierEmbeddings(db, profileId, threshold);
       pruned = result.removed;
       // Counts only — never a vector, never which meeting a pruned sample came from.
@@ -140,7 +141,7 @@ export const speakerProfileUpdateTool: AppTool = {
     }
 
     const updated = await profileStore.getProfile(db, profileId);
-    const threshold = await readMatchThreshold(db);
+    const threshold = workspaceMatchThreshold();
     return {
       profile: updated ? toListItem(updated, profileStore.profileHealth(updated, threshold)) : null,
       ...(pruned !== undefined ? { pruned } : {}),

@@ -6,7 +6,7 @@
  */
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
-import { JobRepository, STALE_AFTER_MS } from '../jobs/job-repository.js';
+import { JobRepository, STALE_JOB_MS } from '../jobs/job-repository.js';
 import { requireRoomMeeting, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
 import { ROOM_AND_MEETING } from './schema-parts.js';
@@ -34,7 +34,7 @@ export const statusTool: AppTool = {
       return { status: 'not_found', step: null, progress: 0, heartbeatAt: null, stale: false };
     }
 
-    const stale = job.status === 'processing' && Date.now() - new Date(job.heartbeatAt).getTime() > STALE_AFTER_MS;
+    const stale = job.status === 'processing' && Date.now() - new Date(job.heartbeatAt).getTime() > STALE_JOB_MS;
     return {
       status: job.status,
       step: job.step,

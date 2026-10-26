@@ -202,6 +202,11 @@ function averageVectors(vectors: readonly Float32Array[]): Float32Array {
  * server-side floor"). The env default itself is operator-controlled, never
  * member-writable, so it is not clamped.
  */
+/** The workspace-default match threshold (env, floored) — for workspace-global profile health and pruning, which no single room tunes. */
+export function workspaceMatchThreshold(): number {
+  return Math.max(env.speakerMatchThreshold, SPEAKER_MATCH_THRESHOLD_FLOOR);
+}
+
 export async function readMatchThreshold(db: AppDbBotClient): Promise<number> {
   const stored = await getSetting<number>(db, 'speakerMatchThreshold');
   const candidate = typeof stored === 'number' && stored > 0 && stored < 1 ? stored : env.speakerMatchThreshold;

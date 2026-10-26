@@ -36,6 +36,14 @@ Marketplace packaging.
   are capped at 2,000 characters and `speaker_resolve` at 50 assignments. Tool
   definitions live in code only: `npm run manifest:sync-tools` copies them into
   `privos-app.json`, and the parity test now compares input schemas too.
+- `meeting_send_to_chat` posts once per meeting: a retry, double click or
+  concurrent call returns the first send instead of posting again.
+- `speaker_profile_update` binds its App DB calls to the caller's room; the
+  room-less client it used resolves to a context the Hub never grants.
+- One dead-job threshold (2 minutes without a heartbeat) for the `stale` flag,
+  for accepting a re-run and for the sweep (was 30 s / 20 min / 10 min). A job
+  interrupted by a restart is re-queued once, resuming its Soniox upload, then
+  failed if interrupted again.
 - Data policy rewritten to match actual behaviour, including what is not
   deleted automatically (transcripts, summaries, data left after uninstall).
 - Dependencies: `@privos_ai/app-server` 0.12, `@privos_ai/app-react` 0.8, `zod` 4,

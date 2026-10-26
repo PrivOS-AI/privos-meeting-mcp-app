@@ -47,7 +47,7 @@ describe('JobRepository', () => {
     expect(second.partFileIds).toEqual(['f1', 'f2']);
   });
 
-  it('sweepStale only fails `processing` jobs whose heartbeat is older than the threshold', async () => {
+  it('sweepStale re-queues a dead `processing` job once, then fails it; a live one is untouched', async () => {
     const r = repo();
     const stuck = await r.claim(claimInput);
     await r.markProcessing(stuck._id);
@@ -58,13 +58,24 @@ describe('JobRepository', () => {
     const fresh = await r.claim({ ...claimInput, meetingId: 'm2' });
     await r.markProcessing(fresh._id);
 
-    const swept = await r.sweepStale(10 * 60_000);
-    expect(swept.map((j) => j.meetingId)).toEqual(['m1']);
+    const first = await r.sweepStale(10 * 60_000);
+    expect(first.requeued.map((j) => j.meetingId)).toEqual(['m1']);
+    expect(first.failed).toEqual([]);
+    expect((await r.findByMeeting('m1'))?.status).toBe('queued');
+    expect((await r.findByMeeting('m2'))?.status).toBe('processing');
 
-    const stuckAfter = await r.findByMeeting('m1');
-    expect(stuckAfter?.status).toBe('failed');
-    const freshAfter = await r.findByMeeting('m2');
-    expect(freshAfter?.status).toBe('processing');
+    // Interrupted again after its automatic retry: given up on.
+    await r.markProcessing(stuck._id);
+    store.processing_jobs = store.processing_jobs.map((row) =>
+      row._id === stuck._id ? { ...row, heartbeatAt: new Date(Date.now() - 20 * 60_000).toISOString() } : row,
+    );
+    const second = await r.sweepStale(10 * 60_000);
+    expect(second.requeued).toEqual([]);
+    expect(second.failed.map((j) => j.meetingId)).toEqual(['m1']);
+    expect((await r.findByMeeting('m1'))?.status).toBe('failed');
+
+    // An explicit retry (claim) earns a fresh automatic retry.
+    expect((await r.claim(claimInput)).autoRetries).toBe(0);
   });
 
   it('finish() writes the result and marks the job completed', async () => {

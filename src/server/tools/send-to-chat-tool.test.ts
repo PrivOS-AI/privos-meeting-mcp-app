@@ -56,6 +56,22 @@ describe('meeting_send_to_chat', () => {
     expect(rows[0].sentToChatAt).toBe(result.sentAt);
   });
 
+  it('posts once: a repeat call returns the first send without posting again', async () => {
+    const first = (await sendToChatTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('user-1'), runtime())) as { sentAt: string };
+    const again = (await sendToChatTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('user-1'), runtime())) as Record<string, unknown>;
+    expect(sentMessages).toHaveLength(1);
+    expect(again).toMatchObject({ sent: false, alreadySent: true, sentAt: first.sentAt });
+  });
+
+  it('posts once when two calls race', async () => {
+    const results = (await Promise.all([
+      sendToChatTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('user-1'), runtime()),
+      sendToChatTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('user-1'), runtime()),
+    ])) as Array<{ sent: boolean }>;
+    expect(sentMessages).toHaveLength(1);
+    expect(results.filter((r) => r.sent)).toHaveLength(1);
+  });
+
   it('rejects when there is no saved summary yet', async () => {
     store.meetings[0].summaryText = undefined;
     await expect(sendToChatTool.execute({ roomId: 'room-1', meetingId: 'meeting-1' }, context('user-1'), runtime())).rejects.toThrow(/summary/);

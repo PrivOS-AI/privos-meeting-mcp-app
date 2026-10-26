@@ -1,7 +1,7 @@
 /**
  * Boot + `meeting_bootstrap` sweep, one room at a time: reloads `queued` jobs
- * into the run queue, fails `processing` jobs whose heartbeat has gone stale
- * (pm2 restart mid-job -> `failed(interrupted)`), marks a meeting stuck in
+ * into the run queue, re-queues `processing` jobs whose heartbeat has gone stale
+ * (pm2 restart mid-job) once and fails them after that, marks a meeting stuck in
  * `recording` with no recent part as `interrupted`, and best-effort deletes a
  * dead Soniox job's own remote file/transcription using the ids THIS APP
  * already persisted (`processing_jobs.providerFileId`/`providerTranscriptionId`)
@@ -17,11 +17,10 @@ import { env } from '../env.js';
 import type { PartRef } from '../media/concat-parts.js';
 import { listRoomFolderFiles } from '../media/hub-file-download.js';
 import { uploadRoomCopy } from '../speaker/speaker-diagnostics-log.js';
-import { JobRepository, type JobRecord } from './job-repository.js';
+import { JobRepository, STALE_JOB_MS, type JobRecord } from './job-repository.js';
 import { runMeetingJob } from './meeting-job.js';
 import { JOB_TIMEOUT_MS, meetingQueue } from './meeting-queue.js';
 
-const STALE_JOB_MS = 10 * 60_000;
 const ABANDONED_MEETING_MS = 10 * 60_000;
 const SONIOX_CLEANUP_TIMEOUT_MS = 15_000;
 
@@ -109,7 +108,9 @@ export async function sweepRoom(hub: RoomBoundHubClient, roomId: string): Promis
   for (const job of queued) await requeueJob(hub, roomId, job);
 
   const stale = await jobRepo.sweepStale(STALE_JOB_MS);
-  for (const job of stale) await cleanupDeadSonioxJob({ ...job });
+  for (const job of stale.requeued) await requeueJob(hub, roomId, job);
+  // Only a job given up on loses its remote Soniox upload; a re-queued one resumes from it.
+  for (const job of stale.failed) await cleanupDeadSonioxJob({ ...job });
 
   const cutoffIso = new Date(Date.now() - ABANDONED_MEETING_MS).toISOString();
   const abandoned = await db.query('meetings', 'room', {

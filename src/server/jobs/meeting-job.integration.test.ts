@@ -142,6 +142,7 @@ function freshJob(overrides: Partial<JobRecord> = {}): JobRecord {
     progress: 0,
     startedAt: now,
     heartbeatAt: now,
+    autoRetries: 0,
     ...overrides,
   };
 }

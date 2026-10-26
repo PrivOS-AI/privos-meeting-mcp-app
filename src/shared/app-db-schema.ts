@@ -192,6 +192,7 @@ export const SCHEMAS: readonly CollectionSchema[] = [
       { name: 'startedAt', type: 'date' },
       { name: 'heartbeatAt', type: 'date' },
       { name: 'finishedAt', type: 'date' },
+      { name: 'autoRetries', type: 'number' },
     ],
     indexes: [{ fields: { meetingId: 1 }, unique: true }, { fields: { jobId: 1 } }, { fields: { status: 1 } }],
   },

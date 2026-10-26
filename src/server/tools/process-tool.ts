@@ -15,7 +15,7 @@ import { getSetting } from '../hub/app-settings.js';
 import { upsertMeeting } from '../jobs/meeting-repository.js';
 import type { PartRef } from '../media/concat-parts.js';
 import { listRoomFolderFiles } from '../media/hub-file-download.js';
-import { JobRepository } from '../jobs/job-repository.js';
+import { JobRepository, STALE_JOB_MS } from '../jobs/job-repository.js';
 import { runMeetingJob } from '../jobs/meeting-job.js';
 import { JOB_TIMEOUT_MS, meetingQueue } from '../jobs/meeting-queue.js';
 import { resolveAsyncVendor } from '../stt/stt-provider-registry.js';
@@ -23,8 +23,6 @@ import { assertFileInRoom, requireMeetingOwner, requireVerifiedActor } from './a
 import type { AppTool, ToolRuntime } from './registry.js';
 import { ROOM_AND_MEETING } from './schema-parts.js';
 
-/** A `processing` job whose heartbeat is older than 2x the sweep window is treated as dead — same threshold `meeting_status` uses for `stale`. */
-const STALE_HEARTBEAT_MS = 20 * 60_000;
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -36,7 +34,7 @@ function parseSeq(name: string): number | null {
 }
 
 function isStale(heartbeatAt: string): boolean {
-  return Date.now() - new Date(heartbeatAt).getTime() > STALE_HEARTBEAT_MS;
+  return Date.now() - new Date(heartbeatAt).getTime() > STALE_JOB_MS;
 }
 
 async function discoverParts(runtime: ToolRuntime, roomId: string, folderId: string, meetingId: string): Promise<PartRef[]> {

@@ -14,6 +14,10 @@
  * swallowed — `callAppPlatformTool` throws an `AppError` with the Hub's own
  * message, which the UI is expected to use to disable the "Send to Chat"
  * button with a tooltip (plan.md: "no silent failure").
+ *
+ * Idempotent per meeting: once `sentToChatAt` is stamped a repeat call (retry,
+ * double click, a second tab) returns that stamp without posting again, and
+ * concurrent calls in this process share one send.
  */
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, type DbRow } from '../hub/app-db-bot-client.js';
@@ -27,6 +31,9 @@ import { ROOM_AND_MEETING } from './schema-parts.js';
 const BOT_SEND_MESSAGE_TOOL = 'mcpapp.bot.sendMessage';
 const SEND_MESSAGE_SCOPE = 'bot:message:send';
 const MAX_CHAT_CHARS = 1_500;
+
+/** In-flight sends by meeting (single replica): a concurrent call awaits the same send instead of posting twice. */
+const inFlight = new Map<string, Promise<{ sent: boolean; sentAt: string }>>();
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -63,6 +70,11 @@ export const sendToChatTool: AppTool = {
 
     const db = new AppDbBotClient(roomId);
     const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
+    if (typeof meeting.sentToChatAt === 'string' && meeting.sentToChatAt) {
+      return { sent: false, alreadySent: true, sentAt: meeting.sentToChatAt };
+    }
+    const pending = inFlight.get(meetingId);
+    if (pending) return { ...(await pending), sent: false, alreadySent: true };
     if (!meeting.summaryText || typeof meeting.summaryText !== 'string') {
       throw new AppError('Meeting has no summary to send yet.');
     }
@@ -75,10 +87,17 @@ export const sendToChatTool: AppTool = {
 
     // Never swallowed: a Hub rejection (unknown tool, missing scope, bot not in room) surfaces verbatim so the UI
     // can show the "Send to chat unavailable" tooltip instead of silently no-op'ing (plan.md: "no silent failure").
-    await callAppPlatformTool(BOT_SEND_MESSAGE_TOOL, { roomId, text }, SEND_MESSAGE_SCOPE, roomId);
-
-    const sentAt = new Date().toISOString();
-    await upsertMeeting(db, meetingId, { sentToChatAt: sentAt });
-    return { sent: true, sentAt };
+    const send = (async () => {
+      await callAppPlatformTool(BOT_SEND_MESSAGE_TOOL, { roomId, text }, SEND_MESSAGE_SCOPE, roomId);
+      const sentAt = new Date().toISOString();
+      await upsertMeeting(db, meetingId, { sentToChatAt: sentAt });
+      return { sent: true, sentAt };
+    })();
+    inFlight.set(meetingId, send);
+    try {
+      return await send;
+    } finally {
+      inFlight.delete(meetingId);
+    }
   },
 };

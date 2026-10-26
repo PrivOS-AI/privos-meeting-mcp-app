@@ -87,6 +87,16 @@ describe('speaker_profile_list/_update/_delete', () => {
     expect(store.speaker_profiles[0].displayName).toBe('Binh');
   });
 
+  it("update binds every App DB call to the caller's room (a room-less call resolves to a context the Hub never grants)", async () => {
+    await speakerProfileUpdateTool.execute({ profileId: 'profile-1', action: 'pruneOutliers' }, ctx('owner-1'), {} as never);
+    const toolCalls = vi
+      .mocked(fakeHub.authorizedFetch)
+      .mock.calls.filter(([path]) => path === '/api/v1/mcp-apps.tool-call')
+      .map(([, init]) => JSON.parse(String(init.body)) as { toolName: string; roomId?: string });
+    expect(toolCalls.length).toBeGreaterThan(0);
+    expect(toolCalls.filter((call) => call.roomId !== 'room-1')).toEqual([]);
+  });
+
   it('update allows a workspace admin (signed workspace_roles) even when not the creator', async () => {
     await speakerProfileUpdateTool.execute({ profileId: 'profile-1', displayName: 'Binh' }, ctx('admin-1', ['admin']), {} as never);
     expect(store.speaker_profiles[0].displayName).toBe('Binh');
