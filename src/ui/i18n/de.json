@@ -354,6 +354,7 @@
   "settings.privacy.keepAudio": "Originalaudio behalten (standardmäßig deaktiviert)",
   "settings.privacy.autoDeleteDays": "Audio nach N Tagen automatisch löschen (0 = deaktiviert)",
   "settings.privacy.interruptedPartsDays": "Unterbrochene Besprechungsteile nach N Tagen bereinigen",
+  "settings.privacy.autoDeleteMeetingsDays": "Ganze Meetings (Transkript, Zusammenfassung, Audio, Stimmproben) nach N Tagen löschen — 0 behält sie",
   "settings.privacy.deleteAllTitle": "Alle Stimmabdrücke löschen",
   "settings.privacy.deleteAllWarning": "Löscht alle Sprecherprofile im Workspace — kann nicht rückgängig gemacht werden. Künftige Besprechungen erkennen niemanden mehr automatisch.",
   "settings.privacy.deleteAllConfirmLabel": "Geben Sie zur Bestätigung „{phrase}“ ein",

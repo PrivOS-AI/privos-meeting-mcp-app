@@ -352,6 +352,7 @@
   "settings.privacy.keepAudio": "元の音声を保持する（デフォルトはオフ）",
   "settings.privacy.autoDeleteDays": "N日後に音声を自動削除（0＝無効）",
   "settings.privacy.interruptedPartsDays": "N日後に中断された会議パートを削除",
+  "settings.privacy.autoDeleteMeetingsDays": "N 日後に会議全体（文字起こし・要約・音声・音声サンプル）を削除 — 0 は保持",
   "settings.privacy.deleteAllTitle": "すべての声紋を削除",
   "settings.privacy.deleteAllWarning": "ワークスペース内のすべての話者プロフィールを削除します — 取り消せません。以降の会議では自動認識されなくなります。",
   "settings.privacy.deleteAllConfirmLabel": "確認のため「{phrase}」と入力してください",

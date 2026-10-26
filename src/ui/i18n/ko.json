@@ -352,6 +352,7 @@
   "settings.privacy.keepAudio": "원본 오디오 보관 (기본값: 꺼짐)",
   "settings.privacy.autoDeleteDays": "N일 후 오디오 자동 삭제 (0 = 사용 안 함)",
   "settings.privacy.interruptedPartsDays": "N일 후 중단된 회의 부분 정리",
+  "settings.privacy.autoDeleteMeetingsDays": "N일 후 회의 전체(대본, 요약, 오디오, 음성 샘플) 삭제 — 0은 보관",
   "settings.privacy.deleteAllTitle": "모든 음성 지문 삭제",
   "settings.privacy.deleteAllWarning": "워크스페이스의 모든 화자 프로필을 삭제합니다 — 되돌릴 수 없습니다. 이후 회의에서는 더 이상 자동으로 인식되지 않습니다.",
   "settings.privacy.deleteAllConfirmLabel": "확인하려면 “{phrase}”를 입력하세요",

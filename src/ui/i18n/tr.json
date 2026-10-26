@@ -354,6 +354,7 @@
   "settings.privacy.keepAudio": "Orijinal sesi sakla (varsayılan olarak kapalı)",
   "settings.privacy.autoDeleteDays": "Sesi N gün sonra otomatik sil (0 = kapalı)",
   "settings.privacy.interruptedPartsDays": "Kesintiye uğramış toplantı parçalarını N gün sonra temizle",
+  "settings.privacy.autoDeleteMeetingsDays": "Toplantıların tamamını (döküm, özet, ses, ses örnekleri) N gün sonra sil — 0 saklar",
   "settings.privacy.deleteAllTitle": "Tüm ses izlerini sil",
   "settings.privacy.deleteAllWarning": "Çalışma alanındaki her konuşmacı profilini siler — geri alınamaz. Gelecekteki toplantılar hiç kimseyi otomatik tanımayı bırakır.",
   "settings.privacy.deleteAllConfirmLabel": "Onaylamak için \"{phrase}\" yazın",

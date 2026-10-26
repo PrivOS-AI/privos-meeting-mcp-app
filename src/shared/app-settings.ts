@@ -27,6 +27,8 @@ export interface WorkspaceAppSettings {
   keepOriginalAudio: boolean;
   autoDeleteAudioDays: number;
   interruptedPartsRetentionDays: number;
+  /** Days after which a finished meeting is deleted entirely (Files, voice samples, records); `0` = keep. */
+  autoDeleteMeetingsDays: number;
 }
 
 /**
@@ -51,6 +53,7 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceAppSettings = {
   keepOriginalAudio: false,
   autoDeleteAudioDays: 90,
   interruptedPartsRetentionDays: 7,
+  autoDeleteMeetingsDays: 0,
 };
 
 export const WORKSPACE_SETTING_KEYS = Object.keys(DEFAULT_WORKSPACE_SETTINGS) as ReadonlyArray<keyof WorkspaceAppSettings>;
@@ -100,6 +103,7 @@ export const WORKSPACE_SETTING_VALIDATORS: Record<keyof WorkspaceAppSettings, Va
   summaryLanguage: enumValidator('summaryLanguage', ['auto', ...SUPPORTED_LANGUAGES]),
   autoDeleteAudioDays: nonNegativeIntValidator('autoDeleteAudioDays'),
   interruptedPartsRetentionDays: nonNegativeIntValidator('interruptedPartsRetentionDays'),
+  autoDeleteMeetingsDays: nonNegativeIntValidator('autoDeleteMeetingsDays'),
   keepOriginalAudio: booleanValidator('keepOriginalAudio'),
 };
 

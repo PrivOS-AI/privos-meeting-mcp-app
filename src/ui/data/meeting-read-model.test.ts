@@ -10,7 +10,7 @@ interface RestReq {
 }
 
 /** Fake McpApp recording REST + tool calls, with optional folder-delete failure. */
-function makeFakeApp(opts: { failFolderDelete?: boolean } = {}) {
+function makeFakeApp(opts: { failFolderDelete?: boolean; forgetResult?: unknown } = {}) {
   const restCalls: RestReq[] = [];
   const toolCalls: Array<{ name: string; arguments: Record<string, unknown> }> = [];
 
@@ -25,6 +25,7 @@ function makeFakeApp(opts: { failFolderDelete?: boolean } = {}) {
     },
     async callServerTool(req: { name: string; arguments: Record<string, unknown> }) {
       toolCalls.push(req);
+      if (req.name === 'meeting_forget_voiceprints' && opts.forgetResult !== undefined) return opts.forgetResult;
       return null; // db.delete carries no envelope — passes straight through
     },
   } as unknown as McpApp;
@@ -44,6 +45,21 @@ function meeting(over: Partial<MeetingReadModel> = {}): MeetingReadModel {
 }
 
 describe('deleteMeeting', () => {
+  it('withdraws the meeting voice samples on the server before deleting anything', async () => {
+    const fake = makeFakeApp();
+    await deleteMeeting(fake.app, meeting());
+    expect(fake.toolCalls[0]).toEqual({ name: 'meeting_forget_voiceprints', arguments: { roomId: 'room-1', meetingId: 'm-1' } });
+  });
+
+  it('deletes nothing when the voice samples could not be withdrawn', async () => {
+    const fake = makeFakeApp({
+      forgetResult: { isError: true, content: [{ type: 'text', text: 'Only the meeting owner can perform this action.' }], structuredContent: { error: { code: 'NOT_MEETING_OWNER', message: 'Only the meeting owner can perform this action.' } } },
+    });
+    await expect(deleteMeeting(fake.app, meeting())).rejects.toMatchObject({ code: 'NOT_MEETING_OWNER' });
+    expect(fake.restCalls).toEqual([]);
+    expect(fake.toolCalls.some((c) => c.name === 'mcpapp.db.delete')).toBe(false);
+  });
+
   it('recursively deletes the meeting folder (one call), then the db row, and does not delete files individually', async () => {
     const fake = makeFakeApp();
     await deleteMeeting(fake.app, meeting());

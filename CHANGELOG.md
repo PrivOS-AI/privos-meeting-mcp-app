@@ -64,6 +64,12 @@ Marketplace packaging.
   `speakerSession*` keys (env-only) and the caption reveal-delay slider.
 - Room settings are read by exact key; one 200-row page of the shared
   `app_settings` collection missed a room's rows once a workspace had enough rooms.
+- Deleting a meeting also removes the voice samples taken from it (new
+  `meeting_forget_voiceprints`, called first; nothing is deleted if it fails)
+  and its node-local diagnostics.
+- New room setting `autoDeleteMeetingsDays` (default 0 = keep): the retention
+  sweep deletes a finished meeting's voice samples, files and records after N
+  days, keeping the row for a retry if a file cannot be deleted.
 - Data policy rewritten to match actual behaviour, including what is not
   deleted automatically (transcripts, summaries, data left after uninstall).
 - Dependencies: `@privos_ai/app-server` 0.12, `@privos_ai/app-react` 0.8, `zod` 4,

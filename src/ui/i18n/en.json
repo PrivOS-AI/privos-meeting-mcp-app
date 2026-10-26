@@ -354,6 +354,7 @@
   "settings.privacy.keepAudio": "Keep original audio (off by default)",
   "settings.privacy.autoDeleteDays": "Auto-delete audio after N days (0 = off)",
   "settings.privacy.interruptedPartsDays": "Clean up interrupted meeting parts after N days",
+  "settings.privacy.autoDeleteMeetingsDays": "Delete whole meetings (transcript, summary, audio, voice samples) after N days — 0 keeps them",
   "settings.privacy.deleteAllTitle": "Delete all voiceprints",
   "settings.privacy.deleteAllWarning": "Deletes every speaker profile in the workspace — cannot be undone. Future meetings will stop auto-recognizing anyone.",
   "settings.privacy.deleteAllConfirmLabel": "Type \"{phrase}\" to confirm",

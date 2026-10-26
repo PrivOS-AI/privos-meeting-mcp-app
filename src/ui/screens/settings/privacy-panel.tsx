@@ -44,7 +44,7 @@ export function PrivacyPanel() {
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
   }, [app, roomId]);
 
-  async function change<K extends 'keepOriginalAudio' | 'autoDeleteAudioDays' | 'interruptedPartsRetentionDays'>(
+  async function change<K extends 'keepOriginalAudio' | 'autoDeleteAudioDays' | 'interruptedPartsRetentionDays' | 'autoDeleteMeetingsDays'>(
     key: K,
     value: WorkspaceAppSettings[K],
   ): Promise<void> {
@@ -118,6 +118,17 @@ export function PrivacyPanel() {
           value={settings?.interruptedPartsRetentionDays ?? 7}
           disabled={!canManage || !settings}
           onChange={(e) => void change('interruptedPartsRetentionDays', Math.max(0, Math.round(Number(e.target.value) || 0)))}
+        />
+      </label>
+
+      <label className="ma-settings-field">
+        <span>{t('settings.privacy.autoDeleteMeetingsDays')}</span>
+        <input
+          type="number"
+          min={0}
+          value={settings?.autoDeleteMeetingsDays ?? 0}
+          disabled={!canManage || !settings}
+          onChange={(e) => void change('autoDeleteMeetingsDays', Math.max(0, Math.round(Number(e.target.value) || 0)))}
         />
       </label>
 

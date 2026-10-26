@@ -379,6 +379,17 @@ export async function enrolEmbedding(db: AppDbBotClient, profileId: string, inpu
 }
 
 /** Back-propagation for `meeting_relabel_speaker` — drops every embedding this profile got FROM the given meeting, then recomputes `centroid`/`sampleCount`. A no-op (not an error) when the profile has none from that meeting. */
+/**
+ * Removes every voice sample taken from `meetingId` from every profile, so deleting a meeting
+ * (by its owner, or by the retention sweep) also withdraws the biometric data derived from it.
+ * Returns how many profiles changed. Idempotent.
+ */
+export async function forgetMeetingVoiceprints(db: AppDbBotClient, meetingId: string): Promise<number> {
+  const touched = (await listProfiles(db)).filter((profile) => profile.embeddings.some((e) => e.meetingId === meetingId));
+  for (const profile of touched) await removeEmbeddingsOfMeeting(db, profile.id, meetingId);
+  return touched.length;
+}
+
 export async function removeEmbeddingsOfMeeting(db: AppDbBotClient, profileId: string, meetingId: string): Promise<void> {
   await withProfileLock(profileId, async () => {
     const row = await db.getById(COLLECTION, SCOPE, profileId);

@@ -352,6 +352,7 @@
   "settings.privacy.keepAudio": "Conserver l'audio original (désactivé par défaut)",
   "settings.privacy.autoDeleteDays": "Suppression automatique de l'audio après N jours (0 = désactivé)",
   "settings.privacy.interruptedPartsDays": "Nettoyer les parties de réunion interrompues après N jours",
+  "settings.privacy.autoDeleteMeetingsDays": "Supprimer les réunions entières (transcription, résumé, audio, échantillons vocaux) après N jours — 0 les conserve",
   "settings.privacy.deleteAllTitle": "Supprimer toutes les empreintes vocales",
   "settings.privacy.deleteAllWarning": "Supprime tous les profils d'intervenants de l'espace de travail — action irréversible. Les futures réunions cesseront de reconnaître automatiquement les participants.",
   "settings.privacy.deleteAllConfirmLabel": "Saisissez « {phrase} » pour confirmer",

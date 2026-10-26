@@ -352,6 +352,7 @@
   "settings.privacy.keepAudio": "保留原始音频（默认关闭）",
   "settings.privacy.autoDeleteDays": "N 天后自动删除音频（0 表示关闭）",
   "settings.privacy.interruptedPartsDays": "N 天后清理中断的会议片段",
+  "settings.privacy.autoDeleteMeetingsDays": "N 天后删除整个会议（转录、摘要、音频、语音样本）— 0 表示保留",
   "settings.privacy.deleteAllTitle": "删除所有声纹",
   "settings.privacy.deleteAllWarning": "将删除工作区中的所有发言人档案 — 此操作无法撤销。未来的会议将不再自动识别任何人。",
   "settings.privacy.deleteAllConfirmLabel": "输入“{phrase}”以确认",

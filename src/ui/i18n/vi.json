@@ -354,6 +354,7 @@
   "settings.privacy.keepAudio": "Giữ audio gốc (mặc định tắt)",
   "settings.privacy.autoDeleteDays": "Tự xoá audio sau N ngày (0 = tắt)",
   "settings.privacy.interruptedPartsDays": "Dọn part của cuộc họp bị gián đoạn sau N ngày",
+  "settings.privacy.autoDeleteMeetingsDays": "Xoá toàn bộ cuộc họp (transcript, tóm tắt, audio, mẫu giọng) sau N ngày — 0 là giữ lại",
   "settings.privacy.deleteAllTitle": "Xoá toàn bộ voiceprint",
   "settings.privacy.deleteAllWarning": "Xoá mọi hồ sơ giọng nói trong workspace — không thể hoàn tác. Các cuộc họp sau sẽ không tự nhận ra ai nữa.",
   "settings.privacy.deleteAllConfirmLabel": "Gõ \"{phrase}\" để xác nhận",
