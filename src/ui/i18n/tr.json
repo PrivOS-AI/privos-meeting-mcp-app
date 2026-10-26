@@ -137,6 +137,7 @@
   "speaker.resolveModal.submit": "Onayla",
   "speaker.resolveModal.submitting": "Kaydediliyor…",
   "speaker.resolveModal.enrolDeferredNotice": "Adlandırıldı. Ses örneği otomatik olarak hatırlanacak kadar net değildi — bu toplantının işlenmesi bittikten sonra iyileşecek.",
+  "speaker.resolveModal.enrolNotPermittedNotice": "Adlandırıldı. Ses örneği, sizin oluşturmadığınız mevcut bir profile eklenmedi — yalnızca oluşturan kişi, bağlı kişi veya bir çalışma alanı yöneticisi örnek ekleyebilir.",
   "speaker.resolveModal.done": "Tamam",
 
   "speaker.memberPicker.placeholder": "Bir üyenin adını yazın…",

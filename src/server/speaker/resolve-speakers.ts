@@ -311,16 +311,18 @@ export async function resolveSpeakers(
         out.push({ speakerId: plan.speakerId, totalSpeakSec: plan.totalSpeakSec, sampleSec: plan.totalSec, sampleRange, resolved: true, displayName: userIdentity.displayName, nameSource: 'user' });
         continue;
       }
-      await logEvent(meetingId, {
-        t: Date.now(),
-        meetingId,
-        type: 'enrol',
-        profile: enrolResult.profile.id,
-        source: 'user-post',
-        coherence,
-        durationSec: plan.totalSec,
-        vectorCountAfter: enrolResult.vectorCountAfter,
-      });
+      if (enrolResult.enrolled) {
+        await logEvent(meetingId, {
+          t: Date.now(),
+          meetingId,
+          type: 'enrol',
+          profile: enrolResult.profile.id,
+          source: 'user-post',
+          coherence,
+          durationSec: plan.totalSec,
+          vectorCountAfter: enrolResult.vectorCountAfter,
+        });
+      }
       out.push({
         speakerId: plan.speakerId,
         totalSpeakSec: plan.totalSpeakSec,

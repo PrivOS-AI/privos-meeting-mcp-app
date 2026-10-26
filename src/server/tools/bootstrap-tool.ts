@@ -8,14 +8,16 @@
  * only a user-execution call may add it (`bot:room:join` is user-only), so the
  * iframe calls `mcpapp.bot.joinCurrentRoom` before invoking this tool.
  *
- * Reserved seams (filled in later phases): sweep interrupted jobs (P3), sweep
- * abandoned recording meetings (P3), delete expired audio (P8).
+ * The bot acts on whatever room it is given, so the room must be the caller's
+ * own verified room — never a `roomId` from the arguments alone. Each run also
+ * sweeps stuck jobs and abandoned recordings and applies retention for the room.
  */
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, ensureAppDbSchema } from '../hub/app-db-bot-client.js';
 import { purgeExpiredAudio } from '../jobs/audio-retention-job.js';
 import { addKnownRoom } from '../jobs/known-rooms-store.js';
 import { sweepRoom } from '../jobs/startup-sweep.js';
+import { requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
 
 export const bootstrapTool: AppTool = {
@@ -23,9 +25,11 @@ export const bootstrapTool: AppTool = {
   title: 'Bootstrap room data',
   description: 'Register the App DB schema, record the room, and ensure the bot is a room member.',
   inputSchema: { type: 'object', required: ['roomId'], properties: { roomId: { type: 'string' } } },
-  async execute(args, _context, runtime) {
+  async execute(args, context, runtime) {
+    const actor = requireVerifiedActor(context);
     const roomId = typeof args.roomId === 'string' ? args.roomId.trim() : '';
     if (!roomId) throw new AppError('roomId is required.');
+    if (actor.roomId !== roomId) throw new AppError('Invalid request for this room.');
 
     const db = new AppDbBotClient(roomId);
     await ensureAppDbSchema(db);

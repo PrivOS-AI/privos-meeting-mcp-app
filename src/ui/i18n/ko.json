@@ -137,6 +137,7 @@
   "speaker.resolveModal.submit": "확인",
   "speaker.resolveModal.submitting": "저장 중…",
   "speaker.resolveModal.enrolDeferredNotice": "이름이 지정되었습니다. 음성 샘플이 아직 자동 인식에 충분히 명확하지 않습니다 — 이 회의 처리가 끝나면 개선됩니다.",
+  "speaker.resolveModal.enrolNotPermittedNotice": "이름을 지정했습니다. 다른 사람이 만든 기존 프로필에는 음성 샘플을 추가하지 않았습니다. 생성자, 연결된 본인 또는 워크스페이스 관리자만 샘플을 추가할 수 있습니다.",
   "speaker.resolveModal.done": "완료",
 
   "speaker.memberPicker.placeholder": "구성원 이름 입력…",

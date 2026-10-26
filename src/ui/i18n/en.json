@@ -137,6 +137,7 @@
   "speaker.resolveModal.submit": "Confirm",
   "speaker.resolveModal.submitting": "Saving…",
   "speaker.resolveModal.enrolDeferredNotice": "Named. Their voice sample wasn't clear enough yet to remember automatically — it will improve after this meeting finishes processing.",
+  "speaker.resolveModal.enrolNotPermittedNotice": "Named. The voice sample was not added to an existing profile you did not create — only its creator, the linked person or a workspace admin can add samples to it.",
   "speaker.resolveModal.done": "Done",
 
   "speaker.memberPicker.placeholder": "Type a member's name…",

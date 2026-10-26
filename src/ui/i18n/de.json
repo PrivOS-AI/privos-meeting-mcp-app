@@ -137,6 +137,7 @@
   "speaker.resolveModal.submit": "Bestätigen",
   "speaker.resolveModal.submitting": "Wird gespeichert…",
   "speaker.resolveModal.enrolDeferredNotice": "Benannt. Die Sprachprobe ist noch nicht klar genug für automatische Erkennung — das verbessert sich, sobald dieses Meeting verarbeitet wurde.",
+  "speaker.resolveModal.enrolNotPermittedNotice": "Benannt. Die Stimmprobe wurde keinem vorhandenen Profil hinzugefügt, das Sie nicht erstellt haben — nur der Ersteller, die verknüpfte Person oder ein Workspace-Administrator kann Proben hinzufügen.",
   "speaker.resolveModal.done": "Fertig",
 
   "speaker.memberPicker.placeholder": "Namen eines Mitglieds eingeben…",

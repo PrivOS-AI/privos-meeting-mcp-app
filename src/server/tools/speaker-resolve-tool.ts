@@ -36,7 +36,7 @@ import { isLiveEnrolBarMet, isPostMeetingCoherent, openPendingEmbedding, readMat
 import { sessionRegistries } from '../speaker/session-speaker-registry.js';
 import { logEvent } from '../speaker/speaker-diagnostics-log.js';
 import { invalidateProfileCache, runOnMeetingQueue } from '../live-speakers/chunk-worker.js';
-import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
+import { isWorkspaceAdmin, requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
 
 /**
@@ -156,6 +156,7 @@ export const speakerResolveTool: AppTool = {
     // ended, or the post-meeting job already took over) has no such worker to
     // race, so a plain `await` is correct and cheaper.
     const holdsRegistry = sessionRegistries.has(meetingId);
+    const actorIsAdmin = isWorkspaceAdmin(actor);
 
     async function resolveOneAssignment(assignment: Assignment): Promise<AssignmentResult> {
       const row = await findSpeakerRow(db, meetingId, assignment.speakerId);
@@ -189,14 +190,14 @@ export const speakerResolveTool: AppTool = {
         if (!displayName) {
           return { speakerId: assignment.speakerId, enrolled: false, reason: 'invalid_display_name' };
         }
-        identity = { displayName, createdByUserId: actor.userId, createdInRoomId: roomId };
+        identity = { displayName, createdByUserId: actor.userId, createdInRoomId: roomId, actorIsAdmin };
       } else if (assignment.mode === 'user') {
         if (!assignment.privosUserId) {
           return { speakerId: assignment.speakerId, enrolled: false, reason: 'missing_privos_user_id' };
         }
         privosUserId = assignment.privosUserId;
         displayName = sanitizeDisplayName(assignment.displayName ?? '') || `User ${privosUserId.slice(0, 6)}`;
-        identity = { displayName, privosUserId, createdByUserId: actor.userId, createdInRoomId: roomId };
+        identity = { displayName, privosUserId, createdByUserId: actor.userId, createdInRoomId: roomId, actorIsAdmin };
       } else {
         // mode === 'merge'
         if (!assignment.profileId) {
@@ -207,7 +208,7 @@ export const speakerResolveTool: AppTool = {
           return { speakerId: assignment.speakerId, enrolled: false, reason: 'profile_not_found' };
         }
         displayName = target.displayName;
-        identity = { displayName, profileId: target.id, createdByUserId: actor.userId, createdInRoomId: roomId };
+        identity = { displayName, profileId: target.id, createdByUserId: actor.userId, createdInRoomId: roomId, actorIsAdmin };
       }
 
       const identityPatch: Record<string, unknown> = { displayName, nameSource: 'user', resolved: true };
@@ -230,6 +231,11 @@ export const speakerResolveTool: AppTool = {
         identityPatch.profileId = enrolResult.profile.id;
         identityPatch.displayName = enrolResult.profile.displayName || displayName;
         await db.update('meeting_speakers', 'room', row._id, identityPatch);
+        if (!enrolResult.enrolled) {
+          // Labelled with someone else's profile, but this caller may not add a voice sample to it (mayEnrolInto).
+          applyRegistryIdentity(meetingId, rowKey, { displayName: identityPatch.displayName as string, privosUserId, profileId: enrolResult.profile.id });
+          return { speakerId: assignment.speakerId, enrolled: false, profileId: enrolResult.profile.id, displayName: identityPatch.displayName as string, reason: 'enrol_not_permitted' };
+        }
         await logResolveEnrol(meetingId, enrolResult.profile.id, source, pending.minPairwiseCosine, pending.durationSec, enrolResult.vectorCountAfter);
         if (isLive) invalidateProfileCache();
         applyRegistryIdentity(meetingId, rowKey, { displayName: identityPatch.displayName as string, privosUserId, profileId: enrolResult.profile.id });

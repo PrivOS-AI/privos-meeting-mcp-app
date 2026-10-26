@@ -137,6 +137,7 @@
   "speaker.resolveModal.submit": "Confirmer",
   "speaker.resolveModal.submitting": "Enregistrement…",
   "speaker.resolveModal.enrolDeferredNotice": "Nommé. L'échantillon vocal n'est pas encore assez clair pour être reconnu automatiquement — cela s'améliorera une fois cette réunion traitée.",
+  "speaker.resolveModal.enrolNotPermittedNotice": "Nommé. L'échantillon vocal n'a pas été ajouté à un profil existant que vous n'avez pas créé — seuls son créateur, la personne liée ou un administrateur de l'espace peuvent y ajouter des échantillons.",
   "speaker.resolveModal.done": "Terminé",
 
   "speaker.memberPicker.placeholder": "Saisissez le nom d'un membre…",

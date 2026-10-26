@@ -20,7 +20,7 @@ import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
 import * as profileStore from '../speaker/profile-store.js';
 import { isPostMeetingCoherent, openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
 import { logEvent } from '../speaker/speaker-diagnostics-log.js';
-import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
+import { isWorkspaceAdmin, requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
 
 function asString(value: unknown): string {
@@ -104,7 +104,10 @@ export const relabelSpeakerTool: AppTool = {
       }
     }
 
-    if (movedVector) {
+    // Someone else's profile keeps its samples: the meeting is relabelled, the vector is not added (see `mayEnrolInto`).
+    const mayEnrol = profileStore.mayEnrolInto(target, actor.userId, isWorkspaceAdmin(actor));
+    const enrolled = Boolean(movedVector) && mayEnrol;
+    if (movedVector && mayEnrol) {
       const vectorCountAfter = await profileStore.enrolEmbedding(db, target.id, {
         vector: movedVector,
         meetingId,
@@ -132,6 +135,6 @@ export const relabelSpeakerTool: AppTool = {
       resolved: true,
     });
 
-    return { updated: true, profileId: target.id, displayName, enrolled: Boolean(movedVector) };
+    return { updated: true, profileId: target.id, displayName, enrolled, ...(movedVector && !mayEnrol ? { reason: 'enrol_not_permitted' } : {}) };
   },
 };

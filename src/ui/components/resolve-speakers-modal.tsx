@@ -85,7 +85,7 @@ export function ResolveSpeakersModal({ roomId, meetingId, speakers, onClose, onR
       // A row named live but not yet coherent enough to enrol (`enrol_deferred`) is still a SUCCESSFUL name —
       // no client retry loop (plan.md) — but the human should see that the voiceprint itself is still pending
       // before the modal disappears, instead of it looking like nothing happened.
-      if (results.some((r) => r.reason === 'enrol_deferred')) {
+      if (results.some((r) => r.reason === 'enrol_deferred' || r.reason === 'enrol_not_permitted')) {
         setDeferredResults(results);
         return;
       }
@@ -172,8 +172,11 @@ export function ResolveSpeakersModal({ roomId, meetingId, speakers, onClose, onR
           </p>
         ) : null}
 
-        {deferredResults ? (
+        {deferredResults?.some((r) => r.reason === 'enrol_deferred') ? (
           <p className="ma-notice ma-notice--info ma-resolve-speakers__deferred-notice">{t('speaker.resolveModal.enrolDeferredNotice')}</p>
+        ) : null}
+        {deferredResults?.some((r) => r.reason === 'enrol_not_permitted') ? (
+          <p className="ma-notice ma-notice--info ma-resolve-speakers__deferred-notice">{t('speaker.resolveModal.enrolNotPermittedNotice')}</p>
         ) : null}
 
         <div className="ma-resolve-speakers__actions">

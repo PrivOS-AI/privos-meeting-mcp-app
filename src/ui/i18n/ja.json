@@ -137,6 +137,7 @@
   "speaker.resolveModal.submit": "確認",
   "speaker.resolveModal.submitting": "保存中…",
   "speaker.resolveModal.enrolDeferredNotice": "名前を設定しました。音声サンプルがまだ自動認識には不十分です — この会議の処理が完了すると改善されます。",
+  "speaker.resolveModal.enrolNotPermittedNotice": "名前を設定しました。他の人が作成した既存のプロフィールには音声サンプルを追加していません。追加できるのは作成者、紐付けられた本人、またはワークスペース管理者のみです。",
   "speaker.resolveModal.done": "完了",
 
   "speaker.memberPicker.placeholder": "メンバーの名前を入力…",

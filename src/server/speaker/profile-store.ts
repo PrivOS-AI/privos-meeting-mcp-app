@@ -419,6 +419,21 @@ export interface EnrolIdentity {
   profileId?: string;
   createdByUserId: string;
   createdInRoomId?: string;
+  /** The confirming user is a workspace admin (signed `workspace_roles`) — may add voice samples to any profile. */
+  actorIsAdmin?: boolean;
+}
+
+/**
+ * Who may add a voice sample to an EXISTING profile: its creator, the PrivOS
+ * user the profile is linked to (their own voice), or a workspace admin.
+ * Anyone else may still label a meeting's speaker with that profile, but a
+ * sample they confirm never lands in it — otherwise any meeting owner could
+ * poison another person's voiceprint (picked by id, matched by display name,
+ * or found through a linked user id) and have the wrong voice auto-labelled
+ * with that name in every room.
+ */
+export function mayEnrolInto(profile: Pick<SpeakerProfile, 'createdByUserId' | 'privosUserId'>, actorUserId: string, actorIsAdmin = false): boolean {
+  return actorIsAdmin || profile.createdByUserId === actorUserId || (Boolean(profile.privosUserId) && profile.privosUserId === actorUserId);
 }
 
 /**
@@ -432,13 +447,15 @@ export interface EnrolIdentity {
  * a freshly created profile. Returns `null` only when `profileId` was given
  * but no longer exists — the caller reports `profile_not_found` rather than
  * silently creating a different profile than the one the human picked.
+ * An existing profile the confirming user may not enrol into ({@link mayEnrolInto})
+ * is returned with `enrolled: false` and left untouched (no sample, no user link).
  */
 export async function findOrCreateProfileAndEnrol(
   db: AppDbBotClient,
   identity: EnrolIdentity,
   vector: Float32Array,
   meta: { meetingId: string; durationSec: number; source: EnrolSource; speakerKey: string; alsoReplaceSpeakerKeys?: readonly string[] },
-): Promise<{ profile: SpeakerProfile; vectorCountAfter: number } | null> {
+): Promise<{ profile: SpeakerProfile; vectorCountAfter: number; enrolled: boolean } | null> {
   let profile: SpeakerProfile | null = null;
   if (identity.profileId) {
     profile = await getProfile(db, identity.profileId);
@@ -453,9 +470,14 @@ export async function findOrCreateProfileAndEnrol(
         createdInRoomId: identity.createdInRoomId,
         privosUserId: identity.privosUserId,
       });
+    } else if (!mayEnrolInto(profile, identity.createdByUserId, identity.actorIsAdmin)) {
+      return { profile, vectorCountAfter: profile.embeddings.length, enrolled: false };
     } else if (identity.privosUserId && !profile.privosUserId) {
       await linkPrivosUser(db, profile.id, identity.privosUserId);
     }
+  }
+  if (!mayEnrolInto(profile, identity.createdByUserId, identity.actorIsAdmin)) {
+    return { profile, vectorCountAfter: profile.embeddings.length, enrolled: false };
   }
 
   const vectorCountAfter = await enrolEmbedding(db, profile.id, {
@@ -466,7 +488,7 @@ export async function findOrCreateProfileAndEnrol(
     speakerKey: meta.speakerKey,
     alsoReplaceSpeakerKeys: meta.alsoReplaceSpeakerKeys,
   });
-  return { profile, vectorCountAfter };
+  return { profile, vectorCountAfter, enrolled: true };
 }
 
 /**

@@ -25,6 +25,12 @@ Marketplace packaging.
   is deleted after processing by default.
 - The retention sweep also deletes audio that a failed summary left behind,
   after the room's auto-delete period; before, that audio was never deleted.
+- `meeting_bootstrap` only runs for the caller's own room; before, any verified
+  user could make the bot sweep and purge audio in another room.
+- A meeting owner can no longer add voice samples to someone else's voiceprint
+  (picked by id, matched by display name, or found through a linked user):
+  only the profile's creator, the linked person or a workspace admin may.
+  Others still label the speaker; the result says `enrol_not_permitted`.
 - Data policy rewritten to match actual behaviour, including what is not
   deleted automatically (transcripts, summaries, data left after uninstall).
 - Dependencies: `@privos_ai/app-server` 0.12, `@privos_ai/app-react` 0.8, `zod` 4,

@@ -23,8 +23,8 @@ let fakeHub: ReturnType<typeof installFakeHub>;
 
 const { speakerResolveTool } = await import('./speaker-resolve-tool.js');
 
-function ctx(userId = 'owner-1'): ToolCallContext {
-  return { transport: 'direct', identityState: 'verified', sessionScope: 'test', actor: { userId, roomId: 'room-1', claims: {}, provenance: 'user-token' } };
+function ctx(userId = 'owner-1', workspaceRoles?: string[]): ToolCallContext {
+  return { transport: 'direct', identityState: 'verified', sessionScope: 'test', actor: { userId, roomId: 'room-1', claims: {}, provenance: 'user-token', ...(workspaceRoles ? { workspaceRoles } : {}) } };
 }
 
 function coherentPending(): string {
@@ -142,6 +142,42 @@ describe('speaker_resolve', () => {
 
     expect(result.resolved[0]).toMatchObject({ enrolled: true, profileId: 'profile-x' });
     expect(store.speaker_profiles[0].sampleCount).toBe(1);
+  });
+
+  describe('voiceprint poisoning guard (mayEnrolInto)', () => {
+    const foreignProfile = () => ({ _id: 'profile-alice', displayName: 'Alice', displayNameNormalized: 'alice', createdByUserId: 'someone-else', privosUserId: 'user-alice', embeddings: [], centroid: '', dim: 0, sampleCount: 0 });
+    type Resolved = { resolved: Array<{ enrolled: boolean; profileId?: string; reason?: string }> };
+    const run = (assignment: Record<string, unknown>, context = ctx()) =>
+      speakerResolveTool.execute({ roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', ...assignment }] }, context, {} as never) as Promise<Resolved>;
+
+    beforeEach(() => {
+      store.speaker_profiles = [foreignProfile()];
+    });
+
+    it.each([
+      ['merge by id', { mode: 'merge', profileId: 'profile-alice' }],
+      ['name matching the display name', { mode: 'name', displayName: 'Alice' }],
+      ['user matching the linked user', { mode: 'user', privosUserId: 'user-alice', displayName: 'Alice' }],
+    ])("%s: labels the speaker but never adds a sample to another person's profile", async (_label, assignment) => {
+      const result = await run(assignment);
+      expect(result.resolved[0]).toMatchObject({ enrolled: false, profileId: 'profile-alice', reason: 'enrol_not_permitted' });
+      expect(store.speaker_profiles).toHaveLength(1);
+      expect(store.speaker_profiles[0].sampleCount).toBe(0);
+      expect(store.meeting_speakers[0]).toMatchObject({ profileId: 'profile-alice', resolved: true });
+    });
+
+    it('lets a workspace admin add the sample', async () => {
+      const result = await run({ mode: 'merge', profileId: 'profile-alice' }, ctx('owner-1', ['admin']));
+      expect(result.resolved[0]).toMatchObject({ enrolled: true, profileId: 'profile-alice' });
+      expect(store.speaker_profiles[0].sampleCount).toBe(1);
+    });
+
+    it('lets the linked user add their own voice', async () => {
+      store.meetings[0].ownerUserId = 'user-alice';
+      const result = await run({ mode: 'merge', profileId: 'profile-alice' }, ctx('user-alice'));
+      expect(result.resolved[0]).toMatchObject({ enrolled: true });
+      expect(store.speaker_profiles[0].sampleCount).toBe(1);
+    });
   });
 
   it('is idempotent — resolving an already-resolved speaker again is a no-op', async () => {
