@@ -359,9 +359,20 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
     const userIdentityBySpeakerId = deriveUserIdentities(asyncToLiveMap, liveIdentities, meetingOwnerUserId);
 
     await jobRepo.patch(job._id, { step: 'embed', progress: 0.7 });
-    const resolved = (await isSpeakerRecognitionEnabled(db))
-      ? await resolveSpeakersEmbed(db, wavPath, segments, job.meetingId, userIdentityBySpeakerId)
-      : resolveSpeakersWithoutVoiceprints(segments, userIdentityBySpeakerId);
+    // Speaker recognition is an enhancement: a missing model or a failed embedding must never cost
+    // the meeting its transcript, so it falls back to the names assigned during the meeting.
+    let resolved: Awaited<ReturnType<typeof resolveSpeakersEmbed>>;
+    if (await isSpeakerRecognitionEnabled(db)) {
+      try {
+        resolved = await resolveSpeakersEmbed(db, wavPath, segments, job.meetingId, userIdentityBySpeakerId);
+      } catch (error) {
+        if (signal.aborted) throw error;
+        console.warn('[meeting-job] speaker recognition failed, continuing without voiceprints:', error instanceof Error ? error.message : error);
+        resolved = resolveSpeakersWithoutVoiceprints(segments, userIdentityBySpeakerId);
+      }
+    } else {
+      resolved = resolveSpeakersWithoutVoiceprints(segments, userIdentityBySpeakerId);
+    }
     const speakerUpserts: SpeakerUpsertInput[] = resolved.map((s, i) => ({
       speakerId: s.speakerId,
       totalSpeakSec: s.totalSpeakSec,
