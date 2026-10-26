@@ -49,6 +49,8 @@
   "screen.new.translation": "Activer les sous-titres bilingues",
   "screen.new.translationTarget": "Langue cible de traduction",
   "screen.new.provider": "Fournisseur de sous-titres en direct : {provider}",
+  "screen.new.voiceprintNotice": "Ce salon reconnaît les intervenants habituels à leur voix : les voix de cette réunion peuvent être comparées à des empreintes vocales enregistrées et y être ajoutées. Prévenez les participants avant de commencer.",
+  "screen.new.voiceprintAcknowledge": "J'ai prévenu les participants",
   "screen.new.start": "Démarrer l'enregistrement",
   "screen.new.starting": "Demande d'accès au microphone…",
   "screen.new.micDenied": "Le navigateur a refusé l'accès au microphone. Autorisez l'accès au micro pour cette page et réessayez.",
@@ -160,6 +162,8 @@
   "speaker.labelEditor.save": "Enregistrer",
 
   "speaker.settingsPanel.title": "Identification des intervenants",
+  "speaker.settingsPanel.recognitionToggle": "Reconnaître les intervenants habituels à leur voix (empreintes vocales)",
+  "speaker.settingsPanel.recognitionHint": "Les empreintes vocales sont des données biométriques. Désactivé, ce salon n'en calcule ni n'en stocke aucune : les libellés d'intervenant viennent uniquement du fournisseur de transcription, et les noms attribués sont conservés sans échantillon vocal.",
   "speaker.settingsPanel.loading": "Chargement des profils…",
   "speaker.settingsPanel.empty": "Aucun profil d'intervenant pour l'instant.",
   "speaker.settingsPanel.colName": "Nom",

@@ -32,7 +32,7 @@ import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, extractDbRecords, type DbRow } from '../hub/app-db-bot-client.js';
 import * as profileStore from '../speaker/profile-store.js';
 import type { EnrolIdentity, EnrolSource } from '../speaker/profile-store.js';
-import { isLiveEnrolBarMet, isPostMeetingCoherent, openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
+import { isLiveEnrolBarMet, isPostMeetingCoherent, isSpeakerRecognitionEnabled, openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
 import { sessionRegistries } from '../speaker/session-speaker-registry.js';
 import { logEvent } from '../speaker/speaker-diagnostics-log.js';
 import { invalidateProfileCache, runOnMeetingQueue } from '../live-speakers/chunk-worker.js';
@@ -154,6 +154,8 @@ export const speakerResolveTool: AppTool = {
     await requireMeetingOwner(db, actor, roomId, meetingId);
 
     const threshold = await readMatchThreshold(db);
+    // Recognition off for this room: identities are still saved, but no voice sample is ever enrolled.
+    const recognitionOn = await isSpeakerRecognitionEnabled(db);
     // Whether THIS process is running the meeting's live chunk worker — decided
     // once, before the loop: it cannot change mid-call, and it is what gates
     // whether an assignment's row-write + registry-mutation must be
@@ -185,7 +187,7 @@ export const speakerResolveTool: AppTool = {
       const expectedProfileId = isLive ? `live:${meetingId}:${rowKey}` : `pending:${meetingId}:${rowKey}`;
       const pendingJson = typeof row.pendingEmbedding === 'string' && row.pendingEmbedding ? row.pendingEmbedding : null;
       const pending = pendingJson ? openPendingEmbedding(pendingJson, expectedProfileId) : null;
-      const coherent = pending ? (isLive ? isLiveEnrolBarMet(pending) : isPostMeetingCoherent(pending, threshold)) : false;
+      const coherent = recognitionOn && pending ? (isLive ? isLiveEnrolBarMet(pending) : isPostMeetingCoherent(pending, threshold)) : false;
 
       let displayName: string | undefined;
       let privosUserId: string | undefined;

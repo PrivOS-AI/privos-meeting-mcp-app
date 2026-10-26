@@ -49,6 +49,8 @@
   "screen.new.translation": "バイリンガル字幕を有効にする",
   "screen.new.translationTarget": "翻訳先の言語",
   "screen.new.provider": "リアルタイム字幕プロバイダー: {provider}",
+  "screen.new.voiceprintNotice": "このルームは声で既知の話者を認識します。この会議の声は保存済みの声紋と照合され、追加される場合があります。開始前に参加者へ伝えてください。",
+  "screen.new.voiceprintAcknowledge": "参加者に伝えました",
   "screen.new.start": "録音を開始",
   "screen.new.starting": "マイクへのアクセスを要求しています…",
   "screen.new.micDenied": "ブラウザがマイクへのアクセスを拒否しました。このページにマイクの許可を与えてから再試行してください。",
@@ -160,6 +162,8 @@
   "speaker.labelEditor.save": "保存",
 
   "speaker.settingsPanel.title": "話者識別",
+  "speaker.settingsPanel.recognitionToggle": "声で既知の話者を認識する（声紋）",
+  "speaker.settingsPanel.recognitionHint": "声紋は生体データです。オフにすると、このルームでは声紋を一切計算・保存しません。話者ラベルは音声認識プロバイダーのものだけになり、付けた名前は音声サンプルなしで保持されます。",
   "speaker.settingsPanel.loading": "プロフィールを読み込み中…",
   "speaker.settingsPanel.empty": "話者プロフィールはまだありません。",
   "speaker.settingsPanel.colName": "名前",

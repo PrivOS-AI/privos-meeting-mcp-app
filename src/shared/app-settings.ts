@@ -21,6 +21,12 @@ export type SettingsLanguage = LanguageCode | 'auto';
 export interface WorkspaceAppSettings {
   sttRealtimeProvider: SttVendor;
   sttAsyncProvider: SttVendor;
+  /**
+   * Voiceprint speaker recognition (embeddings, profile matching, enrolment) for this room.
+   * Off: speaker labels come from the speech-to-text provider only and no biometric data is
+   * computed or stored.
+   */
+  speakerRecognition: boolean;
   speakerMatchThreshold: number;
   summaryLength: SummaryLength;
   summaryLanguage: SettingsLanguage;
@@ -47,6 +53,7 @@ export const SPEAKER_MATCH_THRESHOLD_FLOOR = 0.35;
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceAppSettings = {
   sttRealtimeProvider: 'soniox',
   sttAsyncProvider: 'soniox',
+  speakerRecognition: true,
   speakerMatchThreshold: 0.5,
   summaryLength: 'normal',
   summaryLanguage: 'auto',
@@ -98,6 +105,7 @@ function booleanValidator(name: string): Validator {
 export const WORKSPACE_SETTING_VALIDATORS: Record<keyof WorkspaceAppSettings, Validator> = {
   sttRealtimeProvider: enumValidator('sttRealtimeProvider', ['soniox', 'elevenlabs']),
   sttAsyncProvider: enumValidator('sttAsyncProvider', ['soniox', 'elevenlabs']),
+  speakerRecognition: booleanValidator('speakerRecognition'),
   speakerMatchThreshold: unitFractionValidator('speakerMatchThreshold'),
   summaryLength: enumValidator('summaryLength', ['short', 'normal', 'detailed']),
   summaryLanguage: enumValidator('summaryLanguage', ['auto', ...SUPPORTED_LANGUAGES]),

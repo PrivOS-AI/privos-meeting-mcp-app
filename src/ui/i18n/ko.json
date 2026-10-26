@@ -49,6 +49,8 @@
   "screen.new.translation": "이중 언어 자막 사용",
   "screen.new.translationTarget": "번역 대상 언어",
   "screen.new.provider": "실시간 자막 제공업체: {provider}",
+  "screen.new.voiceprintNotice": "이 룸은 목소리로 기존 화자를 인식합니다. 이 회의의 목소리가 저장된 성문과 대조되고 추가될 수 있습니다. 시작하기 전에 참석자에게 알리세요.",
+  "screen.new.voiceprintAcknowledge": "참석자에게 알렸습니다",
   "screen.new.start": "녹음 시작",
   "screen.new.starting": "마이크 권한을 요청하는 중…",
   "screen.new.micDenied": "브라우저가 마이크 접근을 거부했습니다. 이 페이지에 마이크 권한을 허용한 후 다시 시도하세요.",
@@ -160,6 +162,8 @@
   "speaker.labelEditor.save": "저장",
 
   "speaker.settingsPanel.title": "화자 식별",
+  "speaker.settingsPanel.recognitionToggle": "목소리로 기존 화자 인식(성문)",
+  "speaker.settingsPanel.recognitionHint": "성문은 생체 데이터입니다. 끄면 이 룸에서는 성문을 계산하거나 저장하지 않습니다. 화자 라벨은 음성 인식 제공업체에서만 가져오며, 지정한 이름은 음성 샘플 없이 유지됩니다.",
   "speaker.settingsPanel.loading": "프로필 불러오는 중…",
   "speaker.settingsPanel.empty": "아직 화자 프로필이 없습니다.",
   "speaker.settingsPanel.colName": "이름",

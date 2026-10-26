@@ -70,6 +70,12 @@ Marketplace packaging.
 - New room setting `autoDeleteMeetingsDays` (default 0 = keep): the retention
   sweep deletes a finished meeting's voice samples, files and records after N
   days, keeping the row for a retry if a file cannot be deleted.
+- Voiceprint recognition is a room setting (`speakerRecognition`, on by
+  default). Off: no embedding, matching or enrolment anywhere — live chunks are
+  not processed, the post-meeting pass keeps assigned names without reading
+  audio, `speaker_resolve`/`meeting_relabel_speaker` save names only. On: the
+  new-meeting screen tells the recorder voices may be matched and requires them
+  to confirm they told participants; the time is stored as `voiceprintNoticeAt`.
 - Data policy rewritten to match actual behaviour, including what is not
   deleted automatically (transcripts, summaries, data left after uninstall).
 - Dependencies: `@privos_ai/app-server` 0.12, `@privos_ai/app-react` 0.8, `zod` 4,

@@ -80,6 +80,18 @@ describe('speaker_resolve', () => {
     sessionRegistries.delete('meeting-2');
   });
 
+  it('keeps the name but enrols nothing when the room turned speaker recognition off', async () => {
+    store.app_settings = [{ _id: 's1', key: 'room:room-1:speakerRecognition', valueJson: 'false' }];
+    const result = (await speakerResolveTool.execute(
+      { roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'name', displayName: 'Alex Smith' }] },
+      ctx(),
+      {} as never,
+    )) as { resolved: Array<{ enrolled: boolean }> };
+    expect(result.resolved[0].enrolled).toBe(false);
+    expect(store.speaker_profiles).toHaveLength(0);
+    expect(store.meeting_speakers[0]).toMatchObject({ displayName: 'Alex Smith', resolved: true });
+  });
+
   it('rejects a non-owner', async () => {
     await expect(
       speakerResolveTool.execute({ roomId: 'room-1', meetingId: 'meeting-1', assignments: [{ speakerId: 'spk1', mode: 'skip' }] }, ctx('someone-else'), {} as never),

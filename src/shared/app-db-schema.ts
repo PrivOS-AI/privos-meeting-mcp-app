@@ -90,6 +90,8 @@ export const SCHEMAS: readonly CollectionSchema[] = [
       { name: 'partCount', type: 'number' },
       { name: 'lastPartAt', type: 'date' },
       { name: 'keepAudio', type: 'boolean' },
+      // When the recorder confirmed they told participants that voices may be matched to voiceprints.
+      { name: 'voiceprintNoticeAt', type: 'date' },
       // JSON {recorderEpochMs, sessions:[{index,wsSessionOffsetMs,startedAt,clockSkewMs}]}
       { name: 'sttSessionMeta', type: 'string', maxLength: 20000 },
       { name: 'liveTurnsFileId', type: 'string' },

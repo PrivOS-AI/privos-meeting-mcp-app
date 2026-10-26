@@ -18,7 +18,7 @@ import { sanitizeDisplayName } from '../../shared/sanitize-display-name.js';
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
 import * as profileStore from '../speaker/profile-store.js';
-import { isPostMeetingCoherent, openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
+import { isPostMeetingCoherent, isSpeakerRecognitionEnabled, openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
 import { logEvent } from '../speaker/speaker-diagnostics-log.js';
 import { isWorkspaceAdmin, requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
@@ -100,7 +100,7 @@ export const relabelSpeakerTool: AppTool = {
     }
 
     // Someone else's profile keeps its samples: the meeting is relabelled, the vector is not added (see `mayEnrolInto`).
-    const mayEnrol = profileStore.mayEnrolInto(target, actor.userId, isWorkspaceAdmin(actor));
+    const mayEnrol = profileStore.mayEnrolInto(target, actor.userId, isWorkspaceAdmin(actor)) && (await isSpeakerRecognitionEnabled(db));
     const enrolled = Boolean(movedVector) && mayEnrol;
     if (movedVector && mayEnrol) {
       const vectorCountAfter = await profileStore.enrolEmbedding(db, target.id, {

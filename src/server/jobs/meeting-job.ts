@@ -25,7 +25,12 @@ import { deleteRoomFile } from '../media/hub-file-download.js';
 import { readLiveTurns, type LiveTurnSpan } from '../media/live-turns-store.js';
 import { dataDir } from '../paths.js';
 import { abortMeetingQueue } from '../live-speakers/chunk-worker.js';
-import { resolveSpeakers as resolveSpeakersEmbed, type UserIdentity } from '../speaker/resolve-speakers.js';
+import {
+  isSpeakerRecognitionEnabled,
+  resolveSpeakers as resolveSpeakersEmbed,
+  resolveSpeakersWithoutVoiceprints,
+  type UserIdentity,
+} from '../speaker/resolve-speakers.js';
 import { sessionRegistries } from '../speaker/session-speaker-registry.js';
 import { uploadRoomCopy } from '../speaker/speaker-diagnostics-log.js';
 import { chunkTranscript } from '../summary/chunker.js';
@@ -354,7 +359,9 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
     const userIdentityBySpeakerId = deriveUserIdentities(asyncToLiveMap, liveIdentities, meetingOwnerUserId);
 
     await jobRepo.patch(job._id, { step: 'embed', progress: 0.7 });
-    const resolved = await resolveSpeakersEmbed(db, wavPath, segments, job.meetingId, userIdentityBySpeakerId);
+    const resolved = (await isSpeakerRecognitionEnabled(db))
+      ? await resolveSpeakersEmbed(db, wavPath, segments, job.meetingId, userIdentityBySpeakerId)
+      : resolveSpeakersWithoutVoiceprints(segments, userIdentityBySpeakerId);
     const speakerUpserts: SpeakerUpsertInput[] = resolved.map((s, i) => ({
       speakerId: s.speakerId,
       totalSpeakSec: s.totalSpeakSec,

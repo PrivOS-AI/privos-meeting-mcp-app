@@ -61,6 +61,13 @@ describe('meeting_chunk_ready', () => {
     expect(req.segments).toHaveLength(2);
   });
 
+  it('computes nothing biometric when the room turned speaker recognition off', async () => {
+    store.app_settings = [{ _id: 's1', key: 'room:room-1:speakerRecognition', valueJson: 'false' }];
+    const result = await chunkReadyTool.execute({ ...baseArgs, segments: [{ speaker: 's0:1', startMs: 0, endMs: 20_000, final: true }] }, context('user-1'), runtime);
+    expect(result).toEqual({ accepted: false, reason: 'speaker_recognition_disabled' });
+    expect(enqueueChunk).not.toHaveBeenCalled();
+  });
+
   it('rejects a caller who is not the meeting owner, without enqueueing', async () => {
     await expect(chunkReadyTool.execute({ ...baseArgs, segments: [] }, context('user-2'), runtime)).rejects.toThrow(/meeting owner/);
     expect(enqueueChunk).not.toHaveBeenCalled();

@@ -49,6 +49,8 @@
   "screen.new.translation": "Bật phụ đề song ngữ",
   "screen.new.translationTarget": "Ngôn ngữ dịch",
   "screen.new.provider": "Nhà cung cấp phụ đề trực tiếp: {provider}",
+  "screen.new.voiceprintNotice": "Room này nhận diện người nói quen bằng giọng: giọng trong cuộc họp có thể được so khớp và thêm vào voiceprint đã lưu. Hãy thông báo cho người tham dự trước khi bắt đầu.",
+  "screen.new.voiceprintAcknowledge": "Tôi đã thông báo cho người tham dự",
   "screen.new.start": "Bắt đầu ghi",
   "screen.new.starting": "Đang xin quyền micro…",
   "screen.new.micDenied": "Trình duyệt từ chối quyền micro. Vui lòng cấp quyền micro cho trang này rồi thử lại.",
@@ -160,6 +162,8 @@
   "speaker.labelEditor.save": "Lưu",
 
   "speaker.settingsPanel.title": "Nhận diện người nói",
+  "speaker.settingsPanel.recognitionToggle": "Nhận diện người nói quen bằng giọng (voiceprint)",
+  "speaker.settingsPanel.recognitionHint": "Voiceprint là dữ liệu sinh trắc học. Khi tắt, room này không tính và không lưu voiceprint nào: nhãn người nói chỉ lấy từ nhà cung cấp chuyển giọng nói thành văn bản, tên bạn gán vẫn được giữ nhưng không kèm mẫu giọng.",
   "speaker.settingsPanel.loading": "Đang tải hồ sơ…",
   "speaker.settingsPanel.empty": "Chưa có hồ sơ giọng nói nào.",
   "speaker.settingsPanel.colName": "Tên",

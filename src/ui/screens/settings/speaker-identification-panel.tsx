@@ -11,7 +11,7 @@ import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 import { speakerProfileDelete, speakerProfileList, speakerProfileUpdate, type SpeakerProfileListItem } from '../../data/speaker-api.js';
 import { ConfirmDialog } from '../../components/confirm-dialog.js';
 import { SpeakerAvatar } from '../../components/speaker-avatar.js';
-import { loadWorkspaceSettings } from '../../data/settings-store.js';
+import { loadWorkspaceSettings, saveWorkspaceSetting } from '../../data/settings-store.js';
 import { useI18n } from '../../i18n/i18n-provider.js';
 import { useCanManageRoomSettings } from './use-can-manage-room-settings.js';
 
@@ -32,6 +32,7 @@ export function SpeakerIdentificationPanel() {
   const [rowError, setRowError] = useState<Record<string, string>>({});
   const [renameDrafts, setRenameDrafts] = useState<Record<string, string>>({});
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
+  const [recognitionOn, setRecognitionOn] = useState(true);
   const [thresholdNotice, setThresholdNotice] = useState<string | null>(null);
   // Prune/delete both need confirmation; window.confirm is a no-op in the
   // sandboxed iframe, so an in-app ConfirmDialog gates them instead.
@@ -57,7 +58,10 @@ export function SpeakerIdentificationPanel() {
   useEffect(() => {
     if (!roomId) return;
     loadWorkspaceSettings(app, roomId)
-      .then((settings) => setThreshold(settings.speakerMatchThreshold))
+      .then((settings) => {
+        setThreshold(settings.speakerMatchThreshold);
+        setRecognitionOn(settings.speakerRecognition);
+      })
       .catch(() => undefined);
   }, [app, roomId]);
 
@@ -136,6 +140,21 @@ export function SpeakerIdentificationPanel() {
   return (
     <section className="ma-speaker-settings">
       <h3 className="ma-speaker-settings__title">{t('speaker.settingsPanel.title')}</h3>
+
+      <label className="ma-settings-field ma-settings-field--checkbox">
+        <input
+          type="checkbox"
+          checked={recognitionOn}
+          disabled={!canManage}
+          onChange={(e) => {
+            const next = e.target.checked;
+            setRecognitionOn(next);
+            void saveWorkspaceSetting(app, 'speakerRecognition', next).catch(() => setRecognitionOn(!next));
+          }}
+        />
+        <span>{t('speaker.settingsPanel.recognitionToggle')}</span>
+      </label>
+      <p className="ma-settings-panel__hint">{t('speaker.settingsPanel.recognitionHint')}</p>
 
       <div className="ma-speaker-settings__threshold">
         <label htmlFor="ma-speaker-threshold">{t('speaker.settingsPanel.thresholdLabel', { value: threshold.toFixed(2) })}</label>

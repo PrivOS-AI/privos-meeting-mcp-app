@@ -49,6 +49,8 @@
   "screen.new.translation": "Enable bilingual captions",
   "screen.new.translationTarget": "Translation target",
   "screen.new.provider": "Live caption provider: {provider}",
+  "screen.new.voiceprintNotice": "This room recognises returning speakers by voice: voices in this meeting may be matched to, and added to, saved voiceprints. Tell participants before you start.",
+  "screen.new.voiceprintAcknowledge": "I have told the participants",
   "screen.new.start": "Start recording",
   "screen.new.starting": "Requesting microphone access…",
   "screen.new.micDenied": "The browser denied microphone access. Grant mic permission for this page and try again.",
@@ -160,6 +162,8 @@
   "speaker.labelEditor.save": "Save",
 
   "speaker.settingsPanel.title": "Speaker identification",
+  "speaker.settingsPanel.recognitionToggle": "Recognise returning speakers by voice (voiceprints)",
+  "speaker.settingsPanel.recognitionHint": "Voiceprints are biometric data. Turned off, this room computes and stores none: speaker labels come from the speech-to-text provider only, and names you assign are kept without a voice sample.",
   "speaker.settingsPanel.loading": "Loading profiles…",
   "speaker.settingsPanel.empty": "No speaker profiles yet.",
   "speaker.settingsPanel.colName": "Name",

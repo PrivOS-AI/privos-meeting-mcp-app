@@ -49,6 +49,8 @@
   "screen.new.translation": "Çift dilli altyazıları etkinleştir",
   "screen.new.translationTarget": "Çeviri hedefi",
   "screen.new.provider": "Canlı altyazı sağlayıcısı: {provider}",
+  "screen.new.voiceprintNotice": "Bu oda tanıdık konuşmacıları sesinden tanır: bu toplantıdaki sesler kayıtlı ses izleriyle eşleştirilebilir ve onlara eklenebilir. Başlamadan önce katılımcıları bilgilendirin.",
+  "screen.new.voiceprintAcknowledge": "Katılımcıları bilgilendirdim",
   "screen.new.start": "Kaydı başlat",
   "screen.new.starting": "Mikrofon erişimi isteniyor…",
   "screen.new.micDenied": "Tarayıcı mikrofon erişimini reddetti. Bu sayfa için mikrofon izni verin ve tekrar deneyin.",
@@ -160,6 +162,8 @@
   "speaker.labelEditor.save": "Kaydet",
 
   "speaker.settingsPanel.title": "Konuşmacı tanımlama",
+  "speaker.settingsPanel.recognitionToggle": "Tanıdık konuşmacıları sesinden tanı (ses izi)",
+  "speaker.settingsPanel.recognitionHint": "Ses izleri biyometrik veridir. Kapalıyken bu oda hiç ses izi hesaplamaz ve saklamaz: konuşmacı etiketleri yalnızca konuşmayı metne çeviren sağlayıcıdan gelir, verdiğiniz adlar ses örneği olmadan korunur.",
   "speaker.settingsPanel.loading": "Profiller yükleniyor…",
   "speaker.settingsPanel.empty": "Henüz konuşmacı profili yok.",
   "speaker.settingsPanel.colName": "Ad",

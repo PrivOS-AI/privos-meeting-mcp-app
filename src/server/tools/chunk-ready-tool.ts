@@ -19,6 +19,7 @@ import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { enqueueChunk } from '../live-speakers/chunk-worker.js';
 import { resolveRealtimeVendor, realtimeProviderFor } from '../stt/stt-provider-registry.js';
+import { isSpeakerRecognitionEnabled } from '../speaker/resolve-speakers.js';
 import { asChunkSegment, assertStructuralSpans, MAX_PART_DURATION_MS, MAX_SEGMENTS_PER_CHUNK, type ChunkSegment } from './span-validation.js';
 import type { AppTool } from './registry.js';
 import { ID, MS, ROOM_AND_MEETING } from './schema-parts.js';
@@ -98,6 +99,10 @@ export const chunkReadyTool: AppTool = {
     if (!realtimeProviderFor(vendor).capabilities.speakerLabels) {
       // D-18 degraded mode — not an error, just nothing to do.
       return { accepted: false, reason: 'labels_not_supported' };
+    }
+    if (!(await isSpeakerRecognitionEnabled(db))) {
+      // The room turned voiceprint recognition off: no embedding is computed for live turns.
+      return { accepted: false, reason: 'speaker_recognition_disabled' };
     }
 
     const segmentsRaw = Array.isArray(args.segments) ? args.segments : [];

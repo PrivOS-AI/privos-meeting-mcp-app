@@ -105,6 +105,8 @@ export interface StartRecordingInput {
   /** Bilingual-translation target language (only used when `translationEnabled`). */
   translationLang: LanguageCode;
   translationEnabled: boolean;
+  /** The recorder confirmed they told participants about voiceprint recognition (only asked while it is on). */
+  voiceprintNoticeAcknowledged?: boolean;
 }
 
 const PALETTE = ['blue', 'gold', 'green', 'purple', 'red', 'teal'];
@@ -512,6 +514,7 @@ export class RecordingStore {
         language: input.language,
         translationEnabled: input.translationEnabled,
         translationLang: input.translationLang,
+        ...(input.voiceprintNoticeAcknowledged ? { voiceprintNoticeAt: startedAtIso } : {}),
         ownerUserId: this.ctx.userId,
         startedAt: startedAtIso,
       });

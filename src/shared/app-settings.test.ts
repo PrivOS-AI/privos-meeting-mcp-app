@@ -16,3 +16,11 @@ describe('room settings allowlist', () => {
     expect(isWorkspaceSettingKey('summaryLength')).toBe(true);
   });
 });
+
+describe('speakerRecognition', () => {
+  it('is on by default and only accepts a boolean', () => {
+    expect(DEFAULT_WORKSPACE_SETTINGS.speakerRecognition).toBe(true);
+    expect(WORKSPACE_SETTING_VALIDATORS.speakerRecognition(false)).toBe(false);
+    expect(() => WORKSPACE_SETTING_VALIDATORS.speakerRecognition('off')).toThrow(/speakerRecognition/);
+  });
+});

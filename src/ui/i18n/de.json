@@ -49,6 +49,8 @@
   "screen.new.translation": "Zweisprachige Untertitel aktivieren",
   "screen.new.translationTarget": "Zielsprache der Übersetzung",
   "screen.new.provider": "Anbieter für Live-Untertitel: {provider}",
+  "screen.new.voiceprintNotice": "Dieser Raum erkennt wiederkehrende Sprecher an der Stimme: Stimmen in diesem Meeting können mit gespeicherten Stimmabdrücken abgeglichen und ihnen hinzugefügt werden. Informieren Sie die Teilnehmenden vor dem Start.",
+  "screen.new.voiceprintAcknowledge": "Ich habe die Teilnehmenden informiert",
   "screen.new.start": "Aufnahme starten",
   "screen.new.starting": "Mikrofonzugriff wird angefragt…",
   "screen.new.micDenied": "Der Browser hat den Mikrofonzugriff verweigert. Erteilen Sie dieser Seite die Mikrofonberechtigung und versuchen Sie es erneut.",
@@ -160,6 +162,8 @@
   "speaker.labelEditor.save": "Speichern",
 
   "speaker.settingsPanel.title": "Sprecheridentifikation",
+  "speaker.settingsPanel.recognitionToggle": "Wiederkehrende Sprecher an der Stimme erkennen (Stimmabdrücke)",
+  "speaker.settingsPanel.recognitionHint": "Stimmabdrücke sind biometrische Daten. Ausgeschaltet berechnet und speichert dieser Raum keine: Sprecherbezeichnungen kommen nur vom Spracherkennungsanbieter, vergebene Namen bleiben ohne Stimmprobe erhalten.",
   "speaker.settingsPanel.loading": "Profile werden geladen…",
   "speaker.settingsPanel.empty": "Noch keine Sprecherprofile.",
   "speaker.settingsPanel.colName": "Name",

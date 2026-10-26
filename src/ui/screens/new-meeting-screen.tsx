@@ -11,6 +11,7 @@ import { useI18n } from '../i18n/i18n-provider.js';
 import { SUPPORTED_LANGUAGES, LANGUAGE_ENDONYMS, type Language } from '../i18n/languages.js';
 import { defaultTranslationTarget } from '../../shared/languages.js';
 import { loadLocalPreferences, saveLocalPreference } from '../data/local-preferences.js';
+import { loadWorkspaceSettings } from '../data/settings-store.js';
 import { useRecordingStore } from '../stores/recording-store.js';
 import { Icon } from '../components/icon.js';
 
@@ -28,8 +29,12 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
   const [title, setTitle] = useState('');
   const [language, setLanguage] = useState<Language>(prefs.meetingLanguage);
   const [translationLang, setTranslationLang] = useState<Language>(prefs.translationLang);
-  // Bilingual captions add latency + Hub-AI cost, so start unchecked; the user opts in per meeting.
+  // Bilingual captions add latency + Hub-AI cost: the default is the user's own preference (off unless they set it).
   const [translationEnabled, setTranslationEnabled] = useState(prefs.showTranslation);
+  // Voiceprint recognition is on for this room until the setting says otherwise; while on, the
+  // recorder must confirm they told participants before the recording can start.
+  const [recognitionOn, setRecognitionOn] = useState(true);
+  const [noticeAcknowledged, setNoticeAcknowledged] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
   const [micError, setMicError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
@@ -51,13 +56,26 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
     };
   }, [app]);
 
+  useEffect(() => {
+    if (!context.roomId) return;
+    let cancelled = false;
+    loadWorkspaceSettings(app, context.roomId)
+      .then((settings) => {
+        if (!cancelled) setRecognitionOn(settings.speakerRecognition);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [app, context.roomId]);
+
   async function handleStart(): Promise<void> {
     setMicError(null);
     setStarting(true);
     // Remember the picked main language as the default for the next new meeting.
     saveLocalPreference('meetingLanguage', language);
     try {
-      await store.startRecording({ title: title.trim() || t('screen.new.untitled'), language, translationLang: translationLang === language ? defaultTranslationTarget(language) : translationLang, translationEnabled });
+      await store.startRecording({ title: title.trim() || t('screen.new.untitled'), language, translationLang: translationLang === language ? defaultTranslationTarget(language) : translationLang, translationEnabled, voiceprintNoticeAcknowledged: recognitionOn && noticeAcknowledged });
       onStarted();
     } catch (error) {
       // Keep the raw cause for diagnosis; the on-screen text is classified below.
@@ -136,9 +154,22 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
         </div>
       </div>
 
+      {recognitionOn ? (
+        <div className="ma-new-meeting__consent">
+          <p className="ma-notice ma-notice--info">
+            <Icon name="person-multiple" size={16} />
+            <span>{t('screen.new.voiceprintNotice')}</span>
+          </p>
+          <label className="ma-field ma-field--checkbox">
+            <input type="checkbox" checked={noticeAcknowledged} onChange={(e) => setNoticeAcknowledged(e.target.checked)} />
+            <span>{t('screen.new.voiceprintAcknowledge')}</span>
+          </label>
+        </div>
+      ) : null}
+
       {micError ? <p className="ma-new-meeting__error">{micError}</p> : null}
 
-      <button type="button" className="ma-new-meeting__start" disabled={starting} onClick={() => void handleStart()}>
+      <button type="button" className="ma-new-meeting__start" disabled={starting || (recognitionOn && !noticeAcknowledged)} onClick={() => void handleStart()}>
         <Icon name="record" size={18} />
         {starting ? t('screen.new.starting') : t('screen.new.start')}
       </button>
