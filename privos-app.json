@@ -12,9 +12,15 @@
     "url": "https://privos.ai"
   },
   "homepage": "https://privos.ai",
-  "repository": "https://github.com/privos-ai/privos-meeting-mcp-app",
+  "repository": "https://github.com/PrivOS-AI/privos-meeting-mcp-app",
   "port": 3012,
   "stateless": false,
+  "volumes": [
+    {
+      "name": "data",
+      "mountPath": "/app/data"
+    }
+  ],
   "capabilities": {
     "verifiedActor": true
   },
@@ -25,12 +31,16 @@
   "resources": {
     "memoryMb": 2048,
     "cpus": 2,
-    "tmpSizeMb": 2048
+    "tmpSizeMb": 1024
   },
   "dataPolicy": {
-    "version": "2026-09-17",
+    "version": "2026-10-26",
     "externalProcessing": true,
-    "retention": "Attendee audio is streamed and uploaded to the STT provider selected in Settings (Soniox: realtime zero-retention, async auto-deleted after 30 days; or ElevenLabs). Transcripts and summaries are processed by Hub AI inside the workspace and stored in the room's Files; original audio is deleted after processing unless Keep original audio is enabled."
+    "externalDestinations": [
+      "Soniox (speech-to-text)",
+      "ElevenLabs (speech-to-text)"
+    ],
+    "retention": "Attendee audio is streamed and uploaded to the STT provider selected in Settings (Soniox: realtime zero-retention, async files deleted by the app after transcription and auto-deleted by Soniox after 30 days; or ElevenLabs). Transcripts and summaries are processed by Hub AI inside the workspace and stored in the room's Files; original audio is deleted after processing unless Keep original audio is enabled. Voiceprints (speaker embeddings, biometric data) are stored encrypted (AES-256-GCM) in the workspace App DB, never leave the workspace, and are removed when the profile creator or a workspace admin deletes the profile. Local scratch on the app volume is deleted after each job; operator diagnostics are pruned after 90 days."
   },
   "permissions": [
     {
@@ -175,7 +185,7 @@
         }
       },
       "ui": {
-        "resourceUri": "ui://meeting-agent/app.html",
+        "resourceUri": "ui://ai.privos.meeting-agent/app.html",
         "hideAiChat": true,
         "permissions": [
           "microphone",
@@ -185,16 +195,16 @@
           "connect-src": [
             "wss://stt-rt.soniox.com",
             "wss://api.elevenlabs.io",
-            "<PRIVOS_FILES_ORIGIN>"
+            "<FILES_ORIGIN>"
           ],
           "media-src": [
-            "<PRIVOS_FILES_ORIGIN>"
+            "<FILES_ORIGIN>"
           ]
         }
       },
       "_meta": {
         "ui": {
-          "resourceUri": "ui://meeting-agent/app.html",
+          "resourceUri": "ui://ai.privos.meeting-agent/app.html",
           "hideAiChat": true,
           "permissions": [
             "microphone",
@@ -204,10 +214,10 @@
             "connect-src": [
               "wss://stt-rt.soniox.com",
               "wss://api.elevenlabs.io",
-              "<PRIVOS_FILES_ORIGIN>"
+              "<FILES_ORIGIN>"
             ],
             "media-src": [
-              "<PRIVOS_FILES_ORIGIN>"
+              "<FILES_ORIGIN>"
             ]
           }
         }
@@ -475,8 +485,8 @@
     },
     {
       "name": "meeting_settings_set",
-      "title": "Update workspace settings",
-      "description": "Write a workspace-wide setting (STT provider, speaker-match thresholds, retention…) — workspace admins only.",
+      "title": "Update room settings",
+      "description": "Write a setting for the caller's room (STT provider, speaker-match thresholds, retention…) — any verified room member.",
       "inputSchema": {
         "type": "object",
         "required": [
@@ -636,14 +646,10 @@
       }
     }
   ],
+  "ui": {
+    "distDir": "dist/ui"
+  },
   "env": [
-    {
-      "key": "PORT",
-      "description": "The app's listen port (default 3012).",
-      "required": false,
-      "secret": false,
-      "default": "3012"
-    },
     {
       "key": "SONIOX_API_KEY",
       "description": "Soniox API key. Required if Soniox is the selected provider.",
@@ -728,8 +734,8 @@
     },
     {
       "key": "SPEAKER_MODEL_PATH",
-      "description": "Path to the speaker-embedding ONNX model (downloaded at deploy time).",
-      "required": true,
+      "description": "Path to the speaker-embedding ONNX model (baked into the image at this default path).",
+      "required": false,
       "secret": false,
       "default": "models/3dspeaker_speaker-embedding_advanced.onnx"
     },
@@ -795,9 +801,9 @@
       "secret": false
     },
     {
-      "key": "PRIVOS_FILES_ORIGIN",
-      "description": "Origin of presigned Files downloads (declared in CSP connect-src/media-src).",
-      "required": true,
+      "key": "FILES_ORIGIN",
+      "description": "Origin of presigned Files downloads; replaces <FILES_ORIGIN> in the UI CSP. Optional: audio falls back to Files /download.",
+      "required": false,
       "secret": false
     },
     {

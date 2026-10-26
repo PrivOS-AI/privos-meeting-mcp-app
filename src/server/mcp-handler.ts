@@ -23,7 +23,7 @@ const UI_TOOL_DESCRIPTION = String(UI_TOOL?.description ?? manifest.description)
 
 /**
  * `_meta.ui` (resourceUri + permissions + csp + hideAiChat) for the UI tool.
- * The CSP `<PRIVOS_FILES_ORIGIN>` placeholder is resolved from env here too —
+ * The CSP `<FILES_ORIGIN>` placeholder is resolved from env here too —
  * this `_meta` is what `tools/list` advertises to the Hub, which is where the
  * iframe CSP is actually enforced from.
  */

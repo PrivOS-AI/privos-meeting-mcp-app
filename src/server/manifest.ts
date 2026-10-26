@@ -23,19 +23,19 @@ export type AppManifest = Pick<typeof publisherManifest, Extract<(typeof MARKETP
  * Placeholder token in the manifest CSP (`_meta.ui.csp.connect-src`/`media-src`)
  * that must be replaced with the Hub's real presigned-Files origin before the
  * iframe can fetch transcript/audio. Kept literal in `privos-app.json` (source +
- * lint) and resolved from `PRIVOS_FILES_ORIGIN` at build/boot by
+ * lint) and resolved from `FILES_ORIGIN` (legacy `PRIVOS_FILES_ORIGIN`) at build/boot by
  * {@link createManifest}, so switching Hub is an env change, not a manifest edit.
  */
-export const FILES_ORIGIN_PLACEHOLDER = '<PRIVOS_FILES_ORIGIN>';
+export const FILES_ORIGIN_PLACEHOLDER = '<FILES_ORIGIN>';
 
 /**
- * Substitute {@link FILES_ORIGIN_PLACEHOLDER} with `PRIVOS_FILES_ORIGIN` when set
+ * Substitute {@link FILES_ORIGIN_PLACEHOLDER} with `FILES_ORIGIN` when set
  * (trailing slash trimmed). Regex-free string replace so an origin with special
  * characters is safe. Leaves the placeholder untouched when the env is unset
  * (dev / `manifest:lint`), which never reaches a real iframe.
  */
 export function resolveFilesOrigin<T>(value: T): T {
-  const origin = (process.env.PRIVOS_FILES_ORIGIN ?? '').trim().replace(/\/+$/, '');
+  const origin = (process.env.FILES_ORIGIN || process.env.PRIVOS_FILES_ORIGIN || '').trim().replace(/\/+$/, '');
   if (!origin) return value;
   return JSON.parse(JSON.stringify(value).split(FILES_ORIGIN_PLACEHOLDER).join(origin)) as T;
 }
@@ -62,7 +62,7 @@ export const UI_RESOURCE_URI =
   publisherManifest.tools.find(
     (tool): tool is (typeof publisherManifest.tools)[number] & { _meta: { ui: { resourceUri: string } } } =>
       typeof (tool as { _meta?: { ui?: { resourceUri?: unknown } } })._meta?.ui?.resourceUri === 'string',
-  )?._meta.ui.resourceUri ?? 'ui://meeting-agent/app.html';
+  )?._meta.ui.resourceUri ?? `ui://${publisherManifest.name}/app.html`;
 
 /**
  * The `AppDescriptor` the SDK's Relay transport needs — built straight from the

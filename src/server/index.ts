@@ -11,7 +11,7 @@ import 'dotenv/config';
 import path from 'node:path';
 
 import express from 'express';
-import { serveApp, RuntimeModeError, type RoomBoundHubClient } from '@privos_ai/app-server';
+import { serveApp, resolveRuntimeMode, RuntimeModeError, type RoomBoundHubClient } from '@privos_ai/app-server';
 
 import { assertProviderKeysAtBoot } from './env.js';
 import { startAudioRetention } from './jobs/audio-retention-job.js';
@@ -84,6 +84,10 @@ async function logAgentBotCredentialStatus(agentBotHub: RoomBoundHubClient): Pro
 }
 
 async function start(): Promise<void> {
+  // A production container with no runtime identity (the Marketplace build probe:
+  // no env, read-only root FS) must serve its manifest, so resolve the mode BEFORE
+  // the secret checks below — those would otherwise exit before the fallback.
+  resolveRuntimeMode();
   registerAllTools();
   installDrainHandlers();
   await runBootChecks();

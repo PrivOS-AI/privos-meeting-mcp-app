@@ -150,7 +150,8 @@ export function loadEnv(): AppEnv {
     summaryProvider: str('SUMMARY_PROVIDER'),
     translateModel: str('TRANSLATE_MODEL'),
     translateProvider: str('TRANSLATE_PROVIDER'),
-    privosFilesOrigin: str('PRIVOS_FILES_ORIGIN'),
+    // `PRIVOS_FILES_ORIGIN` is the pre-Marketplace name (reserved prefix), still read on existing installs.
+    privosFilesOrigin: str('FILES_ORIGIN') ?? str('PRIVOS_FILES_ORIGIN'),
     meetingJobConcurrency: num('MEETING_JOB_CONCURRENCY', 1),
     meetingJobTimeoutMs: num('MEETING_JOB_TIMEOUT_MS', 3_600_000),
     allowUnverifiedActor: str('ALLOW_UNVERIFIED_ACTOR') === '1',

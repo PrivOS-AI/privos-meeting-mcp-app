@@ -16,8 +16,8 @@ import type { AppTool } from './registry.js';
 
 export const settingsSetTool: AppTool = {
   name: 'meeting_settings_set',
-  title: 'Update workspace settings',
-  description: 'Write a workspace-wide setting (STT provider, speaker-match thresholds, retention…) — workspace admins only.',
+  title: 'Update room settings',
+  description: "Write a setting for the caller's room (STT provider, speaker-match thresholds, retention…) — any verified room member.",
   inputSchema: {
     type: 'object',
     required: ['key', 'value'],
