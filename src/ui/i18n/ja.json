@@ -282,7 +282,7 @@
   "settings.nav.privacy": "プライバシーと保存",
   "settings.nav.caption": "字幕表示",
 
-  "settings.adminOnlyNote": "この設定はワークスペース管理者のみが変更できます。",
+  "settings.adminOnlyNote": "この設定はルームのオーナーとモデレーター、またはワークスペース管理者のみが変更できます。",
 
   "settings.language.title": "言語と翻訳",
   "settings.language.uiLanguage": "インターフェース言語",
@@ -315,7 +315,7 @@
   "settings.speech.keyNote": "APIキーは管理者がサーバーの環境変数として設定します。",
   "settings.speech.memberOk": "リアルタイム字幕は正常に稼働しています。",
   "settings.speech.memberDown": "リアルタイム字幕は現在利用できません — 録音は通常どおり動作します。",
-  "settings.speech.adminOnly": "ワークスペース管理者のみが詳細を確認し、プロバイダーを変更できます。",
+  "settings.speech.adminOnly": "ルームのオーナーとモデレーター、またはワークスペース管理者のみが詳細を確認し、プロバイダーを変更できます。",
 
   "settings.microphone.title": "マイク",
   "settings.microphone.permission.unknown": "マイクの権限状態は不明です。",

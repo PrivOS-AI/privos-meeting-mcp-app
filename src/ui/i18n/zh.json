@@ -282,7 +282,7 @@
   "settings.nav.privacy": "隐私与存储",
   "settings.nav.caption": "字幕显示",
 
-  "settings.adminOnlyNote": "只有工作区管理员可以更改此设置。",
+  "settings.adminOnlyNote": "只有房间所有者、房间管理员或工作区管理员可以更改此设置。",
 
   "settings.language.title": "语言与翻译",
   "settings.language.uiLanguage": "界面语言",
@@ -315,7 +315,7 @@
   "settings.speech.keyNote": "API 密钥由管理员以服务器环境变量的形式配置。",
   "settings.speech.memberOk": "实时字幕运行正常。",
   "settings.speech.memberDown": "实时字幕当前不可用 — 录制功能仍正常运行。",
-  "settings.speech.adminOnly": "只有工作区管理员可以查看详情并更改服务商。",
+  "settings.speech.adminOnly": "只有房间所有者、房间管理员或工作区管理员可以查看详情并更改服务商。",
 
   "settings.microphone.title": "麦克风",
   "settings.microphone.permission.unknown": "麦克风权限状态未知。",

@@ -14,7 +14,11 @@ Marketplace packaging.
 - Manifest: one `data` volume at `/app/data`, `tmpSizeMb` 1024, data-policy
   destinations and voiceprint retention, no `PORT` declaration, and
   `PRIVOS_FILES_ORIGIN` renamed to `FILES_ORIGIN` (the old name is still read).
-- `meeting_settings_set` describes its actual policy (any verified room member).
+- Room settings can be changed only by the room's owners and moderators, or a
+  workspace admin, read from the Hub-signed `room_roles` / `workspace_roles`
+  claims (new optional `rooms:roles:read`). Without them nobody can write (fail
+  closed). Workspace admins are recognised from `workspace_roles` instead of
+  guessed JWT claims. The speaker-threshold slider is disabled for others.
 - The room's "Keep original audio" setting now takes effect: `meeting_process`
   reads `keepOriginalAudio` on the server and stamps `keepAudio` on the meeting
   (the iframe no longer writes it, and used to hard-code `true`). Merged audio

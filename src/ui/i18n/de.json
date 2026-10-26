@@ -284,7 +284,7 @@
   "settings.nav.privacy": "Datenschutz & Speicherung",
   "settings.nav.caption": "Untertitelanzeige",
 
-  "settings.adminOnlyNote": "Nur ein Workspace-Administrator kann diese Einstellung ändern.",
+  "settings.adminOnlyNote": "Nur Eigentümer und Moderatoren des Raums oder ein Workspace-Administrator können diese Einstellung ändern.",
 
   "settings.language.title": "Sprache & Übersetzung",
   "settings.language.uiLanguage": "Oberflächensprache",
@@ -317,7 +317,7 @@
   "settings.speech.keyNote": "API-Schlüssel werden von einem Administrator als Server-Umgebungsvariablen konfiguriert.",
   "settings.speech.memberOk": "Live-Untertitel funktionieren.",
   "settings.speech.memberDown": "Live-Untertitel sind derzeit nicht verfügbar — die Aufnahme funktioniert weiterhin normal.",
-  "settings.speech.adminOnly": "Nur ein Workspace-Administrator kann die Details einsehen und den Anbieter ändern.",
+  "settings.speech.adminOnly": "Nur Eigentümer und Moderatoren des Raums oder ein Workspace-Administrator können die Details einsehen und den Anbieter ändern.",
 
   "settings.microphone.title": "Mikrofon",
   "settings.microphone.permission.unknown": "Der Status der Mikrofonberechtigung ist unbekannt.",

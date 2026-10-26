@@ -126,6 +126,15 @@
       "degradedBehavior": "The user types a name freely instead of picking from the member list."
     },
     {
+      "scope": "rooms:roles:read",
+      "requirement": "optional",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.settings.manage",
+      "reason": "Let only the room's owners and moderators, and workspace admins, change the room's speech-to-text, speaker and retention settings.",
+      "degradedBehavior": "Nobody can change the room's settings in the app; the room keeps its current values or the defaults, and the Settings screen shows them read-only."
+    },
+    {
       "scope": "lists:read",
       "requirement": "optional",
       "context": "room",
@@ -251,7 +260,7 @@
     {
       "name": "meeting_stt_status",
       "title": "Speech-to-text status",
-      "description": "Status of both STT providers for admins to compare.",
+      "description": "Status of both STT providers for room owners, moderators and workspace admins to compare.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -486,7 +495,7 @@
     {
       "name": "meeting_settings_set",
       "title": "Update room settings",
-      "description": "Write a setting for the caller's room (STT provider, speaker-match thresholds, retention…) — any verified room member.",
+      "description": "Write a setting for the caller's room (STT provider, speaker-match thresholds, retention…) — room owners, moderators and workspace admins only.",
       "inputSchema": {
         "type": "object",
         "required": [

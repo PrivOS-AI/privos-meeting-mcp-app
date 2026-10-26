@@ -284,7 +284,7 @@
   "settings.nav.privacy": "Gizlilik ve depolama",
   "settings.nav.caption": "Altyazı görünümü",
 
-  "settings.adminOnlyNote": "Bu ayarı yalnızca bir çalışma alanı yöneticisi değiştirebilir.",
+  "settings.adminOnlyNote": "Bu ayarı yalnızca odanın sahipleri ve moderatörleri ya da bir çalışma alanı yöneticisi değiştirebilir.",
 
   "settings.language.title": "Dil ve çeviri",
   "settings.language.uiLanguage": "Arayüz dili",
@@ -317,7 +317,7 @@
   "settings.speech.keyNote": "API anahtarları bir yönetici tarafından sunucu ortam değişkenleri olarak yapılandırılır.",
   "settings.speech.memberOk": "Canlı altyazı çalışıyor.",
   "settings.speech.memberDown": "Canlı altyazı şu anda kullanılamıyor — kayıt yine de normal şekilde çalışır.",
-  "settings.speech.adminOnly": "Ayrıntıları yalnızca bir çalışma alanı yöneticisi görebilir ve sağlayıcıyı değiştirebilir.",
+  "settings.speech.adminOnly": "Ayrıntıları yalnızca odanın sahipleri ve moderatörleri ya da bir çalışma alanı yöneticisi görebilir ve sağlayıcıyı değiştirebilir.",
 
   "settings.microphone.title": "Mikrofon",
   "settings.microphone.permission.unknown": "Mikrofon izni durumu bilinmiyor.",

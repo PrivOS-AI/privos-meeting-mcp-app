@@ -2,12 +2,8 @@
  * Settings › Speaker identification (plan.md § UI). Lists every workspace
  * profile from `speaker_profile_list`, with rename / link / delete / re-enrol
  * actions through `speaker_profile_update`/`_delete`, and a match-threshold
- * slider. The threshold slider calls `meeting_settings_set` — a tool this
- * phase does NOT build (out of P4's file ownership; owned by a later
- * settings phase per plan.md's tool table) — so saving it surfaces a clear
- * "not available yet" notice instead of pretending to persist silently. Once
- * that tool ships with the same name/shape, this panel starts working
- * without any further change.
+ * slider saved through `meeting_settings_set` — disabled for callers who may
+ * not change the room's settings (the server refuses them anyway).
  */
 import { useCallback, useEffect, useState } from 'react';
 import { usePrivosApp } from '@privos_ai/app-react';
@@ -16,6 +12,7 @@ import { speakerProfileDelete, speakerProfileList, speakerProfileUpdate, type Sp
 import { ConfirmDialog } from '../../components/confirm-dialog.js';
 import { SpeakerAvatar } from '../../components/speaker-avatar.js';
 import { useI18n } from '../../i18n/i18n-provider.js';
+import { useCanManageRoomSettings } from './use-can-manage-room-settings.js';
 
 const THRESHOLD_MIN = 0.3;
 const THRESHOLD_MAX = 0.8;
@@ -25,6 +22,7 @@ const DEFAULT_THRESHOLD = 0.5;
 export function SpeakerIdentificationPanel() {
   const app = usePrivosApp();
   const { t } = useI18n();
+  const { canManage } = useCanManageRoomSettings();
   const [profiles, setProfiles] = useState<SpeakerProfileListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -138,12 +136,14 @@ export function SpeakerIdentificationPanel() {
           max={THRESHOLD_MAX}
           step={THRESHOLD_STEP}
           value={threshold}
+          disabled={!canManage}
           onChange={(e) => setThreshold(Number(e.target.value))}
         />
-        <button type="button" onClick={() => void saveThreshold()}>
+        <button type="button" disabled={!canManage} onClick={() => void saveThreshold()}>
           {t('speaker.settingsPanel.thresholdSave')}
         </button>
         <p className="ma-speaker-settings__threshold-warning">{t('speaker.settingsPanel.thresholdWarning')}</p>
+        {!canManage ? <p className="ma-settings-panel__hint">{t('settings.adminOnlyNote')}</p> : null}
         {thresholdNotice ? <p className="ma-speaker-settings__threshold-notice">{thresholdNotice}</p> : null}
       </div>
 

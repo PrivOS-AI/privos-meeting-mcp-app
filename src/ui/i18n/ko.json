@@ -282,7 +282,7 @@
   "settings.nav.privacy": "개인정보 및 저장소",
   "settings.nav.caption": "자막 표시",
 
-  "settings.adminOnlyNote": "워크스페이스 관리자만 이 설정을 변경할 수 있습니다.",
+  "settings.adminOnlyNote": "룸 소유자와 모더레이터 또는 워크스페이스 관리자만 이 설정을 변경할 수 있습니다.",
 
   "settings.language.title": "언어 및 번역",
   "settings.language.uiLanguage": "인터페이스 언어",
@@ -315,7 +315,7 @@
   "settings.speech.keyNote": "API 키는 관리자가 서버 환경 변수로 설정합니다.",
   "settings.speech.memberOk": "실시간 자막이 정상 작동 중입니다.",
   "settings.speech.memberDown": "실시간 자막을 현재 사용할 수 없습니다 — 녹음은 정상적으로 작동합니다.",
-  "settings.speech.adminOnly": "워크스페이스 관리자만 세부정보를 보고 제공업체를 변경할 수 있습니다.",
+  "settings.speech.adminOnly": "룸 소유자와 모더레이터 또는 워크스페이스 관리자만 세부정보를 보고 제공업체를 변경할 수 있습니다.",
 
   "settings.microphone.title": "마이크",
   "settings.microphone.permission.unknown": "마이크 권한 상태를 알 수 없습니다.",

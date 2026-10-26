@@ -13,8 +13,9 @@ vi.mock('../hub/resolve-own-mcp-app-id.js', () => ({ resolveOwnMcpAppId: async (
 let store: Store;
 let fakeHub: ReturnType<typeof installFakeHub>;
 
-function context(claims: Record<string, unknown> = {}): ToolCallContext {
-  return { transport: 'direct', identityState: 'verified', sessionScope: 'test', actor: { userId: 'user-1', roomId: 'room-1', claims, provenance: 'user-token' } };
+/** Roles as the SDK lifts them from the Hub-signed `room_roles` / `workspace_roles` claims; omitted = no role signal. */
+function context(roles: { roomRoles?: string[]; workspaceRoles?: string[] } = {}): ToolCallContext {
+  return { transport: 'direct', identityState: 'verified', sessionScope: 'test', actor: { userId: 'user-1', roomId: 'room-1', claims: {}, provenance: 'user-token', ...roles } };
 }
 
 const { settingsSetTool } = await import('./settings-set-tool.js');
@@ -25,44 +26,59 @@ describe('meeting_settings_set', () => {
     fakeHub = installFakeHub({ store });
   });
 
-  it('lets any verified room member change the room settings (interim policy: the Hub exposes no role signal)', async () => {
-    await settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 0.5 }, context(), {} as never);
+  it.each([
+    ['a room owner', { roomRoles: ['owner'] }],
+    ['a room moderator', { roomRoles: ['moderator'] }],
+    ['a workspace admin who is a plain room member', { roomRoles: [], workspaceRoles: ['admin'] }],
+  ])('lets %s change the room settings', async (_label, roles) => {
+    await settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 0.5 }, context(roles), {} as never);
     expect(store.app_settings.map((r) => r.key)).toEqual(['room:room-1:speakerMatchThreshold']);
   });
 
-  it('rejects a caller that is not bound to a room', async () => {
-    const roomless = context();
-    (roomless.actor as { roomId?: string }).roomId = undefined;
-    await expect(settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 0.5 }, roomless, {} as never)).rejects.toThrow(/member of this room/);
+  it('rejects a plain room member', async () => {
+    await expect(
+      settingsSetTool.execute({ key: 'keepOriginalAudio', value: true }, context({ roomRoles: [], workspaceRoles: ['user'] }), {} as never),
+    ).rejects.toThrow(/owners, moderators/);
+    expect(store.app_settings).toHaveLength(0);
   });
 
-  it('rejects an unsupported key even for an admin', async () => {
-    await expect(settingsSetTool.execute({ key: 'notARealKey', value: 1 }, context({ isAdmin: true }), {} as never)).rejects.toThrow(/not supported/);
+  it('fails closed when the dispatch carries no role signal (scope not granted, managed runtime)', async () => {
+    await expect(settingsSetTool.execute({ key: 'sttRealtimeProvider', value: 'elevenlabs' }, context(), {} as never)).rejects.toThrow(
+      /owners, moderators/,
+    );
+    expect(store.app_settings).toHaveLength(0);
+  });
+
+  it('ignores admin-looking claims that are not the signed workspace_roles', async () => {
+    const forged = context();
+    (forged.actor as { claims: Record<string, unknown> }).claims = { isAdmin: true, roles: ['admin'], role: 'admin' };
+    await expect(settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 0.5 }, forged, {} as never)).rejects.toThrow(/owners, moderators/);
+  });
+
+  it('rejects a caller that is not bound to a room', async () => {
+    const roomless = context({ roomRoles: ['owner'] });
+    (roomless.actor as { roomId?: string }).roomId = undefined;
+    await expect(settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 0.5 }, roomless, {} as never)).rejects.toThrow(/owners, moderators/);
+  });
+
+  it('rejects an unsupported key even for an owner', async () => {
+    await expect(settingsSetTool.execute({ key: 'notARealKey', value: 1 }, context({ roomRoles: ['owner'] }), {} as never)).rejects.toThrow(/not supported/);
   });
 
   it('rejects an out-of-range threshold', async () => {
     await expect(
-      settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 1.5 }, context({ isAdmin: true }), {} as never),
+      settingsSetTool.execute({ key: 'speakerMatchThreshold', value: 1.5 }, context({ roomRoles: ['owner'] }), {} as never),
     ).rejects.toThrow(/range/);
   });
 
-  it('lets an admin persist a valid setting into app_settings', async () => {
+  it('persists a valid setting into app_settings', async () => {
     const result = (await settingsSetTool.execute(
       { key: 'sttRealtimeProvider', value: 'elevenlabs' },
-      context({ isAdmin: true }),
+      context({ roomRoles: ['owner'] }),
       {} as never,
     )) as { settings: Record<string, unknown> };
     expect(result.settings).toEqual({ sttRealtimeProvider: 'elevenlabs' });
     expect(store.app_settings).toHaveLength(1);
     expect(JSON.parse(String(store.app_settings[0].valueJson))).toBe('elevenlabs');
-  });
-
-  it('recognizes the roles[] admin claim shape too', async () => {
-    const result = (await settingsSetTool.execute(
-      { key: 'autoDeleteAudioDays', value: 30 },
-      context({ roles: ['member', 'admin'] }),
-      {} as never,
-    )) as { settings: Record<string, unknown> };
-    expect(result.settings).toEqual({ autoDeleteAudioDays: 30 });
   });
 });

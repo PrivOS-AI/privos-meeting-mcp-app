@@ -10,13 +10,13 @@ import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 import { useI18n } from '../../i18n/i18n-provider.js';
 import { loadWorkspaceSettings, saveWorkspaceSetting } from '../../data/settings-store.js';
 import type { WorkspaceAppSettings } from '../../../shared/app-settings.js';
-import { useWorkspaceAdmin } from './use-workspace-admin.js';
+import { useCanManageRoomSettings } from './use-can-manage-room-settings.js';
 
 export function AiSummaryPanel() {
   const app = usePrivosApp();
   const { roomId } = usePrivosContext();
   const { t } = useI18n();
-  const { isAdmin } = useWorkspaceAdmin();
+  const { canManage } = useCanManageRoomSettings();
   const [settings, setSettings] = useState<WorkspaceAppSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,7 +51,7 @@ export function AiSummaryPanel() {
         <span>{t('settings.aiSummary.length')}</span>
         <select
           value={settings?.summaryLength ?? 'normal'}
-          disabled={!isAdmin || !settings}
+          disabled={!canManage || !settings}
           onChange={(e) => void change('summaryLength', e.target.value as WorkspaceAppSettings['summaryLength'])}
         >
           <option value="short">{t('settings.aiSummary.lengthShort')}</option>
@@ -64,7 +64,7 @@ export function AiSummaryPanel() {
         <span>{t('settings.aiSummary.language')}</span>
         <select
           value={settings?.summaryLanguage ?? 'vi'}
-          disabled={!isAdmin || !settings}
+          disabled={!canManage || !settings}
           onChange={(e) => void change('summaryLanguage', e.target.value as WorkspaceAppSettings['summaryLanguage'])}
         >
           <option value="vi">Tiếng Việt</option>
@@ -72,7 +72,7 @@ export function AiSummaryPanel() {
         </select>
       </label>
 
-      {!isAdmin ? <p className="ma-settings-panel__hint">{t('settings.adminOnlyNote')}</p> : null}
+      {!canManage ? <p className="ma-settings-panel__hint">{t('settings.adminOnlyNote')}</p> : null}
       {error ? (
         <p className="ma-settings-panel__error" role="alert">
           {error}

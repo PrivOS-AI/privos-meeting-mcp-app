@@ -20,7 +20,7 @@ import { useI18n } from '../../i18n/i18n-provider.js';
 import { loadWorkspaceSettings, saveWorkspaceSetting } from '../../data/settings-store.js';
 import { speakerProfileDelete, speakerProfileList } from '../../data/speaker-api.js';
 import type { WorkspaceAppSettings } from '../../../shared/app-settings.js';
-import { useWorkspaceAdmin } from './use-workspace-admin.js';
+import { useCanManageRoomSettings } from './use-can-manage-room-settings.js';
 import publisherManifest from '../../../../privos-app.json';
 
 /** Must be typed verbatim (case-insensitive) to enable the bulk-delete button — see file header. */
@@ -30,7 +30,7 @@ export function PrivacyPanel() {
   const app = usePrivosApp();
   const { roomId } = usePrivosContext();
   const { t } = useI18n();
-  const { isAdmin } = useWorkspaceAdmin();
+  const { canManage } = useCanManageRoomSettings();
   const [settings, setSettings] = useState<WorkspaceAppSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmText, setConfirmText] = useState('');
@@ -93,7 +93,7 @@ export function PrivacyPanel() {
         <input
           type="checkbox"
           checked={settings?.keepOriginalAudio ?? false}
-          disabled={!isAdmin || !settings}
+          disabled={!canManage || !settings}
           onChange={(e) => void change('keepOriginalAudio', e.target.checked)}
         />
         <span>{t('settings.privacy.keepAudio')}</span>
@@ -105,7 +105,7 @@ export function PrivacyPanel() {
           type="number"
           min={0}
           value={settings?.autoDeleteAudioDays ?? 90}
-          disabled={!isAdmin || !settings}
+          disabled={!canManage || !settings}
           onChange={(e) => void change('autoDeleteAudioDays', Math.max(0, Math.round(Number(e.target.value) || 0)))}
         />
       </label>
@@ -116,12 +116,12 @@ export function PrivacyPanel() {
           type="number"
           min={0}
           value={settings?.interruptedPartsRetentionDays ?? 7}
-          disabled={!isAdmin || !settings}
+          disabled={!canManage || !settings}
           onChange={(e) => void change('interruptedPartsRetentionDays', Math.max(0, Math.round(Number(e.target.value) || 0)))}
         />
       </label>
 
-      {!isAdmin ? <p className="ma-settings-panel__hint">{t('settings.adminOnlyNote')}</p> : null}
+      {!canManage ? <p className="ma-settings-panel__hint">{t('settings.adminOnlyNote')}</p> : null}
 
       <div className="ma-settings-panel__danger">
         <h4>{t('settings.privacy.deleteAllTitle')}</h4>

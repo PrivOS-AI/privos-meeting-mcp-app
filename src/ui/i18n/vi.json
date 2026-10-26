@@ -284,7 +284,7 @@
   "settings.nav.privacy": "Riêng tư & lưu trữ",
   "settings.nav.caption": "Hiển thị phụ đề",
 
-  "settings.adminOnlyNote": "Chỉ quản trị viên workspace mới thay đổi được cấu hình này.",
+  "settings.adminOnlyNote": "Chỉ chủ room, người điều hành room hoặc quản trị viên workspace mới thay đổi được cấu hình này.",
 
   "settings.language.title": "Ngôn ngữ & dịch",
   "settings.language.uiLanguage": "Ngôn ngữ giao diện",
@@ -317,7 +317,7 @@
   "settings.speech.keyNote": "Khoá API do quản trị viên cấu hình trong biến môi trường trên máy chủ.",
   "settings.speech.memberOk": "Phụ đề trực tiếp đang hoạt động.",
   "settings.speech.memberDown": "Phụ đề trực tiếp hiện không khả dụng — ghi âm vẫn hoạt động bình thường.",
-  "settings.speech.adminOnly": "Chỉ quản trị viên workspace mới xem được chi tiết và đổi nhà cung cấp.",
+  "settings.speech.adminOnly": "Chỉ chủ room, người điều hành room hoặc quản trị viên workspace mới xem được chi tiết và đổi nhà cung cấp.",
 
   "settings.microphone.title": "Micro",
   "settings.microphone.permission.unknown": "Chưa rõ trạng thái quyền truy cập micro.",

@@ -21,7 +21,7 @@ import type { AppTool } from './registry.js';
 export const sttStatusTool: AppTool = {
   name: 'meeting_stt_status',
   title: 'Speech-to-text status',
-  description: 'Status of both STT providers for admins to compare.',
+  description: 'Status of both STT providers for room owners, moderators and workspace admins to compare.',
   inputSchema: { type: 'object', properties: {} },
   async execute(_args, context) {
     const actor = requireVerifiedActor(context);
@@ -30,7 +30,7 @@ export const sttStatusTool: AppTool = {
     const realtimeVendor = await resolveRealtimeVendor(db).catch(() => undefined);
 
     if (!canManageRoomSettings(actor)) {
-      // Not a room member: only "is the currently active realtime provider usable" —
+      // Not a room owner/moderator or workspace admin: only "is the currently active realtime provider usable" —
       // never the vendor name, model, or usage.
       const ok = realtimeVendor ? (await realtimeProviderFor(realtimeVendor).status()).ok : false;
       return { ok };

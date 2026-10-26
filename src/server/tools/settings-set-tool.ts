@@ -1,7 +1,8 @@
 /**
  * `meeting_settings_set {key, value}` — the single backend write path into
- * global `app_settings` (D-14: workspace-admin only, since these keys affect
- * the whole workspace, not just the calling user's room). The allowlist,
+ * `app_settings`, keyed per room. Only the room's owners and moderators, and
+ * workspace admins, may write (`can-manage-room-settings.ts`, fail closed
+ * without the signed role claims). The allowlist,
  * defaults and validators live in `src/shared/app-settings.ts` — the same
  * module the iframe's `settings-store.ts` reads for its DEFAULTS, so the two
  * sides of the Settings screen cannot drift (DRY, plan.md § Settings store).
@@ -17,7 +18,7 @@ import type { AppTool } from './registry.js';
 export const settingsSetTool: AppTool = {
   name: 'meeting_settings_set',
   title: 'Update room settings',
-  description: "Write a setting for the caller's room (STT provider, speaker-match thresholds, retention…) — any verified room member.",
+  description: "Write a setting for the caller's room (STT provider, speaker-match thresholds, retention…) — room owners, moderators and workspace admins only.",
   inputSchema: {
     type: 'object',
     required: ['key', 'value'],
@@ -29,7 +30,7 @@ export const settingsSetTool: AppTool = {
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
     if (!canManageRoomSettings(actor)) {
-      throw new AppError('Only a member of this room can change its settings.');
+      throw new AppError('Only room owners, moderators and workspace admins can change these settings.');
     }
 
     const key = typeof args.key === 'string' ? args.key.trim() : '';

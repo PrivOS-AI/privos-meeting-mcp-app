@@ -282,7 +282,7 @@
   "settings.nav.privacy": "Confidentialité et stockage",
   "settings.nav.caption": "Affichage des sous-titres",
 
-  "settings.adminOnlyNote": "Seul un administrateur de l'espace peut modifier ce paramètre.",
+  "settings.adminOnlyNote": "Seuls les propriétaires et modérateurs du salon, ou un administrateur de l'espace, peuvent modifier ce paramètre.",
 
   "settings.language.title": "Langue et traduction",
   "settings.language.uiLanguage": "Langue de l'interface",
@@ -315,7 +315,7 @@
   "settings.speech.keyNote": "Les clés API sont configurées par un administrateur en tant que variables d'environnement serveur.",
   "settings.speech.memberOk": "Les sous-titres en direct fonctionnent.",
   "settings.speech.memberDown": "Les sous-titres en direct sont actuellement indisponibles — l'enregistrement fonctionne normalement.",
-  "settings.speech.adminOnly": "Seul un administrateur de l'espace peut voir les détails et modifier le fournisseur.",
+  "settings.speech.adminOnly": "Seuls les propriétaires et modérateurs du salon, ou un administrateur de l'espace, peuvent voir les détails et modifier le fournisseur.",
 
   "settings.microphone.title": "Microphone",
   "settings.microphone.permission.unknown": "Le statut de l'autorisation du microphone est inconnu.",
