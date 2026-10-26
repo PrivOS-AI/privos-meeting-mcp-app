@@ -16,10 +16,11 @@ import { listToolDefinitions, resolveTool, type ToolRuntime } from './tools/regi
 import { renderUiHtml } from './ui-resource.js';
 
 /** The UI-bearing tool declared first in the manifest. */
-const UI_TOOL = manifest.tools[0] as { name?: string; title?: string; description?: string } | undefined;
+const UI_TOOL = manifest.tools[0] as { name?: string; title?: string; description?: string; inputSchema?: Record<string, unknown> } | undefined;
 const UI_TOOL_NAME = String(UI_TOOL?.name ?? 'meeting_agent');
 const UI_TOOL_TITLE = String(UI_TOOL?.title ?? manifest.title);
 const UI_TOOL_DESCRIPTION = String(UI_TOOL?.description ?? manifest.description);
+const UI_TOOL_INPUT_SCHEMA = UI_TOOL?.inputSchema ?? { type: 'object', properties: {} };
 
 /**
  * `_meta.ui` (resourceUri + permissions + csp + hideAiChat) for the UI tool.
@@ -51,7 +52,7 @@ export function createMcpHandler(ctx: ServeAppHandlerContext): AppMcpHandler {
               name: UI_TOOL_NAME,
               title: UI_TOOL_TITLE,
               description: UI_TOOL_DESCRIPTION,
-              inputSchema: { type: 'object', properties: { roomId: { type: 'string' } } },
+              inputSchema: UI_TOOL_INPUT_SCHEMA,
               _meta: UI_TOOL_META,
             },
             ...listToolDefinitions(),

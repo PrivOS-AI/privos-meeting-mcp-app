@@ -23,8 +23,8 @@ export const settingsSetTool: AppTool = {
     type: 'object',
     required: ['key', 'value'],
     properties: {
-      key: { type: 'string' },
-      value: {},
+      key: { type: 'string', maxLength: 64 },
+      value: { type: ['string', 'number', 'boolean'], maxLength: 64 },
     },
   },
   async execute(args, context) {

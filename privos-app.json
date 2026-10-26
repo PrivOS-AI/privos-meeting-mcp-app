@@ -189,7 +189,9 @@
         "type": "object",
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       },
@@ -252,7 +254,9 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -278,10 +282,14 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -301,24 +309,60 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "seq": {
-            "type": "number"
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
           },
           "durationMs": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120000
           },
           "partStartMs": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 86400000
           },
           "segments": {
             "type": "array",
+            "maxItems": 200,
             "items": {
-              "type": "object"
+              "type": "object",
+              "required": [
+                "speaker",
+                "startMs",
+                "endMs"
+              ],
+              "properties": {
+                "speaker": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "startMs": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 86400000
+                },
+                "endMs": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 86400000
+                },
+                "final": {
+                  "type": "boolean"
+                }
+              }
             }
           }
         }
@@ -336,13 +380,19 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "sinceMs": {
             "type": "number",
+            "minimum": 0,
+            "maximum": 86400000,
             "description": "Only return settled turns newer than this meeting-clock timestamp. Omitted -> the most recent turns."
           }
         }
@@ -362,18 +412,52 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "target": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "vi",
+              "en",
+              "fr",
+              "zh",
+              "ko",
+              "ja",
+              "de",
+              "tr"
+            ]
           },
           "segments": {
             "type": "array",
+            "maxItems": 40,
             "items": {
-              "type": "object"
+              "type": "object",
+              "required": [
+                "id",
+                "text"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "lang": {
+                  "type": "string",
+                  "maxLength": 16
+                }
+              }
             }
           }
         }
@@ -391,10 +475,14 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -411,10 +499,14 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -431,10 +523,14 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -452,21 +548,59 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 200
           },
           "language": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "vi",
+              "en",
+              "fr",
+              "zh",
+              "ko",
+              "ja",
+              "de",
+              "tr"
+            ]
           },
           "segments": {
             "type": "array",
+            "maxItems": 8000,
             "items": {
-              "type": "object"
+              "type": "object",
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "speakerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "speakerName": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "startSec": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 2000
+                }
+              }
             }
           }
         }
@@ -484,10 +618,14 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -504,9 +642,17 @@
         ],
         "properties": {
           "key": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 64
           },
-          "value": {}
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "maxLength": 64
+          }
         }
       }
     },
@@ -523,13 +669,19 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "assignments": {
             "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
             "items": {
               "type": "object",
               "required": [
@@ -538,7 +690,9 @@
               ],
               "properties": {
                 "speakerId": {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
                 },
                 "mode": {
                   "type": "string",
@@ -550,14 +704,18 @@
                   ]
                 },
                 "privosUserId": {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
                 },
                 "displayName": {
                   "type": "string",
                   "maxLength": 80
                 },
                 "profileId": {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
                 }
               }
             }
@@ -585,17 +743,22 @@
         ],
         "properties": {
           "profileId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "displayName": {
             "type": "string",
             "maxLength": 80
           },
           "privosUserId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
           },
           "privosUsername": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 64
           },
           "action": {
             "type": "string",
@@ -618,7 +781,9 @@
         ],
         "properties": {
           "profileId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -636,16 +801,24 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "speakerId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "profileId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "displayName": {
             "type": "string",

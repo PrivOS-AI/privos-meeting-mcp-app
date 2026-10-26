@@ -19,12 +19,13 @@ import { addKnownRoom } from '../jobs/known-rooms-store.js';
 import { sweepRoom } from '../jobs/startup-sweep.js';
 import { requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
+import { ID } from './schema-parts.js';
 
 export const bootstrapTool: AppTool = {
   name: 'meeting_bootstrap',
   title: 'Bootstrap room data',
   description: 'Register the App DB schema, record the room, and ensure the bot is a room member.',
-  inputSchema: { type: 'object', required: ['roomId'], properties: { roomId: { type: 'string' } } },
+  inputSchema: { type: 'object', required: ['roomId'], properties: { roomId: ID } },
   async execute(args, context, runtime) {
     const actor = requireVerifiedActor(context);
     const roomId = typeof args.roomId === 'string' ? args.roomId.trim() : '';

@@ -19,8 +19,9 @@ import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { enqueueChunk } from '../live-speakers/chunk-worker.js';
 import { resolveRealtimeVendor, realtimeProviderFor } from '../stt/stt-provider-registry.js';
-import { asChunkSegment, assertStructuralSpans, type ChunkSegment } from './span-validation.js';
+import { asChunkSegment, assertStructuralSpans, MAX_PART_DURATION_MS, MAX_SEGMENTS_PER_CHUNK, type ChunkSegment } from './span-validation.js';
 import type { AppTool } from './registry.js';
+import { ID, MS, ROOM_AND_MEETING } from './schema-parts.js';
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -34,16 +35,22 @@ export const chunkReadyTool: AppTool = {
     type: 'object',
     required: ['roomId', 'meetingId', 'seq', 'durationMs', 'segments'],
     properties: {
-      roomId: { type: 'string' },
-      meetingId: { type: 'string' },
-      seq: { type: 'number' },
-      durationMs: { type: 'number' },
-      // New, optional: the client's absolute part-boundary stamp
-      // (`performance.now() - recorderEpochMs` at blob-emit time). Absent for
-      // an older tab still open across a deploy — the worker falls back to
-      // its own cumulative clock for that meeting; see `chunk-worker.ts`.
-      partStartMs: { type: 'number' },
-      segments: { type: 'array', items: { type: 'object' } },
+      ...ROOM_AND_MEETING,
+      seq: { type: 'integer', minimum: 0, maximum: 100_000 },
+      durationMs: { type: 'number', minimum: 0, maximum: MAX_PART_DURATION_MS },
+      // Optional: the client's absolute part-boundary stamp (`performance.now() - recorderEpochMs`
+      // at blob-emit time). Absent for an older tab open across a deploy — the worker then falls
+      // back to its own cumulative clock for that meeting; see `chunk-worker.ts`.
+      partStartMs: MS,
+      segments: {
+        type: 'array',
+        maxItems: MAX_SEGMENTS_PER_CHUNK,
+        items: {
+          type: 'object',
+          required: ['speaker', 'startMs', 'endMs'],
+          properties: { speaker: { ...ID, maxLength: 64 }, startMs: MS, endMs: MS, final: { type: 'boolean' } },
+        },
+      },
     },
   },
   async execute(args, context, runtime) {

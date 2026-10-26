@@ -17,12 +17,13 @@ import { env } from '../env.js';
 import { allProviderStatuses, realtimeProviderFor, resolveAsyncVendor, resolveRealtimeVendor } from '../stt/stt-provider-registry.js';
 import { countActiveRealtimeRecordings } from './realtime-token-tool.js';
 import type { AppTool } from './registry.js';
+import { NO_ARGUMENTS } from './schema-parts.js';
 
 export const sttStatusTool: AppTool = {
   name: 'meeting_stt_status',
   title: 'Speech-to-text status',
   description: 'Status of both STT providers for room owners, moderators and workspace admins to compare.',
-  inputSchema: { type: 'object', properties: {} },
+  inputSchema: NO_ARGUMENTS,
   async execute(_args, context) {
     const actor = requireVerifiedActor(context);
     // Bind to the caller's room so the global `app_settings` reads resolve to the granted `room` permission context.

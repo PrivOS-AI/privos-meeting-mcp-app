@@ -22,6 +22,7 @@ import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import { escapeMarkdown } from '../summary/sanitize.js';
 import { upsertMeeting } from '../jobs/meeting-repository.js';
 import type { AppTool } from './registry.js';
+import { ROOM_AND_MEETING } from './schema-parts.js';
 
 const BOT_SEND_MESSAGE_TOOL = 'mcpapp.bot.sendMessage';
 const SEND_MESSAGE_SCOPE = 'bot:message:send';
@@ -53,11 +54,7 @@ export const sendToChatTool: AppTool = {
   name: 'meeting_send_to_chat',
   title: 'Send summary to chat',
   description: 'Send the saved meeting summary to the room chat via the installation bot — the content is built server-side, never taken from the client.',
-  inputSchema: {
-    type: 'object',
-    required: ['roomId', 'meetingId'],
-    properties: { roomId: { type: 'string' }, meetingId: { type: 'string' } },
-  },
+  inputSchema: { type: 'object', required: ['roomId', 'meetingId'], properties: { ...ROOM_AND_MEETING } },
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);

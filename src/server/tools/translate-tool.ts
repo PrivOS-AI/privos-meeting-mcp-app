@@ -12,6 +12,7 @@ import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { generateWithHubAi } from '../hub/hub-ai-client.js';
 import type { AppTool, ToolRuntime } from './registry.js';
 import { checkRateLimit } from './rate-limiter.js';
+import { ID, LANGUAGE, MAX_LINE_CHARS, ROOM_AND_MEETING, TEXT_LINE } from './schema-parts.js';
 
 const MAX_SEGMENTS_PER_CALL = 40;
 /** Generous ceiling above the 3-5s batching cadence — guards against a runaway client, not normal use. */
@@ -37,7 +38,7 @@ function asInputSegment(value: unknown): InputSegment | null {
   if (!value || typeof value !== 'object') return null;
   const raw = value as Record<string, unknown>;
   const id = asString(raw.id);
-  const text = typeof raw.text === 'string' ? raw.text : '';
+  const text = typeof raw.text === 'string' ? raw.text.slice(0, MAX_LINE_CHARS) : '';
   if (!id || !text) return null;
   const lang = typeof raw.lang === 'string' ? raw.lang : undefined;
   return { id, text, lang };
@@ -100,10 +101,13 @@ export const translateTool: AppTool = {
     type: 'object',
     required: ['roomId', 'meetingId', 'target', 'segments'],
     properties: {
-      roomId: { type: 'string' },
-      meetingId: { type: 'string' },
-      target: { type: 'string' },
-      segments: { type: 'array', items: { type: 'object' } },
+      ...ROOM_AND_MEETING,
+      target: LANGUAGE,
+      segments: {
+        type: 'array',
+        maxItems: MAX_SEGMENTS_PER_CALL,
+        items: { type: 'object', required: ['id', 'text'], properties: { id: ID, text: TEXT_LINE, lang: { type: 'string', maxLength: 16 } } },
+      },
     },
   },
   async execute(args, context, runtime: ToolRuntime) {

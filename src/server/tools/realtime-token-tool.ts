@@ -13,6 +13,7 @@ import { env } from '../env.js';
 import { realtimeProviderFor, resolveRealtimeVendor } from '../stt/stt-provider-registry.js';
 import type { AppTool } from './registry.js';
 import { checkRateLimit } from './rate-limiter.js';
+import { ROOM_AND_MEETING } from './schema-parts.js';
 
 const BUDGET_PER_HOUR = 30;
 const BUDGET_WINDOW_MS = 60 * 60 * 1000;
@@ -68,11 +69,7 @@ export const realtimeTokenTool: AppTool = {
   name: 'meeting_realtime_token',
   title: 'Get live caption token',
   description: "Mint a short-lived realtime token for the selected STT provider's live caption SDK.",
-  inputSchema: {
-    type: 'object',
-    required: ['roomId', 'meetingId'],
-    properties: { roomId: { type: 'string' }, meetingId: { type: 'string' } },
-  },
+  inputSchema: { type: 'object', required: ['roomId', 'meetingId'], properties: { ...ROOM_AND_MEETING } },
   async execute(args, context) {
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);

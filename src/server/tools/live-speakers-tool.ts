@@ -25,6 +25,7 @@ import { resolveRealtimeVendor, realtimeProviderFor } from '../stt/stt-provider-
 import { ensureRegistry } from '../live-speakers/live-speaker-repository.js';
 import { requireRoomMeeting, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
+import { MS, ROOM_AND_MEETING } from './schema-parts.js';
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -71,9 +72,8 @@ export const liveSpeakersTool: AppTool = {
     type: 'object',
     required: ['roomId', 'meetingId'],
     properties: {
-      roomId: { type: 'string' },
-      meetingId: { type: 'string' },
-      sinceMs: { type: 'number', description: 'Only return settled turns newer than this meeting-clock timestamp. Omitted -> the most recent turns.' },
+      ...ROOM_AND_MEETING,
+      sinceMs: { ...MS, description: 'Only return settled turns newer than this meeting-clock timestamp. Omitted -> the most recent turns.' },
     },
   },
   async execute(args, context, runtime) {

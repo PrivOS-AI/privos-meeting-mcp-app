@@ -9,6 +9,7 @@ import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { JobRepository, STALE_AFTER_MS } from '../jobs/job-repository.js';
 import { requireRoomMeeting, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
+import { ROOM_AND_MEETING } from './schema-parts.js';
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -18,11 +19,7 @@ export const statusTool: AppTool = {
   name: 'meeting_status',
   title: 'Meeting processing status',
   description: 'View meeting processing progress: current step, percent complete, and the result when finished.',
-  inputSchema: {
-    type: 'object',
-    required: ['roomId', 'meetingId'],
-    properties: { roomId: { type: 'string' }, meetingId: { type: 'string' } },
-  },
+  inputSchema: { type: 'object', required: ['roomId', 'meetingId'], properties: { ...ROOM_AND_MEETING } },
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);

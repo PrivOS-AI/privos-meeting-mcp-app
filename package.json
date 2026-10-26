@@ -20,6 +20,7 @@
     "pair": "tsx scripts/pair.ts",
     "build": "vite build && tsx scripts/generate-manifest.ts && npm run manifest:lint",
     "manifest:lint": "node scripts/lint-manifest.mjs",
+    "manifest:sync-tools": "tsx scripts/sync-manifest-tools.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

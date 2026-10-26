@@ -22,6 +22,7 @@ import { isPostMeetingCoherent, openPendingEmbedding, readMatchThreshold } from 
 import { logEvent } from '../speaker/speaker-diagnostics-log.js';
 import { isWorkspaceAdmin, requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
+import { DISPLAY_NAME, ID, ROOM_AND_MEETING } from './schema-parts.js';
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -34,13 +35,7 @@ export const relabelSpeakerTool: AppTool = {
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId', 'speakerId'],
-    properties: {
-      roomId: { type: 'string' },
-      meetingId: { type: 'string' },
-      speakerId: { type: 'string' },
-      profileId: { type: 'string' },
-      displayName: { type: 'string', maxLength: 80 },
-    },
+    properties: { ...ROOM_AND_MEETING, speakerId: ID, profileId: ID, displayName: DISPLAY_NAME },
   },
   async execute(args, context) {
     const actor = requireVerifiedActor(context);

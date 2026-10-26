@@ -21,6 +21,7 @@ import { logEvent } from '../speaker/speaker-diagnostics-log.js';
 import { isWorkspaceAdmin, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
 import type { VerifiedActor } from '@privos_ai/app-server';
+import { DISPLAY_NAME, ID, NO_ARGUMENTS } from './schema-parts.js';
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -57,7 +58,7 @@ export const speakerProfileListTool: AppTool = {
   name: 'speaker_profile_list',
   title: 'List voiceprint profiles',
   description: 'List every voiceprint profile in the workspace (name, links, sample count) — never returns the vector.',
-  inputSchema: { type: 'object', properties: {} },
+  inputSchema: NO_ARGUMENTS,
   async execute(_args, context) {
     const actor = requireVerifiedActor(context);
     const db = new AppDbBotClient(actor.roomId ?? context.roomId);
@@ -86,10 +87,10 @@ export const speakerProfileUpdateTool: AppTool = {
     type: 'object',
     required: ['profileId'],
     properties: {
-      profileId: { type: 'string' },
-      displayName: { type: 'string', maxLength: 80 },
-      privosUserId: { type: 'string' },
-      privosUsername: { type: 'string' },
+      profileId: ID,
+      displayName: DISPLAY_NAME,
+      privosUserId: { ...ID, maxLength: 64 },
+      privosUsername: { type: 'string', maxLength: 64 },
       action: { type: 'string', enum: ['reenrol', 'pruneOutliers'] },
     },
   },
@@ -151,7 +152,7 @@ export const speakerProfileDeleteTool: AppTool = {
   name: 'speaker_profile_delete',
   title: 'Delete voiceprint profile',
   description: 'Permanently delete a voiceprint profile and all its links across every room — only the profile creator or a workspace admin.',
-  inputSchema: { type: 'object', required: ['profileId'], properties: { profileId: { type: 'string' } } },
+  inputSchema: { type: 'object', required: ['profileId'], properties: { profileId: ID } },
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
     const profileId = asString(args.profileId);

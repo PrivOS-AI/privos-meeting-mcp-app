@@ -31,6 +31,11 @@ Marketplace packaging.
   (picked by id, matched by display name, or found through a linked user):
   only the profile's creator, the linked person or a workspace admin may.
   Others still label the speaker; the result says `enrol_not_permitted`.
+- Every tool input is bounded: ids and strings carry `maxLength`, arrays
+  `maxItems` matching the server caps, array items a typed shape; caption lines
+  are capped at 2,000 characters and `speaker_resolve` at 50 assignments. Tool
+  definitions live in code only: `npm run manifest:sync-tools` copies them into
+  `privos-app.json`, and the parity test now compares input schemas too.
 - Data policy rewritten to match actual behaviour, including what is not
   deleted automatically (transcripts, summaries, data left after uninstall).
 - Dependencies: `@privos_ai/app-server` 0.12, `@privos_ai/app-react` 0.8, `zod` 4,

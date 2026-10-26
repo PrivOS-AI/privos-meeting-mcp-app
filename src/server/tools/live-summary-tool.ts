@@ -24,6 +24,7 @@ import { asLanguageCode } from '../../shared/languages.js';
 import type { Segment } from '../transcript/segment-builder.js';
 import type { AppTool, ToolRuntime } from './registry.js';
 import { checkRateLimit } from './rate-limiter.js';
+import { DISPLAY_NAME, ID, LANGUAGE, MAX_LINE_CHARS, ROOM_AND_MEETING, TEXT_LINE } from './schema-parts.js';
 
 /** Auto-refresh cadence is ~10 min; this ceiling only guards a runaway client while still allowing a manual "refresh now". */
 const LIVE_SUMMARY_LIMIT_PER_5MIN = 6;
@@ -49,7 +50,7 @@ function asLanguage(value: unknown): SummaryLanguage {
 function asInputSegment(value: unknown, index: number): InputSegment | null {
   if (!value || typeof value !== 'object') return null;
   const raw = value as Record<string, unknown>;
-  const text = typeof raw.text === 'string' ? raw.text.trim() : '';
+  const text = typeof raw.text === 'string' ? raw.text.trim().slice(0, MAX_LINE_CHARS) : '';
   if (!text) return null;
   const speakerName = asString(raw.speakerName);
   const speakerId = asString(raw.speakerId) || speakerName || 'unknown';
@@ -65,11 +66,18 @@ export const liveSummaryTool: AppTool = {
     type: 'object',
     required: ['roomId', 'meetingId', 'segments'],
     properties: {
-      roomId: { type: 'string' },
-      meetingId: { type: 'string' },
-      title: { type: 'string' },
-      language: { type: 'string' },
-      segments: { type: 'array', items: { type: 'object' } },
+      ...ROOM_AND_MEETING,
+      title: { type: 'string', maxLength: 200 },
+      language: LANGUAGE,
+      segments: {
+        type: 'array',
+        maxItems: MAX_SEGMENTS,
+        items: {
+          type: 'object',
+          required: ['text'],
+          properties: { speakerId: ID, speakerName: DISPLAY_NAME, startSec: { type: 'number', minimum: 0 }, text: TEXT_LINE },
+        },
+      },
     },
   },
   async execute(args, context, runtime: ToolRuntime) {

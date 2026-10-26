@@ -38,6 +38,7 @@ import { logEvent } from '../speaker/speaker-diagnostics-log.js';
 import { invalidateProfileCache, runOnMeetingQueue } from '../live-speakers/chunk-worker.js';
 import { isWorkspaceAdmin, requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
+import { DISPLAY_NAME, ID, ROOM_AND_MEETING } from './schema-parts.js';
 
 /**
  * Logs one `enrol` event for a `speaker_resolve` confirmation — every mode
@@ -67,6 +68,9 @@ interface AssignmentResult {
   displayName?: string;
   reason?: string;
 }
+
+/** One resolve covers one meeting's speakers; far more than any real meeting has. */
+const MAX_ASSIGNMENTS = 50;
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -116,19 +120,20 @@ export const speakerResolveTool: AppTool = {
     type: 'object',
     required: ['roomId', 'meetingId', 'assignments'],
     properties: {
-      roomId: { type: 'string' },
-      meetingId: { type: 'string' },
+      ...ROOM_AND_MEETING,
       assignments: {
         type: 'array',
+        minItems: 1,
+        maxItems: MAX_ASSIGNMENTS,
         items: {
           type: 'object',
           required: ['speakerId', 'mode'],
           properties: {
-            speakerId: { type: 'string' },
+            speakerId: ID,
             mode: { type: 'string', enum: ['user', 'name', 'merge', 'skip'] },
-            privosUserId: { type: 'string' },
-            displayName: { type: 'string', maxLength: 80 },
-            profileId: { type: 'string' },
+            privosUserId: { ...ID, maxLength: 64 },
+            displayName: DISPLAY_NAME,
+            profileId: ID,
           },
         },
       },
@@ -141,6 +146,7 @@ export const speakerResolveTool: AppTool = {
     if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
 
     const assignmentsRaw = Array.isArray(args.assignments) ? args.assignments : [];
+    if (assignmentsRaw.length > MAX_ASSIGNMENTS) throw new AppError(`At most ${MAX_ASSIGNMENTS} speakers can be resolved at once.`);
     const assignments = assignmentsRaw.map(asAssignment).filter((a): a is Assignment => a !== null);
     if (assignments.length === 0) throw new AppError('assignments is invalid or empty.');
 

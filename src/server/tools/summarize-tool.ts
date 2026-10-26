@@ -26,6 +26,7 @@ import { buildTranscriptJson, serializeTranscriptJson, type TranscriptJson } fro
 import { buildSrt } from '../transcript/srt-writer.js';
 import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool, ToolRuntime } from './registry.js';
+import { ROOM_AND_MEETING } from './schema-parts.js';
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -41,11 +42,7 @@ export const summarizeTool: AppTool = {
   name: 'meeting_summarize',
   title: 'Re-summarize meeting',
   description: 'Re-run only the summary step with Hub AI from the saved transcript, without reprocessing everything.',
-  inputSchema: {
-    type: 'object',
-    required: ['roomId', 'meetingId'],
-    properties: { roomId: { type: 'string' }, meetingId: { type: 'string' } },
-  },
+  inputSchema: { type: 'object', required: ['roomId', 'meetingId'], properties: { ...ROOM_AND_MEETING } },
   async execute(args, context, runtime: ToolRuntime) {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
