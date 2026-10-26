@@ -37,6 +37,10 @@
   "banner.botCredential.notConfigured": "The installation bot is not configured yet. Some features will not work until an admin sets it up.",
   "banner.botCredential.invalid": "The installation bot's credential is invalid. Please contact an admin.",
   "banner.botCredential.hub-unreachable": "Could not reach the Hub to check the installation bot. Please try again later.",
+  "banner.assistantNotInRoom.message": "The meeting assistant is not a member of this room yet, so it cannot save or process meetings here.",
+  "banner.assistantNotInRoom.add": "Add to room",
+  "banner.assistantNotInRoom.adding": "Adding…",
+  "banner.assistantNotInRoom.manual": "The app could not add the assistant. Ask a room owner to invite @{slug} to this room, then reopen the app.",
   "banner.dismiss": "Dismiss notification",
 
   "screen.new.untitled": "Untitled meeting",

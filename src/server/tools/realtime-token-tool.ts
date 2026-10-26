@@ -73,27 +73,27 @@ export const realtimeTokenTool: AppTool = {
   async execute(args, context) {
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.', 'INVALID_INPUT');
 
     const actor = context.actor;
     if (!actor || actor.roomId !== roomId) {
-      throw new AppError('Invalid request for this room.');
+      throw new AppError('Invalid request for this room.', 'ROOM_MISMATCH');
     }
 
     const db = new AppDbBotClient(roomId);
     const meeting = await db.getById('meetings', 'room', meetingId);
     if (!meeting || meeting.roomId !== roomId) {
-      throw new AppError('Meeting not found in this room.');
+      throw new AppError('Meeting not found in this room.', 'NOT_FOUND');
     }
     if (meeting.ownerUserId !== actor.userId) {
-      throw new AppError('Only the meeting owner can get a live caption token.');
+      throw new AppError('Only the meeting owner can get a live caption token.', 'NOT_MEETING_OWNER');
     }
     if (meeting.status !== 'recording') {
-      throw new AppError('Meeting is not currently recording.');
+      throw new AppError('Meeting is not currently recording.', 'INVALID_STATE');
     }
 
     if (!checkRateLimit('meeting_realtime_token', `${actor.userId}:${meetingId}`, BUDGET_PER_HOUR, BUDGET_WINDOW_MS)) {
-      throw new AppError('Exceeded the allowed number of live caption token requests per hour. Please try again later.');
+      throw new AppError('Exceeded the allowed number of live caption token requests per hour. Please try again later.', 'RATE_LIMITED');
     }
 
     const freshSince = new Date(Date.now() - CONCURRENCY_FRESHNESS_MS).toISOString();
@@ -101,7 +101,7 @@ export const realtimeTokenTool: AppTool = {
     if (activeCount >= env.liveMaxConcurrentRecordings) {
       throw new AppError(
         `The system is already recording the maximum of ${env.liveMaxConcurrentRecordings} meetings, so live captions are temporarily unavailable — ` +
-          'the recording keeps running and speaker names will be available after processing.',
+          'the recording keeps running and speaker names will be available after processing.', 'CAPACITY_REACHED',
       );
     }
 
@@ -111,7 +111,7 @@ export const realtimeTokenTool: AppTool = {
     if (!status.configured) {
       const keyName = vendor === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY';
       throw new AppError(
-        `The selected live-caption provider (sttRealtimeProvider=${vendor}) is missing an API key — check the ${keyName} environment variable.`,
+        `The selected live-caption provider (sttRealtimeProvider=${vendor}) is missing an API key — check the ${keyName} environment variable.`, 'PROVIDER_NOT_CONFIGURED',
       );
     }
 

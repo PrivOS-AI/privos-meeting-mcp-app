@@ -275,6 +275,19 @@
   background: rgba(0, 0, 0, 0.06);
 }
 
+.ma-banner__action {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  color: var(--ma-accent-on);
+  background: var(--ma-accent);
+  border: none;
+  border-radius: var(--ma-radius-sm);
+}
+
+.ma-banner__action:disabled {
+  opacity: 0.6;
+}
+
 /* ---------- Icon primitive ---------- */
 
 .ma-icon {

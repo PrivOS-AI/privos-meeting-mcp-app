@@ -76,7 +76,7 @@ export const elevenLabsBatchProvider: AsyncSttProvider = {
   vendor: 'elevenlabs',
 
   async transcribeFile(input: TranscribeInput): Promise<SttResult> {
-    if (!env.elevenLabsApiKey) throw new AppError('Missing ELEVENLABS_API_KEY — cannot run elevenlabs-batch.');
+    if (!env.elevenLabsApiKey) throw new AppError('Missing ELEVENLABS_API_KEY — cannot run elevenlabs-batch.', 'PROVIDER_NOT_CONFIGURED');
     const client = new ElevenLabsClient({ apiKey: env.elevenLabsApiKey });
     const languageCode = input.languageHints?.[0];
 
@@ -100,7 +100,7 @@ export const elevenLabsBatchProvider: AsyncSttProvider = {
       );
     } catch (error) {
       if (error instanceof ElevenLabsError) {
-        throw new AppError(`ElevenLabs processing failed (HTTP ${error.statusCode ?? '?'}): ${error.message}`);
+        throw new AppError(`ElevenLabs processing failed (HTTP ${error.statusCode ?? '?'}): ${error.message}`, 'PROVIDER_UNAVAILABLE');
       }
       throw error;
     }

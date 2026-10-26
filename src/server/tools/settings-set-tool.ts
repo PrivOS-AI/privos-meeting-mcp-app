@@ -30,12 +30,12 @@ export const settingsSetTool: AppTool = {
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
     if (!canManageRoomSettings(actor)) {
-      throw new AppError('Only room owners, moderators and workspace admins can change these settings.');
+      throw new AppError('Only room owners, moderators and workspace admins can change these settings.', 'FORBIDDEN');
     }
 
     const key = typeof args.key === 'string' ? args.key.trim() : '';
     if (!isWorkspaceSettingKey(key)) {
-      throw new AppError(`Setting "${key}" is not supported.`);
+      throw new AppError(`Setting "${key}" is not supported.`, 'INVALID_INPUT');
     }
     const value = WORKSPACE_SETTING_VALIDATORS[key](args.value);
 

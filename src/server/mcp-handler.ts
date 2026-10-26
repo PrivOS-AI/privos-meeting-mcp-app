@@ -37,7 +37,7 @@ function assertVerifiedActor(context: ToolCallContext): void {
   const verified = Boolean(context.actor) && context.identityState === 'verified';
   if (verified) return;
   if (isDevelopmentRuntime() && env.allowUnverifiedActor) return;
-  throw new AppError('Request denied: a verified user identity is required.');
+  throw new AppError('Request denied: a verified user identity is required.', 'FORBIDDEN');
 }
 
 export function createMcpHandler(ctx: ServeAppHandlerContext): AppMcpHandler {
@@ -81,15 +81,23 @@ export function createMcpHandler(ctx: ServeAppHandlerContext): AppMcpHandler {
         if (!tool) {
           throw Object.assign(new Error(`Unknown tool: ${params.name ?? '<missing>'}`), { code: -32601 });
         }
-        assertVerifiedActor(context);
         try {
+          assertVerifiedActor(context);
           const result = await tool.execute(params.arguments ?? {}, context, runtime);
           return { content: [{ type: 'text', text: JSON.stringify(result) }] };
         } catch (error) {
-          // The SDK collapses a thrown error to "-32603 Internal error" with no
-          // message, so every tool failure is otherwise opaque in the logs. Log
-          // the tool + full cause here before rethrowing (AppError preserved).
           console.error(`[tool:${params.name}] failed`, error);
+          // An AppError is meant for the user: return it as an MCP tool error with
+          // its stable code. `serveApp` does not forward a `mapAppError`, so a
+          // thrown one would reach the iframe as a bare "-32603 Internal error".
+          // Anything else is rethrown and the SDK hides its message.
+          if (error instanceof AppError) {
+            return {
+              isError: true,
+              content: [{ type: 'text', text: error.message }],
+              structuredContent: { error: { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) } },
+            };
+          }
           throw error;
         }
       }

@@ -24,7 +24,7 @@ export const statusTool: AppTool = {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.', 'INVALID_INPUT');
 
     const db = new AppDbBotClient(roomId);
     await requireRoomMeeting(db, actor, roomId, meetingId);

@@ -60,7 +60,7 @@ export const processTool: AppTool = {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.', 'INVALID_INPUT');
 
     const db = new AppDbBotClient(roomId);
     const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
@@ -77,9 +77,9 @@ export const processTool: AppTool = {
     }
 
     const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
-    if (!folderId) throw new AppError('Meeting has no storage folder yet — cannot process.');
+    if (!folderId) throw new AppError('Meeting has no storage folder yet — cannot process.', 'INVALID_STATE');
     const parts = await discoverParts(runtime, roomId, folderId, meetingId);
-    if (parts.length === 0) throw new AppError('Meeting has no recording parts to process.');
+    if (parts.length === 0) throw new AppError('Meeting has no recording parts to process.', 'INVALID_STATE');
 
     const asyncVendor = await resolveAsyncVendor(db);
     const sttProvider = asyncVendor === 'elevenlabs' ? ('elevenlabs-batch' as const) : ('soniox-async' as const);

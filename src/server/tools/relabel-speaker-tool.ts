@@ -42,10 +42,10 @@ export const relabelSpeakerTool: AppTool = {
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
     const speakerId = asString(args.speakerId);
-    if (!roomId || !meetingId || !speakerId) throw new AppError('roomId, meetingId, and speakerId are required.');
+    if (!roomId || !meetingId || !speakerId) throw new AppError('roomId, meetingId, and speakerId are required.', 'INVALID_INPUT');
     const targetProfileId = asString(args.profileId);
     const rawDisplayName = typeof args.displayName === 'string' ? sanitizeDisplayName(args.displayName) : '';
-    if (!targetProfileId && !rawDisplayName) throw new AppError('Must provide profileId or displayName.');
+    if (!targetProfileId && !rawDisplayName) throw new AppError('Must provide profileId or displayName.', 'INVALID_INPUT');
 
     const db = new AppDbBotClient(roomId);
     await requireMeetingOwner(db, actor, roomId, meetingId);
@@ -55,7 +55,7 @@ export const relabelSpeakerTool: AppTool = {
       limit: 1,
     });
     const row = extractDbRecords(existingResult)[0];
-    if (!row) throw new AppError('This speaker was not found in the meeting.');
+    if (!row) throw new AppError('This speaker was not found in the meeting.', 'NOT_FOUND');
 
     const oldProfileId = typeof row.profileId === 'string' && row.profileId ? row.profileId : undefined;
 
@@ -63,7 +63,7 @@ export const relabelSpeakerTool: AppTool = {
     let target: profileStore.SpeakerProfile | null = null;
     if (targetProfileId) {
       target = await profileStore.getProfile(db, targetProfileId);
-      if (!target) throw new AppError('Target voiceprint profile not found.');
+      if (!target) throw new AppError('Target voiceprint profile not found.', 'NOT_FOUND');
     } else {
       target = await profileStore.findProfileByName(db, rawDisplayName);
       if (!target) target = await profileStore.createProfile(db, { displayName: rawDisplayName, createdByUserId: actor.userId, createdInRoomId: roomId });

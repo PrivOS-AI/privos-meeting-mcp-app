@@ -66,7 +66,7 @@ export const sendToChatTool: AppTool = {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.', 'INVALID_INPUT');
 
     const db = new AppDbBotClient(roomId);
     const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
@@ -76,7 +76,7 @@ export const sendToChatTool: AppTool = {
     const pending = inFlight.get(meetingId);
     if (pending) return { ...(await pending), sent: false, alreadySent: true };
     if (!meeting.summaryText || typeof meeting.summaryText !== 'string') {
-      throw new AppError('Meeting has no summary to send yet.');
+      throw new AppError('Meeting has no summary to send yet.', 'INVALID_STATE');
     }
 
     const fileLink =

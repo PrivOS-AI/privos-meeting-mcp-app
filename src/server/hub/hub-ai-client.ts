@@ -72,10 +72,10 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function validateGenerateInput(input: HubAiGenerateInput): void {
   if (!input.prompt || input.prompt.length >= PROMPT_LIMIT) {
-    throw new AppError('Content sent to Hub AI is empty or exceeds the allowed limit.');
+    throw new AppError('Content sent to Hub AI is empty or exceeds the allowed limit.', 'INVALID_INPUT');
   }
   if (input.systemContext && input.systemContext.length >= SYSTEM_LIMIT) {
-    throw new AppError('System context sent to Hub AI exceeds the allowed limit.');
+    throw new AppError('System context sent to Hub AI exceeds the allowed limit.', 'HUB_ERROR');
   }
 }
 
@@ -108,16 +108,16 @@ export async function generateWithHubAi(hub: RoomBoundHubClient, input: HubAiGen
       }),
     });
   } catch {
-    throw new AppError('Could not call Hub AI — please try again later.');
+    throw new AppError('Could not call Hub AI — please try again later.', 'HUB_ERROR');
   }
 
   const parsed = await readJsonBody(response);
   if (!response.ok) {
     const reason = typeof parsed.error === 'string' ? parsed.error : `HTTP ${response.status}`;
-    throw new AppError(`Hub AI returned an error: ${reason}`);
+    throw new AppError(`Hub AI returned an error: ${reason}`, 'HUB_ERROR');
   }
   if (typeof parsed.text !== 'string') {
-    throw new AppError('Hub AI returned invalid data.');
+    throw new AppError('Hub AI returned invalid data.', 'HUB_ERROR');
   }
   return { text: parsed.text, source: typeof parsed.source === 'string' ? parsed.source : 'unknown' };
 }
@@ -151,7 +151,7 @@ function extractAttemptError(parsed: Record<string, unknown>): string | undefine
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      reject(new AppError('The Hub AI request was cancelled.'));
+      reject(new AppError('The Hub AI request was cancelled.', 'HUB_ERROR'));
       return;
     }
     const timer = setTimeout(resolve, ms);
@@ -159,7 +159,7 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       'abort',
       () => {
         clearTimeout(timer);
-        reject(new AppError('The Hub AI request was cancelled.'));
+        reject(new AppError('The Hub AI request was cancelled.', 'HUB_ERROR'));
       },
       { once: true },
     );
@@ -197,17 +197,17 @@ export async function generateAsyncWithHubAi(
       }),
     });
   } catch {
-    throw new AppError('Could not call Hub AI (generate-async) — please try again later.');
+    throw new AppError('Could not call Hub AI (generate-async) — please try again later.', 'HUB_ERROR');
   }
 
   const startBody = await readJsonBody(startResponse);
   if (!startResponse.ok) {
     const reason = typeof startBody.error === 'string' ? startBody.error : `HTTP ${startResponse.status}`;
-    throw new AppError(`Hub AI returned an error during initialization: ${reason}`);
+    throw new AppError(`Hub AI returned an error during initialization: ${reason}`, 'HUB_ERROR');
   }
   const attemptId = typeof startBody.attemptId === 'string' ? startBody.attemptId : typeof startBody.id === 'string' ? startBody.id : undefined;
   if (!attemptId) {
-    throw new AppError('Hub AI did not return an attemptId.');
+    throw new AppError('Hub AI did not return an attemptId.', 'HUB_ERROR');
   }
 
   let backoffMs = POLL_START_MS;
@@ -227,28 +227,28 @@ export async function generateAsyncWithHubAi(
         },
       );
     } catch {
-      throw new AppError('Could not check Hub AI status — please try again later.');
+      throw new AppError('Could not check Hub AI status — please try again later.', 'HUB_ERROR');
     }
 
     const pollBody = await readJsonBody(pollResponse);
     if (!pollResponse.ok) {
       const reason = typeof pollBody.error === 'string' ? pollBody.error : `HTTP ${pollResponse.status}`;
-      throw new AppError(`Hub AI returned an error while checking progress: ${reason}`);
+      throw new AppError(`Hub AI returned an error while checking progress: ${reason}`, 'HUB_ERROR');
     }
 
     const status = extractAttemptStatus(pollBody);
     if (FAILURE_STATES.has(status)) {
-      throw new AppError(`Hub AI processing failed: ${extractAttemptError(pollBody) ?? status}`);
+      throw new AppError(`Hub AI processing failed: ${extractAttemptError(pollBody) ?? status}`, 'HUB_ERROR');
     }
     if (SUCCESS_STATES.has(status)) {
       const text = extractAttemptText(pollBody);
       if (typeof text !== 'string') {
-        throw new AppError('Hub AI returned invalid data.');
+        throw new AppError('Hub AI returned invalid data.', 'HUB_ERROR');
       }
       return { text, source: typeof pollBody.source === 'string' ? pollBody.source : 'unknown' };
     }
     // queued/processing/unknown — keep polling.
   }
 
-  throw new AppError('Hub AI processing took too long — please try again later.');
+  throw new AppError('Hub AI processing took too long — please try again later.', 'HUB_ERROR');
 }

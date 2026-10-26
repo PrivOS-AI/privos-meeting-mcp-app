@@ -13,6 +13,7 @@ import { Readable } from 'node:stream';
 import type { RoomBoundHubClient } from '@privos_ai/app-server';
 
 import { AppError } from '../../shared/app-error.js';
+import { manifest } from '../manifest.js';
 
 export interface RoomFileMeta {
   _id: string;
@@ -44,13 +45,25 @@ function asFileMeta(value: unknown): RoomFileMeta | null {
   return { _id: record._id, name: record.name, channel_id: record.channel_id, folder_id: typeof record.folder_id === 'string' ? record.folder_id : null };
 }
 
-/** Mirrors genealogy's hub-file-upload.ts message so the "add the bot" recovery flow reads the same everywhere. */
+/** The Files API refuses a bot that is not a member of the room with this message. */
+export function isBotNotInRoomFileError(message: string | undefined): boolean {
+  return Boolean(message?.includes('Not authorized to access this channel'));
+}
+
+/** Same code and details as the App Platform path (`bot-tool-call.ts`), so the UI offers one fix: add the bot. */
+export function botNotInRoomFileError(): AppError {
+  return new AppError('The Meeting Agent bot has not been added to this room. Add the bot to the room and try again.', 'ASSISTANT_NOT_IN_ROOM', {
+    scope: 'files:read',
+    botSlug: manifest.agentBot.slug,
+  });
+}
+
 function mapFileHttpError(status: number, body: Record<string, unknown> | null): AppError {
   const message = typeof body?.error === 'string' ? body.error : typeof body?.message === 'string' ? body.message : undefined;
-  if (message?.includes('Not authorized to access this channel')) {
-    return new AppError('The Meeting Agent bot has not been added to this room. Add the bot to the room and try again.');
+  if (isBotNotInRoomFileError(message)) {
+    return botNotInRoomFileError();
   }
-  return new AppError(`Could not access the file in the room (HTTP ${status}): ${message ?? 'Unknown error from Hub.'}`);
+  return new AppError(`Could not access the file in the room (HTTP ${status}): ${message ?? 'Unknown error from Hub.'}`, 'HUB_ERROR');
 }
 
 /** One file's own metadata, or `null` when it does not exist. Never throws on a plain 404. */
@@ -84,7 +97,7 @@ export async function listRoomFolderFiles(
 export async function fetchFileReadable(hub: RoomBoundHubClient, fileId: string, signal?: AbortSignal): Promise<Readable> {
   const response = await hub.authorizedFetch(fileDownloadPath(fileId), { method: 'GET', requiredScope: 'files:read', signal });
   if (!response.ok || !response.body) {
-    throw new AppError(`Could not download file ${fileId} from Files (HTTP ${response.status}).`);
+    throw new AppError(`Could not download file ${fileId} from Files (HTTP ${response.status}).`, 'HUB_ERROR');
   }
   // `Response.body` is a DOM `ReadableStream`; `Readable.fromWeb` expects Node's `stream/web` type
   // of the same shape. The two are structurally identical (WHATWG streams) — safe cast, no data loss.

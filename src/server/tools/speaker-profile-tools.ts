@@ -97,14 +97,14 @@ export const speakerProfileUpdateTool: AppTool = {
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
     const profileId = asString(args.profileId);
-    if (!profileId) throw new AppError('profileId is required.');
+    if (!profileId) throw new AppError('profileId is required.', 'INVALID_INPUT');
 
     // Bound to the caller's room: a room-less client resolves to the `workspace` permission context, which this app is never granted.
     const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     const profile = await profileStore.getProfile(db, profileId);
-    if (!profile) throw new AppError('Voiceprint profile not found.');
+    if (!profile) throw new AppError('Voiceprint profile not found.', 'NOT_FOUND');
     if (!canEditProfile(profile, actor)) {
-      throw new AppError('Only the profile creator or a workspace admin can edit this profile.');
+      throw new AppError('Only the profile creator or a workspace admin can edit this profile.', 'FORBIDDEN');
     }
 
     if (args.action === 'reenrol') {
@@ -112,7 +112,7 @@ export const speakerProfileUpdateTool: AppTool = {
       // global-scope tool does not have (no `roomId` in its input by design —
       // plan.md keeps `speaker_profile_*` room-less). Surfacing this clearly
       // beats silently accepting a request that does nothing.
-      throw new AppError('Re-enrolling voice from stored audio is not supported in this version.');
+      throw new AppError('Re-enrolling voice from stored audio is not supported in this version.', 'INVALID_INPUT');
     }
 
     let pruned: number | undefined;
@@ -133,7 +133,7 @@ export const speakerProfileUpdateTool: AppTool = {
 
     if (typeof args.displayName === 'string') {
       const displayName = sanitizeDisplayName(args.displayName);
-      if (!displayName) throw new AppError('Invalid display name.');
+      if (!displayName) throw new AppError('Invalid display name.', 'INVALID_INPUT');
       await profileStore.renameProfile(db, profileId, displayName);
     }
     if (typeof args.privosUserId === 'string' && args.privosUserId) {
@@ -157,13 +157,13 @@ export const speakerProfileDeleteTool: AppTool = {
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
     const profileId = asString(args.profileId);
-    if (!profileId) throw new AppError('profileId is required.');
+    if (!profileId) throw new AppError('profileId is required.', 'INVALID_INPUT');
 
     const db = new AppDbBotClient(actor.roomId ?? context.roomId);
     const profile = await profileStore.getProfile(db, profileId);
-    if (!profile) throw new AppError('Voiceprint profile not found.');
+    if (!profile) throw new AppError('Voiceprint profile not found.', 'NOT_FOUND');
     if (!canEditProfile(profile, actor)) {
-      throw new AppError('Only the profile creator or a workspace admin can delete this profile.');
+      throw new AppError('Only the profile creator or a workspace admin can delete this profile.', 'FORBIDDEN');
     }
 
     const knownRooms = await readKnownRooms();

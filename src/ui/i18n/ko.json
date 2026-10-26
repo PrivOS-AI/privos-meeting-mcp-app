@@ -37,6 +37,10 @@
   "banner.botCredential.notConfigured": "설치 봇이 아직 구성되지 않았습니다. 관리자가 설정할 때까지 일부 기능이 작동하지 않습니다.",
   "banner.botCredential.invalid": "설치 봇의 자격 증명이 유효하지 않습니다. 관리자에게 문의하세요.",
   "banner.botCredential.hub-unreachable": "설치 봇을 확인하기 위해 Hub에 연결할 수 없습니다. 나중에 다시 시도하세요.",
+  "banner.assistantNotInRoom.message": "회의 어시스턴트가 아직 이 룸의 멤버가 아니어서 여기서 회의를 저장하거나 처리할 수 없습니다.",
+  "banner.assistantNotInRoom.add": "룸에 추가",
+  "banner.assistantNotInRoom.adding": "추가하는 중…",
+  "banner.assistantNotInRoom.manual": "앱이 어시스턴트를 추가하지 못했습니다. 룸 소유자에게 @{slug} 를 이 룸에 초대해 달라고 요청한 뒤 앱을 다시 여세요.",
   "banner.dismiss": "알림 닫기",
 
   "screen.new.untitled": "제목 없는 회의",

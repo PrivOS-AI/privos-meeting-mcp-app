@@ -143,12 +143,12 @@ export const speakerResolveTool: AppTool = {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.', 'INVALID_INPUT');
 
     const assignmentsRaw = Array.isArray(args.assignments) ? args.assignments : [];
-    if (assignmentsRaw.length > MAX_ASSIGNMENTS) throw new AppError(`At most ${MAX_ASSIGNMENTS} speakers can be resolved at once.`);
+    if (assignmentsRaw.length > MAX_ASSIGNMENTS) throw new AppError(`At most ${MAX_ASSIGNMENTS} speakers can be resolved at once.`, 'INVALID_INPUT');
     const assignments = assignmentsRaw.map(asAssignment).filter((a): a is Assignment => a !== null);
-    if (assignments.length === 0) throw new AppError('assignments is invalid or empty.');
+    if (assignments.length === 0) throw new AppError('assignments is invalid or empty.', 'INVALID_INPUT');
 
     const db = new AppDbBotClient(roomId);
     await requireMeetingOwner(db, actor, roomId, meetingId);

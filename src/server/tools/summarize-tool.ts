@@ -47,15 +47,15 @@ export const summarizeTool: AppTool = {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.', 'INVALID_INPUT');
 
     const db = new AppDbBotClient(roomId);
     const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
     if (!meeting.transcriptJsonFileId || typeof meeting.transcriptJsonFileId !== 'string') {
-      throw new AppError('Meeting has no transcript to summarize.');
+      throw new AppError('Meeting has no transcript to summarize.', 'INVALID_STATE');
     }
     const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
-    if (!folderId) throw new AppError('Meeting has no storage folder yet.');
+    if (!folderId) throw new AppError('Meeting has no storage folder yet.', 'INVALID_STATE');
 
     const readable = await fetchFileReadable(runtime.agentBotHub, meeting.transcriptJsonFileId);
     const raw = await streamToText(readable);
@@ -63,10 +63,10 @@ export const summarizeTool: AppTool = {
     try {
       transcriptDoc = JSON.parse(raw);
     } catch {
-      throw new AppError('Could not read transcript.json — invalid file.');
+      throw new AppError('Could not read transcript.json — invalid file.', 'INVALID_INPUT');
     }
     if (!isTranscriptJson(transcriptDoc)) {
-      throw new AppError('transcript.json is not in the expected format.');
+      throw new AppError('transcript.json is not in the expected format.', 'INVALID_INPUT');
     }
 
     // Prefer the CURRENT `meeting_speakers` display names (may have been corrected by `speaker_resolve` since the
@@ -114,7 +114,7 @@ export const summarizeTool: AppTool = {
 
     if (!summarized) {
       await upsertMeeting(db, meetingId, { summaryError: (summaryError ?? 'Summary failed.').slice(0, 4000) });
-      throw new AppError(summaryError ?? 'Summarizing with Hub AI failed.');
+      throw new AppError(summaryError ?? 'Summarizing with Hub AI failed.', 'HUB_ERROR');
     }
 
     const finalSegments = summarized.translatedSegments;

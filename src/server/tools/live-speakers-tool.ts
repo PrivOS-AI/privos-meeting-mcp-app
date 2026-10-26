@@ -39,7 +39,7 @@ function asStringArray(value: unknown): string[] {
 function parseSinceMs(value: unknown): number | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    throw new AppError('sinceMs must be a finite number >= 0 when provided.');
+    throw new AppError('sinceMs must be a finite number >= 0 when provided.', 'INVALID_INPUT');
   }
   return value;
 }
@@ -80,7 +80,7 @@ export const liveSpeakersTool: AppTool = {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.', 'INVALID_INPUT');
     const sinceMs = parseSinceMs(args.sinceMs);
 
     const db = new AppDbBotClient(roomId);

@@ -29,8 +29,8 @@ export const bootstrapTool: AppTool = {
   async execute(args, context, runtime) {
     const actor = requireVerifiedActor(context);
     const roomId = typeof args.roomId === 'string' ? args.roomId.trim() : '';
-    if (!roomId) throw new AppError('roomId is required.');
-    if (actor.roomId !== roomId) throw new AppError('Invalid request for this room.');
+    if (!roomId) throw new AppError('roomId is required.', 'INVALID_INPUT');
+    if (actor.roomId !== roomId) throw new AppError('Invalid request for this room.', 'ROOM_MISMATCH');
 
     const db = new AppDbBotClient(roomId);
     await ensureAppDbSchema(db);

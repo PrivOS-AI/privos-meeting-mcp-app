@@ -74,24 +74,24 @@ export const chunkReadyTool: AppTool = {
       durationMs <= 0 ||
       (partStartMs !== undefined && !Number.isFinite(partStartMs))
     ) {
-      throw new AppError('Invalid meeting_chunk_ready parameters.');
+      throw new AppError('Invalid meeting_chunk_ready parameters.', 'INVALID_INPUT');
     }
 
     const actor = context.actor;
     if (!actor || actor.roomId !== roomId) {
-      throw new AppError('Invalid request for this room.');
+      throw new AppError('Invalid request for this room.', 'ROOM_MISMATCH');
     }
 
     const db = new AppDbBotClient(roomId);
     const meeting = await db.getById('meetings', 'room', meetingId);
     if (!meeting || meeting.roomId !== roomId) {
-      throw new AppError('Meeting not found in this room.');
+      throw new AppError('Meeting not found in this room.', 'NOT_FOUND');
     }
     if (meeting.ownerUserId !== actor.userId) {
-      throw new AppError('Only the meeting owner can send meeting_chunk_ready.');
+      throw new AppError('Only the meeting owner can send meeting_chunk_ready.', 'NOT_MEETING_OWNER');
     }
     if (meeting.status !== 'recording' && meeting.status !== 'uploading') {
-      throw new AppError('Meeting is not in a state that accepts recording parts.');
+      throw new AppError('Meeting is not in a state that accepts recording parts.', 'INVALID_STATE');
     }
 
     const vendor = await resolveRealtimeVendor(db);
@@ -103,13 +103,13 @@ export const chunkReadyTool: AppTool = {
     const segmentsRaw = Array.isArray(args.segments) ? args.segments : [];
     const segments = segmentsRaw.map(asChunkSegment).filter((s): s is ChunkSegment => s !== null);
     if (segments.length !== segmentsRaw.length) {
-      throw new AppError('Some turns contain invalid data.');
+      throw new AppError('Some turns contain invalid data.', 'INVALID_INPUT');
     }
     const structuralError = assertStructuralSpans(segments, durationMs);
-    if (structuralError) throw new AppError(structuralError);
+    if (structuralError) throw new AppError(structuralError, 'INVALID_INPUT');
 
     const folderId = typeof meeting.folderId === 'string' && meeting.folderId ? meeting.folderId : '';
-    if (!folderId) throw new AppError('Meeting has no storage folder yet.');
+    if (!folderId) throw new AppError('Meeting has no storage folder yet.', 'INVALID_STATE');
 
     enqueueChunk({ db, hub: runtime.agentBotHub, folderId }, { roomId, meetingId, seq, durationMs, partStartMs, arrivedAtMs, segments });
 

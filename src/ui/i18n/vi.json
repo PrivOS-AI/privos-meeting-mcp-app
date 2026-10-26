@@ -37,6 +37,10 @@
   "banner.botCredential.notConfigured": "Bot cài đặt chưa được cấu hình. Một số tính năng sẽ không hoạt động cho tới khi quản trị viên thiết lập.",
   "banner.botCredential.invalid": "Thông tin xác thực của bot cài đặt không hợp lệ. Vui lòng liên hệ quản trị viên.",
   "banner.botCredential.hub-unreachable": "Không thể kết nối tới Hub để kiểm tra bot cài đặt. Vui lòng thử lại sau.",
+  "banner.assistantNotInRoom.message": "Trợ lý cuộc họp chưa là thành viên của room này nên chưa lưu và xử lý cuộc họp ở đây được.",
+  "banner.assistantNotInRoom.add": "Thêm vào room",
+  "banner.assistantNotInRoom.adding": "Đang thêm…",
+  "banner.assistantNotInRoom.manual": "App không tự thêm được trợ lý. Nhờ chủ room mời @{slug} vào room này rồi mở lại app.",
   "banner.dismiss": "Đóng thông báo",
 
   "screen.new.untitled": "Cuộc họp chưa đặt tên",

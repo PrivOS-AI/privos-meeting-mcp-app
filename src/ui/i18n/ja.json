@@ -37,6 +37,10 @@
   "banner.botCredential.notConfigured": "インストールボットはまだ設定されていません。管理者が設定するまで一部の機能が利用できません。",
   "banner.botCredential.invalid": "インストールボットの認証情報が無効です。管理者にお問い合わせください。",
   "banner.botCredential.hub-unreachable": "インストールボットを確認するためにHubへ接続できませんでした。しばらくしてから再試行してください。",
+  "banner.assistantNotInRoom.message": "会議アシスタントはまだこのルームのメンバーではないため、ここで会議を保存・処理できません。",
+  "banner.assistantNotInRoom.add": "ルームに追加",
+  "banner.assistantNotInRoom.adding": "追加中…",
+  "banner.assistantNotInRoom.manual": "アプリがアシスタントを追加できませんでした。ルームのオーナーに @{slug} をこのルームへ招待してもらい、アプリを開き直してください。",
   "banner.dismiss": "通知を閉じる",
 
   "screen.new.untitled": "無題の会議",

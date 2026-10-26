@@ -37,6 +37,10 @@
   "banner.botCredential.notConfigured": "Kurulum botu henüz yapılandırılmadı. Bir yönetici ayarlayana kadar bazı özellikler çalışmaz.",
   "banner.botCredential.invalid": "Kurulum botunun kimlik bilgisi geçersiz. Lütfen bir yöneticiyle iletişime geçin.",
   "banner.botCredential.hub-unreachable": "Kurulum botunu kontrol etmek için Hub'a ulaşılamadı. Lütfen daha sonra tekrar deneyin.",
+  "banner.assistantNotInRoom.message": "Toplantı asistanı henüz bu odanın üyesi değil, bu yüzden burada toplantıları kaydedemez veya işleyemez.",
+  "banner.assistantNotInRoom.add": "Odaya ekle",
+  "banner.assistantNotInRoom.adding": "Ekleniyor…",
+  "banner.assistantNotInRoom.manual": "Uygulama asistanı ekleyemedi. Bir oda sahibinden @{slug} kullanıcısını bu odaya davet etmesini isteyin, ardından uygulamayı yeniden açın.",
   "banner.dismiss": "Bildirimi kapat",
 
   "screen.new.untitled": "Başlıksız toplantı",

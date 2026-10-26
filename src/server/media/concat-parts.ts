@@ -32,13 +32,13 @@ export async function concatParts(
   signal: AbortSignal,
 ): Promise<void> {
   if (parts.length === 0) {
-    throw new AppError('Meeting has no recording parts to concatenate.');
+    throw new AppError('Meeting has no recording parts to concatenate.', 'INVALID_STATE');
   }
   const sorted = [...parts].sort((a, b) => a.seq - b.seq);
   for (let i = 1; i < sorted.length; i++) {
     if (sorted[i].seq === sorted[i - 1].seq) continue;
     if (sorted[i].seq !== sorted[i - 1].seq + 1) {
-      throw new AppError(`Recording is missing part #${sorted[i - 1].seq + 1}.`);
+      throw new AppError(`Recording is missing part #${sorted[i - 1].seq + 1}.`, 'INVALID_INPUT');
     }
   }
 
@@ -47,16 +47,16 @@ export async function concatParts(
   const dest = createWriteStream(destPath);
   try {
     for (const part of sorted) {
-      if (signal.aborted) throw new AppError('Job was cancelled while concatenating recording parts.');
+      if (signal.aborted) throw new AppError('Job was cancelled while concatenating recording parts.', 'INVALID_STATE');
       if (!allowed.has(part.fileId)) {
         throw new AppError(`Recording part "${part.name}" does not match the processing job — aborting concatenation.`);
       }
       if (!part.name.includes(digest)) {
-        throw new AppError(`Recording part "${part.name}" does not carry the correct meeting signature — it may belong to a different meeting.`);
+        throw new AppError(`Recording part "${part.name}" does not carry the correct meeting signature — it may belong to a different meeting.`, 'INVALID_INPUT');
       }
       const source = await fetchFileReadable(hub, part.fileId, signal);
       for await (const chunk of source) {
-        if (signal.aborted) throw new AppError('Job was cancelled while concatenating recording parts.');
+        if (signal.aborted) throw new AppError('Job was cancelled while concatenating recording parts.', 'INVALID_STATE');
         if (!dest.write(chunk)) await once(dest, 'drain');
       }
     }

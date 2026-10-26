@@ -37,6 +37,10 @@
   "banner.botCredential.notConfigured": "Der Installationsbot ist noch nicht konfiguriert. Einige Funktionen stehen erst zur Verfügung, wenn ein Administrator ihn eingerichtet hat.",
   "banner.botCredential.invalid": "Die Anmeldedaten des Installationsbots sind ungültig. Bitte wenden Sie sich an einen Administrator.",
   "banner.botCredential.hub-unreachable": "Der Hub konnte nicht erreicht werden, um den Installationsbot zu prüfen. Bitte später erneut versuchen.",
+  "banner.assistantNotInRoom.message": "Der Meeting-Assistent ist noch kein Mitglied dieses Raums und kann hier keine Meetings speichern oder verarbeiten.",
+  "banner.assistantNotInRoom.add": "Zum Raum hinzufügen",
+  "banner.assistantNotInRoom.adding": "Wird hinzugefügt…",
+  "banner.assistantNotInRoom.manual": "Die App konnte den Assistenten nicht hinzufügen. Bitten Sie einen Raumeigentümer, @{slug} in diesen Raum einzuladen, und öffnen Sie die App erneut.",
   "banner.dismiss": "Benachrichtigung schließen",
 
   "screen.new.untitled": "Unbenannte Besprechung",

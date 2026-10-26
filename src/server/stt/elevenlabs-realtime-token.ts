@@ -22,7 +22,7 @@ export const elevenLabsRealtimeProvider: RealtimeTokenProvider = {
 
   async mint(_meetingId: string): Promise<RealtimeToken> {
     if (!env.elevenLabsApiKey) {
-      throw new AppError('Missing ELEVENLABS_API_KEY — cannot mint an ElevenLabs live-caption token.');
+      throw new AppError('Missing ELEVENLABS_API_KEY — cannot mint an ElevenLabs live-caption token.', 'PROVIDER_NOT_CONFIGURED');
     }
 
     let response: Response;
@@ -33,15 +33,15 @@ export const elevenLabsRealtimeProvider: RealtimeTokenProvider = {
         body: '{}',
       });
     } catch {
-      throw new AppError('Could not connect to ElevenLabs to fetch a live-caption token.');
+      throw new AppError('Could not connect to ElevenLabs to fetch a live-caption token.', 'PROVIDER_UNAVAILABLE');
     }
     if (!response.ok) {
-      throw new AppError(`ElevenLabs refused to issue a live-caption token (HTTP ${response.status}).`);
+      throw new AppError(`ElevenLabs refused to issue a live-caption token (HTTP ${response.status}).`, 'PROVIDER_UNAVAILABLE');
     }
 
     const body = (await response.json().catch(() => null)) as { token?: unknown } | null;
     const token = typeof body?.token === 'string' ? body.token : undefined;
-    if (!token) throw new AppError('ElevenLabs returned an invalid token.');
+    if (!token) throw new AppError('ElevenLabs returned an invalid token.', 'PROVIDER_UNAVAILABLE');
 
     return {
       provider: 'elevenlabs',

@@ -44,6 +44,14 @@ Marketplace packaging.
   for accepting a re-run and for the sweep (was 30 s / 20 min / 10 min). A job
   interrupted by a restart is re-queued once, resuming its Soniox upload, then
   failed if interrupted again.
+- Tool errors carry stable codes. An `AppError` is returned as an `isError`
+  result with `structuredContent.error = { code, message, details }`; before,
+  `serveApp` turned every thrown error into a bare `-32603 Internal error`, so
+  the UI never saw the message (the capacity notice could never show).
+- A bot-path `Insufficient scope` is probed: a bot outside the room becomes
+  `ASSISTANT_NOT_IN_ROOM` (the UI offers **Add to room**, or the manual invite
+  with the bot handle), a real grant gap `PERMISSION_NOT_GRANTED`.
+- `npm run diagnose:scopes` walks the bot diagnosis ladder on a paired install.
 - Data policy rewritten to match actual behaviour, including what is not
   deleted automatically (transcripts, summaries, data left after uninstall).
 - Dependencies: `@privos_ai/app-server` 0.12, `@privos_ai/app-react` 0.8, `zod` 4,

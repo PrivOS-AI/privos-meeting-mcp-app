@@ -28,6 +28,7 @@ import { speakerResolve, type RealtimeAssignChoice } from '../data/speaker-api.j
 import { ScreenWakeLock, type WakeLockState } from '../data/screen-wake-lock.js';
 import type { RealtimeCapabilities, RealtimeToken, SttVendor } from '../data/stt-types.js';
 import { TranslateBuffer } from '../data/translate-buffer.js';
+import { parseToolResultOrThrow, toolErrorCode } from '../data/tool-error.js';
 import type { LanguageCode } from '../../shared/languages.js';
 
 export type RecordingStatus = 'idle' | 'recording' | 'paused' | 'ending' | 'uploading' | 'done' | 'error';
@@ -570,13 +571,13 @@ export class RecordingStore {
     let token: RealtimeToken;
     try {
       const raw = await this.app.callServerTool({ name: 'meeting_realtime_token', arguments: { roomId: this.ctx.roomId, meetingId } });
-      token = parseToolResult(raw) as unknown as RealtimeToken;
+      token = parseToolResultOrThrow(raw) as unknown as RealtimeToken;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      // Only the server's concurrency-cap refusal ("The system is already recording the maximum
-      // of N meetings") is a capacity problem; any other failure is plain "captions off" — never
-      // mislabel it as capacity. Either way the recording itself keeps going.
-      this.setState({ captionStatus: /recording the maximum of \d+ meetings/.test(message) ? 'capacity' : 'off', error: message });
+      // Only the server's concurrency-cap refusal (`CAPACITY_REACHED`) is a capacity problem; any
+      // other failure is plain "captions off" — never mislabel it as capacity. Either way the
+      // recording itself keeps going.
+      this.setState({ captionStatus: toolErrorCode(error) === 'CAPACITY_REACHED' ? 'capacity' : 'off', error: message });
       return;
     }
     this.setState({ provider: token.provider, capabilities: token.capabilities });
@@ -613,7 +614,7 @@ export class RecordingStore {
       translateTo: this.translationTarget,
       mintToken: async () => {
         const raw = await this.app.callServerTool({ name: 'meeting_realtime_token', arguments: { roomId: this.ctx.roomId, meetingId } });
-        return parseToolResult(raw) as unknown as RealtimeToken;
+        return parseToolResultOrThrow(raw) as unknown as RealtimeToken;
       },
       onStarted: (sessionIndex) => {
         this.clock?.registerSessionStart(sessionIndex);

@@ -70,7 +70,7 @@ function formatTimestamp(totalSec: number): string {
 function extractJsonObject(text: string): unknown {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1 || end < start) throw new AppError('Hub AI returned data that is not valid JSON.');
+  if (start === -1 || end === -1 || end < start) throw new AppError('Hub AI returned data that is not valid JSON.', 'HUB_ERROR');
   return JSON.parse(text.slice(start, end + 1));
 }
 
@@ -109,7 +109,7 @@ async function callAndValidate<S extends z.ZodTypeAny>(
   const secondParsed = schema.safeParse(safeExtract(second));
   if (secondParsed.success) return secondParsed.data;
 
-  throw new AppError('Hub AI returned JSON that does not match the schema even after a retry.');
+  throw new AppError('Hub AI returned JSON that does not match the schema even after a retry.', 'HUB_ERROR');
 }
 
 function safeExtract(text: string): unknown {
@@ -141,7 +141,7 @@ export async function summarizeTranscript(
   signal?: AbortSignal,
 ): Promise<SummaryPayload> {
   if (input.chunks.length === 0) {
-    throw new AppError('No transcript content to summarize.');
+    throw new AppError('No transcript content to summarize.', 'INVALID_STATE');
   }
 
   const notesByChunk: ChunkNotes[] = [];

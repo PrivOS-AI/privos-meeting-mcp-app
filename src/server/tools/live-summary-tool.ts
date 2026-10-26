@@ -83,32 +83,32 @@ export const liveSummaryTool: AppTool = {
   async execute(args, context, runtime: ToolRuntime) {
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.', 'INVALID_INPUT');
 
     const actor = context.actor;
     if (!actor || actor.roomId !== roomId) {
-      throw new AppError('Invalid request for this room.');
+      throw new AppError('Invalid request for this room.', 'ROOM_MISMATCH');
     }
 
     const rawSegments = Array.isArray(args.segments) ? args.segments : [];
-    if (rawSegments.length === 0) throw new AppError('No caption content to summarize yet.');
-    if (rawSegments.length > MAX_SEGMENTS) throw new AppError('Too many caption lines in one summary batch.');
+    if (rawSegments.length === 0) throw new AppError('No caption content to summarize yet.', 'INVALID_STATE');
+    if (rawSegments.length > MAX_SEGMENTS) throw new AppError('Too many caption lines in one summary batch.', 'INVALID_INPUT');
 
     const db = new AppDbBotClient(roomId);
     const meeting = await db.getById('meetings', 'room', meetingId);
     if (!meeting || meeting.roomId !== roomId) {
-      throw new AppError('Meeting not found in this room.');
+      throw new AppError('Meeting not found in this room.', 'NOT_FOUND');
     }
 
     if (!checkRateLimit('meeting_live_summary', meetingId, LIVE_SUMMARY_LIMIT_PER_5MIN, 5 * 60_000)) {
-      throw new AppError('Live summary is rate-limited for this meeting. Please try again later.');
+      throw new AppError('Live summary is rate-limited for this meeting. Please try again later.', 'RATE_LIMITED');
     }
 
     const lines = rawSegments
       .map((value, index) => asInputSegment(value, index))
       .filter((s): s is InputSegment => s !== null)
       .sort((a, b) => a.startSec - b.startSec);
-    if (lines.length === 0) throw new AppError('No caption content to summarize yet.');
+    if (lines.length === 0) throw new AppError('No caption content to summarize yet.', 'INVALID_STATE');
 
     // Build the Segment[] + names map the shared chunker/summarizer expect. endSec
     // is the next line's start (last line: its own start) — only used for the

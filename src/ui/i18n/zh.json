@@ -37,6 +37,10 @@
   "banner.botCredential.notConfigured": "安装机器人尚未配置。部分功能在管理员完成配置前将无法使用。",
   "banner.botCredential.invalid": "安装机器人的凭据无效。请联系管理员。",
   "banner.botCredential.hub-unreachable": "无法连接到 Hub 以检查安装机器人。请稍后重试。",
+  "banner.assistantNotInRoom.message": "会议助手还不是此房间的成员，因此无法在这里保存或处理会议。",
+  "banner.assistantNotInRoom.add": "添加到房间",
+  "banner.assistantNotInRoom.adding": "正在添加…",
+  "banner.assistantNotInRoom.manual": "应用无法添加助手。请房间所有者将 @{slug} 邀请到此房间，然后重新打开应用。",
   "banner.dismiss": "关闭通知",
 
   "screen.new.untitled": "未命名会议",

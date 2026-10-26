@@ -69,15 +69,15 @@ function parseTranslationResponse(text: string, requested: InputSegment[]): Tran
   const start = text.indexOf('[');
   const end = text.lastIndexOf(']');
   if (start === -1 || end === -1 || end < start) {
-    throw new AppError('Hub AI returned invalid translation data.');
+    throw new AppError('Hub AI returned invalid translation data.', 'HUB_ERROR');
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(text.slice(start, end + 1));
   } catch {
-    throw new AppError('Hub AI returned invalid translation data.');
+    throw new AppError('Hub AI returned invalid translation data.', 'HUB_ERROR');
   }
-  if (!Array.isArray(parsed)) throw new AppError('Hub AI returned invalid translation data.');
+  if (!Array.isArray(parsed)) throw new AppError('Hub AI returned invalid translation data.', 'HUB_ERROR');
 
   const requestedIds = new Set(requested.map((s) => s.id));
   const out: TranslatedSegment[] = [];
@@ -115,28 +115,28 @@ export const translateTool: AppTool = {
     const meetingId = asString(args.meetingId);
     const target = asString(args.target);
     if (!roomId || !meetingId || !TARGETS.has(target)) {
-      throw new AppError('roomId, meetingId, and target (vi|en) are required.');
+      throw new AppError('roomId, meetingId, and target (vi|en) are required.', 'INVALID_INPUT');
     }
 
     const actor = context.actor;
     if (!actor || actor.roomId !== roomId) {
-      throw new AppError('Invalid request for this room.');
+      throw new AppError('Invalid request for this room.', 'ROOM_MISMATCH');
     }
 
     const segmentsRaw = Array.isArray(args.segments) ? args.segments : [];
     if (segmentsRaw.length === 0) return { translations: [] };
     if (segmentsRaw.length > MAX_SEGMENTS_PER_CALL) {
-      throw new AppError('Too many lines in one translation batch.');
+      throw new AppError('Too many lines in one translation batch.', 'INVALID_INPUT');
     }
 
     const db = new AppDbBotClient(roomId);
     const meeting = await db.getById('meetings', 'room', meetingId);
     if (!meeting || meeting.roomId !== roomId) {
-      throw new AppError('Meeting not found in this room.');
+      throw new AppError('Meeting not found in this room.', 'NOT_FOUND');
     }
 
     if (!checkRateLimit('meeting_translate', meetingId, TRANSLATE_LIMIT_PER_MINUTE, 60_000)) {
-      throw new AppError('Live translation is rate-limited for this meeting. Please try again later.');
+      throw new AppError('Live translation is rate-limited for this meeting. Please try again later.', 'RATE_LIMITED');
     }
 
     const segments = segmentsRaw.map(asInputSegment).filter((s): s is InputSegment => s !== null);

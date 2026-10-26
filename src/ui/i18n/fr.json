@@ -37,6 +37,10 @@
   "banner.botCredential.notConfigured": "Le bot d'installation n'est pas encore configuré. Certaines fonctionnalités ne fonctionneront pas tant qu'un administrateur ne l'aura pas configuré.",
   "banner.botCredential.invalid": "L'identifiant du bot d'installation est invalide. Veuillez contacter un administrateur.",
   "banner.botCredential.hub-unreachable": "Impossible de joindre le Hub pour vérifier le bot d'installation. Veuillez réessayer plus tard.",
+  "banner.assistantNotInRoom.message": "L'assistant de réunion n'est pas encore membre de ce salon : il ne peut pas y enregistrer ni traiter de réunions.",
+  "banner.assistantNotInRoom.add": "Ajouter au salon",
+  "banner.assistantNotInRoom.adding": "Ajout…",
+  "banner.assistantNotInRoom.manual": "L'application n'a pas pu ajouter l'assistant. Demandez à un propriétaire du salon d'inviter @{slug}, puis rouvrez l'application.",
   "banner.dismiss": "Ignorer la notification",
 
   "screen.new.untitled": "Réunion sans titre",
