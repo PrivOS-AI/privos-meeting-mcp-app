@@ -52,6 +52,9 @@ Marketplace packaging.
   `ASSISTANT_NOT_IN_ROOM` (the UI offers **Add to room**, or the manual invite
   with the bot handle), a real grant gap `PERMISSION_NOT_GRANTED`.
 - `npm run diagnose:scopes` walks the bot diagnosis ladder on a paired install.
+- The live screen says when recording audio is at risk: parts waiting to
+  upload, parts lost after the 15-minute retry window, too many parts queued,
+  or the browser recorder stopping. These were recorded in state and never shown.
 - Data policy rewritten to match actual behaviour, including what is not
   deleted automatically (transcripts, summaries, data left after uninstall).
 - Dependencies: `@privos_ai/app-server` 0.12, `@privos_ai/app-react` 0.8, `zod` 4,

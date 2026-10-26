@@ -60,6 +60,10 @@
 
   "recording.keepAwake.notice": "Tắt tự động tắt màn hình/sleep trong lúc ghi — Hub chưa cấp quyền giữ màn hình sáng cho ứng dụng này.",
   "recording.capacity.notice": "Hệ thống đang ghi tối đa số cuộc họp cho phép, phụ đề trực tiếp tạm không khả dụng — bản ghi vẫn chạy và tên người nói sẽ có sau khi xử lý.",
+  "recording.upload.pending": "{n} đoạn ghi âm đang chờ tải lên — giữ tab này mở và có mạng để chúng vào được cuộc họp.",
+  "recording.upload.lost": "{n} đoạn ghi âm không tải lên kịp và sẽ thiếu trong audio của cuộc họp. Phụ đề trên màn hình không bị ảnh hưởng.",
+  "recording.upload.capReached": "Quá nhiều đoạn ghi âm đang chờ tải lên nên audio mới đang bị bỏ. Kiểm tra kết nối; nếu không hồi phục, hãy kết thúc rồi ghi lại.",
+  "recording.upload.recorderError": "Trình duyệt đã ngừng ghi âm. Hãy kết thúc để giữ phần đã ghi, rồi bắt đầu bản ghi mới.",
   "recording.degradedLabels.notice": "Nhãn người nói sẽ có sau khi xử lý.",
   "recording.editTitle": "Đổi tên cuộc họp",
   "recording.speakerBadge.numbered": "Người nói {n}",

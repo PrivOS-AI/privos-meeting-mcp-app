@@ -60,6 +60,10 @@
 
   "recording.keepAwake.notice": "Turn off screen auto-lock/sleep while recording — the Hub has not granted this app the screen-wake-lock permission yet.",
   "recording.capacity.notice": "The system is at its maximum concurrent recordings, live captions are temporarily unavailable — recording continues and speaker names will arrive after processing.",
+  "recording.upload.pending": "{n} recording parts are waiting to upload — keep this tab open and online so they reach the meeting.",
+  "recording.upload.lost": "{n} recording part(s) could not be uploaded in time and are missing from the meeting's audio. Captions on screen are not affected.",
+  "recording.upload.capReached": "Too many recording parts are waiting to upload; new audio is being dropped. Check the connection, then end and restart the recording if it does not recover.",
+  "recording.upload.recorderError": "The browser stopped recording audio. End the recording to keep what was captured, then start a new one.",
   "recording.degradedLabels.notice": "Speaker labels will be available after processing.",
   "recording.editTitle": "Rename meeting",
   "recording.speakerBadge.numbered": "Speaker {n}",

@@ -60,6 +60,10 @@
 
   "recording.keepAwake.notice": "Kayıt sırasında ekran otomatik kilidini/uykusunu kapatın — Hub bu uygulamaya henüz ekran uyanık tutma iznini vermedi.",
   "recording.capacity.notice": "Sistem eşzamanlı kayıtlarda azami sayıda, canlı altyazılar geçici olarak kullanılamıyor — kayıt sürüyor ve konuşmacı adları işlemeden sonra gelecek.",
+  "recording.upload.pending": "{n} kayıt parçası yüklenmeyi bekliyor — toplantıya ulaşmaları için bu sekmeyi açık ve çevrimiçi tutun.",
+  "recording.upload.lost": "{n} kayıt parçası zamanında yüklenemedi ve toplantı sesinde eksik. Ekrandaki altyazılar etkilenmez.",
+  "recording.upload.capReached": "Yüklenmeyi bekleyen çok fazla kayıt parçası var; yeni ses atılıyor. Bağlantıyı kontrol edin, düzelmezse kaydı bitirip yeniden başlatın.",
+  "recording.upload.recorderError": "Tarayıcı ses kaydını durdurdu. Kaydedileni korumak için kaydı bitirin, ardından yeni bir kayıt başlatın.",
   "recording.degradedLabels.notice": "Konuşmacı etiketleri işlemeden sonra kullanılabilir olacak.",
   "recording.editTitle": "Toplantıyı yeniden adlandır",
   "recording.speakerBadge.numbered": "Konuşmacı {n}",

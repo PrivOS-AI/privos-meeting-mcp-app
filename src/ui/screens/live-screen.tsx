@@ -12,6 +12,7 @@ import { DegradedLabelsNotice } from '../components/degraded-labels-notice.js';
 import { EmptyState } from '../components/empty-state.js';
 import { Icon } from '../components/icon.js';
 import { KeepAwakeNotice } from '../components/keep-awake-notice.js';
+import { UploadStatusNotice } from '../components/upload-status-notice.js';
 import { LiveSummaryPanel } from '../components/live-summary-panel.js';
 import { VoiceWaveform } from '../components/voice-waveform.js';
 import { RecIndicator } from '../components/rec-indicator.js';
@@ -84,6 +85,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
     <>
       {!state.wakeLock.supported || state.wakeLock.error ? <KeepAwakeNotice /> : null}
       {state.captionStatus === 'capacity' ? <CapacityNotice /> : null}
+      <UploadStatusNotice pendingParts={state.pendingParts} lostParts={state.lostParts} issue={state.uploadIssue} />
       {state.capabilities && !state.capabilities.speakerLabels ? <DegradedLabelsNotice /> : null}
     </>
   );

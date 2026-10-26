@@ -60,6 +60,10 @@
 
   "recording.keepAwake.notice": "録音中は画面の自動ロック/スリープをオフにしてください — Hubはまだこのアプリに画面スリープ防止の権限を付与していません。",
   "recording.capacity.notice": "システムが同時録音数の上限に達しているため、リアルタイム字幕は一時的に利用できません — 録音は続行され、話者名は処理後に表示されます。",
+  "recording.upload.pending": "{n} 個の録音パートがアップロード待ちです。会議に反映されるまで、このタブを開いたままオンラインにしておいてください。",
+  "recording.upload.lost": "{n} 個の録音パートを時間内にアップロードできず、会議の音声から欠落しています。画面の字幕には影響ありません。",
+  "recording.upload.capReached": "アップロード待ちの録音パートが多すぎるため、新しい音声が破棄されています。接続を確認し、回復しない場合は録音を終了して再開してください。",
+  "recording.upload.recorderError": "ブラウザが音声の録音を停止しました。録音済みの内容を残すため録音を終了し、新しい録音を開始してください。",
   "recording.degradedLabels.notice": "話者ラベルは処理後に利用可能になります。",
   "recording.editTitle": "会議名を変更",
   "recording.speakerBadge.numbered": "話者 {n}",

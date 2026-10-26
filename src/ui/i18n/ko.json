@@ -60,6 +60,10 @@
 
   "recording.keepAwake.notice": "녹음 중에는 화면 자동 잠금/절전 모드를 꺼주세요 — Hub가 아직 이 앱에 화면 잠금 방지 권한을 부여하지 않았습니다.",
   "recording.capacity.notice": "시스템이 최대 동시 녹음 수에 도달하여 실시간 자막을 일시적으로 사용할 수 없습니다 — 녹음은 계속되며 화자 이름은 처리 후 제공됩니다.",
+  "recording.upload.pending": "녹음 파트 {n}개가 업로드를 기다리고 있습니다. 회의에 반영되도록 이 탭을 열어 두고 온라인 상태를 유지하세요.",
+  "recording.upload.lost": "녹음 파트 {n}개를 제시간에 업로드하지 못해 회의 오디오에서 빠졌습니다. 화면의 자막에는 영향이 없습니다.",
+  "recording.upload.capReached": "업로드 대기 중인 녹음 파트가 너무 많아 새 오디오가 버려지고 있습니다. 연결을 확인하고, 복구되지 않으면 녹음을 종료한 뒤 다시 시작하세요.",
+  "recording.upload.recorderError": "브라우저가 오디오 녹음을 중단했습니다. 녹음된 내용을 보존하려면 녹음을 종료한 뒤 새로 시작하세요.",
   "recording.degradedLabels.notice": "화자 라벨은 처리 후 제공됩니다.",
   "recording.editTitle": "회의 이름 변경",
   "recording.speakerBadge.numbered": "화자 {n}",

@@ -66,6 +66,10 @@ export interface RecordingState {
   captionStatus: CaptionStatus | 'capacity';
   sessionIndex: number;
   pendingParts: number;
+  /** Recording parts given up on after the retry window — their audio is not in the meeting. */
+  lostParts: number;
+  /** Why audio may be missing: too many parts waiting, a part lost after retrying, or the recorder failed. */
+  uploadIssue?: 'cap-reached' | 'window-expired' | 'recorder-error';
   clockSkewMs: number;
   lines: CaptionLine[];
   speakerMap: Record<string, LiveSpeakerBadge>;
@@ -117,6 +121,7 @@ function initialState(): RecordingState {
     captionStatus: 'off',
     sessionIndex: 0,
     pendingParts: 0,
+    lostParts: 0,
     clockSkewMs: 0,
     lines: [],
     bookmarkedSecs: [],
@@ -533,7 +538,8 @@ export class RecordingStore {
           // default rather than a live setting.
           retryWindowMin: 15,
           onPendingCountChange: (count) => this.setState({ pendingParts: count }),
-          onCapReached: () => this.setState({ error: 'upload-cap-reached' }),
+          onCapReached: () => this.setState({ uploadIssue: 'cap-reached' }),
+          onWindowExpired: () => this.setState({ uploadIssue: 'window-expired', lostParts: this.state.lostParts + 1 }),
         },
       );
 
@@ -543,7 +549,7 @@ export class RecordingStore {
         (part) => {
           this.uploadQueue?.enqueue(part.seq, part.blob, part.partStartMs, part.durationMs);
         },
-        () => this.setState({ error: 'recorder-error' }),
+        () => this.setState({ uploadIssue: 'recorder-error' }),
       );
       this.recorder.start();
 

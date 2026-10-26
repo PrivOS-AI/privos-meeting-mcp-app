@@ -112,6 +112,11 @@
   background: var(--bg-sunken);
 }
 
+.ma-notice--error {
+  color: var(--ma-status-danger);
+  background: var(--ma-status-danger-bg);
+}
+
 /* ---------- REC indicator ---------- */
 
 .ma-rec {

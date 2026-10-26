@@ -60,6 +60,10 @@
 
   "recording.keepAwake.notice": "录制期间请关闭屏幕自动锁定/休眠 — Hub 尚未授予此应用屏幕唤醒锁定权限。",
   "recording.capacity.notice": "系统已达到最大并发录制数，实时字幕暂时不可用 — 录制将继续，发言人姓名将在处理完成后提供。",
+  "recording.upload.pending": "{n} 段录音正在等待上传——请保持此标签页打开并联网，以便它们进入会议。",
+  "recording.upload.lost": "{n} 段录音未能及时上传，会议音频中将缺少这些部分。屏幕上的字幕不受影响。",
+  "recording.upload.capReached": "等待上传的录音段过多，新的音频正在被丢弃。请检查网络；若无法恢复，请结束并重新开始录音。",
+  "recording.upload.recorderError": "浏览器已停止录音。请结束录音以保留已录内容，然后开始新的录音。",
   "recording.degradedLabels.notice": "发言人标签将在处理完成后提供。",
   "recording.editTitle": "重命名会议",
   "recording.speakerBadge.numbered": "发言人 {n}",

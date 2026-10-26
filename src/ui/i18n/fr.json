@@ -60,6 +60,10 @@
 
   "recording.keepAwake.notice": "Désactivez la mise en veille automatique de l'écran pendant l'enregistrement — le Hub n'a pas encore accordé à cette application l'autorisation de verrouillage d'écran actif.",
   "recording.capacity.notice": "Le système a atteint son nombre maximal d'enregistrements simultanés, les sous-titres en direct sont temporairement indisponibles — l'enregistrement se poursuit et les noms des intervenants arriveront après le traitement.",
+  "recording.upload.pending": "{n} parties de l'enregistrement attendent l'envoi — gardez cet onglet ouvert et connecté pour qu'elles rejoignent la réunion.",
+  "recording.upload.lost": "{n} partie(s) de l'enregistrement n'ont pas pu être envoyées à temps et manquent dans l'audio de la réunion. Les sous-titres à l'écran ne sont pas affectés.",
+  "recording.upload.capReached": "Trop de parties attendent l'envoi ; le nouvel audio est perdu. Vérifiez la connexion, puis arrêtez et relancez l'enregistrement si cela ne se rétablit pas.",
+  "recording.upload.recorderError": "Le navigateur a cessé d'enregistrer l'audio. Arrêtez l'enregistrement pour conserver ce qui a été capté, puis lancez-en un nouveau.",
   "recording.degradedLabels.notice": "Les étiquettes des intervenants seront disponibles après le traitement.",
   "recording.editTitle": "Renommer la réunion",
   "recording.speakerBadge.numbered": "Intervenant {n}",
