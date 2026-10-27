@@ -9,18 +9,21 @@
  */
 import { AppError } from '../../shared/app-error.js';
 import { meetingId8 } from '../../shared/meeting-slug.js';
+import { DEFAULT_WORKSPACE_SETTINGS } from '../../shared/app-settings.js';
+import { finishLiveSession } from '../asr/live-asr-session.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
+import { getSetting } from '../hub/app-settings.js';
+import { upsertMeeting } from '../jobs/meeting-repository.js';
 import type { PartRef } from '../media/concat-parts.js';
 import { listRoomFolderFiles } from '../media/hub-file-download.js';
-import { JobRepository } from '../jobs/job-repository.js';
+import { JobRepository, STALE_JOB_MS } from '../jobs/job-repository.js';
 import { runMeetingJob } from '../jobs/meeting-job.js';
 import { JOB_TIMEOUT_MS, meetingQueue } from '../jobs/meeting-queue.js';
 import { resolveAsyncVendor } from '../stt/stt-provider-registry.js';
 import { assertFileInRoom, requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool, ToolRuntime } from './registry.js';
+import { ROOM_AND_MEETING } from './schema-parts.js';
 
-/** A `processing` job whose heartbeat is older than 2x the sweep window is treated as dead — same threshold `meeting_status` uses for `stale`. */
-const STALE_HEARTBEAT_MS = 20 * 60_000;
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -32,7 +35,7 @@ function parseSeq(name: string): number | null {
 }
 
 function isStale(heartbeatAt: string): boolean {
-  return Date.now() - new Date(heartbeatAt).getTime() > STALE_HEARTBEAT_MS;
+  return Date.now() - new Date(heartbeatAt).getTime() > STALE_JOB_MS;
 }
 
 async function discoverParts(runtime: ToolRuntime, roomId: string, folderId: string, meetingId: string): Promise<PartRef[]> {
@@ -53,16 +56,12 @@ export const processTool: AppTool = {
   name: 'meeting_process',
   title: 'Process meeting',
   description: 'Merge recording parts, identify speakers, and produce the meeting transcript with the selected STT provider.',
-  inputSchema: {
-    type: 'object',
-    required: ['roomId', 'meetingId'],
-    properties: { roomId: { type: 'string' }, meetingId: { type: 'string' } },
-  },
+  inputSchema: { type: 'object', required: ['roomId', 'meetingId'], properties: { ...ROOM_AND_MEETING } },
   async execute(args, context, runtime) {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.', 'INVALID_INPUT');
 
     const db = new AppDbBotClient(roomId);
     const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
@@ -79,12 +78,15 @@ export const processTool: AppTool = {
     }
 
     const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
-    if (!folderId) throw new AppError('Meeting has no storage folder yet — cannot process.');
+    if (!folderId) throw new AppError('Meeting has no storage folder yet — cannot process.', 'INVALID_STATE');
     const parts = await discoverParts(runtime, roomId, folderId, meetingId);
-    if (parts.length === 0) throw new AppError('Meeting has no recording parts to process.');
+    if (parts.length === 0) throw new AppError('Meeting has no recording parts to process.', 'INVALID_STATE');
 
     const asyncVendor = await resolveAsyncVendor(db);
-    const sttProvider = asyncVendor === 'elevenlabs' ? ('elevenlabs-batch' as const) : ('soniox-async' as const);
+    const sttProvider = asyncVendor === 'local' ? ('local' as const) : asyncVendor === 'elevenlabs' ? ('elevenlabs-batch' as const) : ('soniox-async' as const);
+    // The room's setting decides, read here on the server: the `keepAudio` the iframe wrote on the meeting row is ignored.
+    const keepAudio = (await getSetting<boolean>(db, 'keepOriginalAudio')) ?? DEFAULT_WORKSPACE_SETTINGS.keepOriginalAudio;
+    await upsertMeeting(db, meetingId, { keepAudio });
 
     const job = await jobRepo.claim({
       meetingId,
@@ -93,9 +95,12 @@ export const processTool: AppTool = {
       sttProvider,
       language: typeof meeting.language === 'string' && meeting.language ? meeting.language : 'vi',
       title: typeof meeting.title === 'string' ? meeting.title : '',
-      keepAudio: meeting.keepAudio !== false,
+      keepAudio,
     });
 
+    // Recording is over: write the live speakers it found, then drop the live caption session
+    // (the transcript itself comes from the parts).
+    await finishLiveSession(meetingId);
     void meetingQueue
       .enqueue(meetingId, (signal) => runMeetingJob({ job, roomId, folderId, parts, agentBotHub: runtime.agentBotHub, signal }), JOB_TIMEOUT_MS)
       .catch((error) => {

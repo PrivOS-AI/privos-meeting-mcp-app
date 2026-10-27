@@ -12,10 +12,17 @@ export const JOB_STEPS: readonly JobStep[] = ['download', 'decode', 'transcribe'
 
 /** How often `meeting-job.ts` pings `heartbeatAt` while a single step runs long. Single source for both the timer and `meeting_status`'s `stale` threshold. */
 export const HEARTBEAT_INTERVAL_MS = 15_000;
-/** `stale = now - heartbeatAt > 2 × heartbeat cycle` (spec). Informational only — drives the UI's "Reprocess" prompt, not `job-repository.sweepStale`'s own (more conservative) reset threshold. */
-export const STALE_AFTER_MS = HEARTBEAT_INTERVAL_MS * 2;
+/**
+ * A `processing` job whose heartbeat is older than this is dead (8 missed beats).
+ * The ONE threshold for `meeting_status`'s `stale` flag, for `meeting_process`
+ * accepting a re-run, and for the sweep — so "Retry" shows exactly when a retry
+ * would actually restart the job.
+ */
+export const STALE_JOB_MS = HEARTBEAT_INTERVAL_MS * 8;
+/** A job interrupted by a restart is re-queued this many times before it is failed (guards a crash loop). */
+export const MAX_AUTO_RETRIES = 1;
 
-export type SttAsyncProviderName = 'soniox-async' | 'elevenlabs-batch';
+export type SttAsyncProviderName = 'local' | 'soniox-async' | 'elevenlabs-batch';
 export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
 export interface JobResultSpeaker {
@@ -61,6 +68,8 @@ export interface JobRecord {
   heartbeatAt: string;
   finishedAt?: string;
   result?: JobResult;
+  /** Times the sweep re-queued this job after an interruption, since the last explicit claim. */
+  autoRetries: number;
 }
 
 export interface ClaimInput {
@@ -104,7 +113,7 @@ function fromRow(row: DbRow): JobRecord {
     roomId: String(row.roomId ?? ''),
     partFileIds: toStringArray(row.partFileIds),
     audioFileId: optionalString(row.audioFileId),
-    sttProvider: row.sttProvider === 'elevenlabs-batch' ? 'elevenlabs-batch' : 'soniox-async',
+    sttProvider: row.sttProvider === 'elevenlabs-batch' || row.sttProvider === 'local' ? row.sttProvider : 'soniox-async',
     providerFileId: optionalString(row.providerFileId),
     providerTranscriptionId: optionalString(row.providerTranscriptionId),
     language: typeof row.language === 'string' && row.language ? row.language : 'vi',
@@ -117,6 +126,7 @@ function fromRow(row: DbRow): JobRecord {
     startedAt: optionalString(row.startedAt) ?? new Date().toISOString(),
     heartbeatAt: optionalString(row.heartbeatAt) ?? new Date().toISOString(),
     finishedAt: optionalString(row.finishedAt),
+    autoRetries: typeof row.autoRetries === 'number' ? row.autoRetries : 0,
     result,
   };
 }
@@ -164,6 +174,7 @@ export class JobRepository {
         progress: 0,
         startedAt: now,
         heartbeatAt: now,
+        autoRetries: 0,
       });
       return fromRow(created as DbRow);
     }
@@ -182,6 +193,7 @@ export class JobRepository {
       startedAt: now,
       heartbeatAt: now,
       finishedAt: '',
+      autoRetries: 0,
     });
     const reset = await this.findByMeeting(input.meetingId);
     if (!reset) throw new AppError('Could not re-read the job that was just reset.');
@@ -267,8 +279,13 @@ export class JobRepository {
     return extractDbRecords(result).map(fromRow);
   }
 
-  /** `processing` jobs whose heartbeat is older than `olderThanMs` -> `failed(interrupted)`. Returns the ones it touched. */
-  async sweepStale(olderThanMs: number): Promise<JobRecord[]> {
+  /**
+   * `processing` jobs whose heartbeat is older than `olderThanMs` were interrupted.
+   * Each goes back to `queued` (provider ids kept, so the STT step can resume)
+   * until it has been re-queued `MAX_AUTO_RETRIES` times; after that it is
+   * `failed(interrupted)` and waits for the owner's explicit retry.
+   */
+  async sweepStale(olderThanMs: number): Promise<{ requeued: JobRecord[]; failed: JobRecord[] }> {
     const result = await this.db.query(COLLECTION, SCOPE, {
       where: [{ field: 'status', op: '==', value: 'processing' }],
       limit: 1000,
@@ -276,9 +293,19 @@ export class JobRepository {
     const rows = extractDbRecords(result).map(fromRow);
     const cutoff = Date.now() - olderThanMs;
     const stale = rows.filter((row) => new Date(row.heartbeatAt).getTime() < cutoff);
+    const requeued: JobRecord[] = [];
+    const failed: JobRecord[] = [];
     for (const job of stale) {
-      await this.fail(job._id, 'interrupted: job processing was interrupted (pm2 restarted or the process was lost).');
+      if (job.autoRetries < MAX_AUTO_RETRIES) {
+        const now = new Date().toISOString();
+        const autoRetries = job.autoRetries + 1;
+        await this.db.update(COLLECTION, SCOPE, job._id, { status: 'queued', step: '', progress: 0, heartbeatAt: now, autoRetries });
+        requeued.push({ ...job, status: 'queued', step: null, progress: 0, heartbeatAt: now, autoRetries });
+      } else {
+        await this.fail(job._id, 'interrupted: job processing was interrupted (pm2 restarted or the process was lost).');
+        failed.push(job);
+      }
     }
-    return stale;
+    return { requeued, failed };
   }
 }

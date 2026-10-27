@@ -24,6 +24,7 @@ let fakeHub: ReturnType<typeof installFakeHub>;
 const { processTool } = await import('../tools/process-tool.js');
 const { statusTool } = await import('../tools/status-tool.js');
 const { speakerProfileDeleteTool } = await import('../tools/speaker-profile-tools.js');
+const { bootstrapTool } = await import('../tools/bootstrap-tool.js');
 
 function actorContext(userId: string, roomId: string): ToolCallContext {
   return { transport: 'direct', identityState: 'verified', sessionScope: 'test', actor: { userId, roomId, claims: {}, provenance: 'user-token' } };
@@ -53,6 +54,10 @@ describe('cross-room authz — room B cannot touch room A data', () => {
     await expect(
       processTool.execute({ roomId: ROOM_B, meetingId: 'meeting-a1' }, actorContext('user-b', ROOM_B), { agentBotHub: fakeHub }),
     ).rejects.toThrow(/not found/i);
+  });
+
+  it('meeting_bootstrap: room B actor cannot make the bot bootstrap, sweep or purge room A', async () => {
+    await expect(bootstrapTool.execute({ roomId: ROOM_A }, actorContext('user-b', ROOM_B), { agentBotHub: fakeHub })).rejects.toThrow(/invalid request/i);
   });
 
   it('meeting_status: room B actor cannot poll room A\'s meeting status', async () => {

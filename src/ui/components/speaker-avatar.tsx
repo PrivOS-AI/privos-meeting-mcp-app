@@ -23,7 +23,7 @@ export function SpeakerAvatar({ name, colorKey = 'blue', size = 32 }: SpeakerAva
       style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
       aria-hidden="true"
     >
-      {initialsOf(name)}
+      {size < 28 ? initialsOf(name).charAt(0) : initialsOf(name)}
     </span>
   );
 }

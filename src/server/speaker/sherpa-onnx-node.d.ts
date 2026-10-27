@@ -40,8 +40,103 @@ declare module 'sherpa-onnx-node' {
     compute(stream: OnlineStream, enableExternalBuffer?: boolean): Float32Array;
   }
 
+  // ---- Offline ASR, VAD, diarization (src/server/asr), verified against
+  // non-streaming-asr.js, vad.js, non-streaming-speaker-diarization.js, types.js.
+
+  export interface OfflineRecognizerConfig {
+    featConfig?: { sampleRate?: number; featureDim?: number };
+    modelConfig: {
+      transducer?: { encoder: string; decoder: string; joiner: string };
+      tokens: string;
+      numThreads?: number;
+      provider?: string;
+      debug?: boolean | number;
+    };
+    decodingMethod?: string;
+  }
+
+  export interface OfflineRecognizerResult {
+    text: string;
+    tokens: string[];
+    /** Seconds from the start of the stream, one per token. */
+    timestamps: number[];
+    ys_log_probs?: number[];
+    lang?: string;
+  }
+
+  export class OfflineStream {
+    acceptWaveform(obj: Waveform): void;
+  }
+
+  export class OfflineRecognizer {
+    constructor(config: OfflineRecognizerConfig);
+    static createAsync(config: OfflineRecognizerConfig): Promise<OfflineRecognizer>;
+    createStream(): OfflineStream;
+    decode(stream: OfflineStream): void;
+    decodeAsync(stream: OfflineStream): Promise<void>;
+    getResult(stream: OfflineStream): OfflineRecognizerResult;
+  }
+
+  export interface VadConfig {
+    sileroVad: {
+      model: string;
+      threshold?: number;
+      minSilenceDuration?: number;
+      minSpeechDuration?: number;
+      windowSize?: number;
+      maxSpeechDuration?: number;
+    };
+    sampleRate?: number;
+    numThreads?: number;
+    debug?: boolean | number;
+  }
+
+  export interface SpeechSegmentResult {
+    /** Sample index of the segment's first sample, counted since the VAD was created or reset. */
+    start: number;
+    samples: Float32Array;
+  }
+
+  export class Vad {
+    constructor(config: VadConfig, bufferSizeInSeconds: number);
+    acceptWaveform(samples: Float32Array): void;
+    isEmpty(): boolean;
+    isDetected(): boolean;
+    front(enableExternalBuffer?: boolean): SpeechSegmentResult;
+    pop(): void;
+    clear(): void;
+    reset(): void;
+    flush(): void;
+  }
+
+  export interface OfflineSpeakerDiarizationConfig {
+    segmentation: { pyannote: { model: string }; numThreads?: number; debug?: boolean | number };
+    embedding: SpeakerEmbeddingExtractorConfig;
+    clustering?: { numClusters?: number; threshold?: number };
+    minDurationOn?: number;
+    minDurationOff?: number;
+  }
+
+  export interface SpeakerDiarizationSegment {
+    start: number;
+    end: number;
+    speaker: number;
+  }
+
+  export class OfflineSpeakerDiarization {
+    constructor(config: OfflineSpeakerDiarizationConfig);
+    readonly sampleRate: number;
+    process(samples: Float32Array): SpeakerDiarizationSegment[];
+  }
+
+  export function readWave(filename: string): Waveform;
+
   const _default: {
     SpeakerEmbeddingExtractor: typeof SpeakerEmbeddingExtractor;
+    OfflineRecognizer: typeof OfflineRecognizer;
+    Vad: typeof Vad;
+    OfflineSpeakerDiarization: typeof OfflineSpeakerDiarization;
+    readWave: typeof readWave;
   };
   export default _default;
 }

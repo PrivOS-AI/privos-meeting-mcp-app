@@ -29,6 +29,7 @@ const JOB_RECORD_DB_FIELDS = [
   'startedAt',
   'heartbeatAt',
   'finishedAt',
+  'autoRetries',
 ];
 
 describe('processing_jobs schema <-> JobRecord contract', () => {

@@ -11,8 +11,9 @@ import 'dotenv/config';
 import path from 'node:path';
 
 import express from 'express';
-import { serveApp, RuntimeModeError, type RoomBoundHubClient } from '@privos_ai/app-server';
+import { serveApp, resolveRuntimeMode, RuntimeModeError, type RoomBoundHubClient } from '@privos_ai/app-server';
 
+import { missingAsrModels, warmUpAsr } from './asr/asr-engine.js';
 import { assertProviderKeysAtBoot } from './env.js';
 import { startAudioRetention } from './jobs/audio-retention-job.js';
 import { meetingQueue } from './jobs/meeting-queue.js';
@@ -54,6 +55,22 @@ function startManifestOnlySurface(reason: string): void {
   });
 }
 
+/**
+ * The SDK's default logger prints event names only. This one also prints which
+ * request arrived (method, tool, resource) so "the Hub never called us" and
+ * "we failed a resources/read" can be told apart from the container log. Never
+ * logs arguments, tokens or payloads.
+ */
+function logServeAppEvent(event: string, fields: Record<string, unknown>): void {
+  if (event.includes('error') || event.includes('fail') || event.includes('rejected')) {
+    console.error(`[serveApp] ✗ ${event}`, fields);
+    return;
+  }
+  if (event === 'relay.rpc.outbound') return;
+  const detail = [fields.method, fields.toolName].filter((v) => typeof v === 'string').join(' ');
+  console.log(`[serveApp] · ${event}${detail ? ` ${detail}` : ''}`);
+}
+
 /** Boot-time configuration + credential self-checks (non-fatal in dev). */
 async function runBootChecks(): Promise<void> {
   for (const problem of assertProviderKeysAtBoot()) {
@@ -84,6 +101,10 @@ async function logAgentBotCredentialStatus(agentBotHub: RoomBoundHubClient): Pro
 }
 
 async function start(): Promise<void> {
+  // A production container with no runtime identity (the Marketplace build probe:
+  // no env, read-only root FS) must serve its manifest, so resolve the mode BEFORE
+  // the secret checks below — those would otherwise exit before the fallback.
+  resolveRuntimeMode();
   registerAllTools();
   installDrainHandlers();
   await runBootChecks();
@@ -94,6 +115,9 @@ async function start(): Promise<void> {
     descriptor: buildRelayAppDescriptor(),
     createHandler: (ctx) => {
       void logAgentBotCredentialStatus(ctx.agentBotHub);
+      // Load the local speech models now, not on the first utterance (~5 s). Never throws.
+      if (missingAsrModels().length === 0) void warmUpAsr();
+      else console.warn(`[boot] Local speech models missing (${missingAsrModels().join(', ')}) — the local provider is unavailable.`);
       // Fire-and-forget: reloads queued jobs, fails stale processing jobs,
       // marks abandoned recordings interrupted, sweeps dead vendor garbage —
       // across every known room. Never blocks the handler from being ready.
@@ -108,6 +132,7 @@ async function start(): Promise<void> {
     port: Number(process.env.PORT || manifest.port || 3012),
     ...(transportOverride ? { transportOverride } : {}),
     resolveManifest: () => createManifest(),
+    logger: logServeAppEvent,
     configure: (app) => {
       app.use('/public', express.static(path.join(repoRoot, 'public')));
       app.get('/.well-known/mcp/manifest.json', (_req, res) => res.json(createManifest()));

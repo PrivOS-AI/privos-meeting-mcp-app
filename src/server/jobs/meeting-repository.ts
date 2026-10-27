@@ -19,6 +19,8 @@ export interface MeetingPatch {
   sentToChatAt?: string;
   summaryError?: string;
   durationSec?: number;
+  /** Backend-owned: stamped by `meeting_process` from the room's `keepOriginalAudio` setting, never trusted from the iframe. */
+  keepAudio?: boolean;
 }
 
 /** Backend-owned `meetings` fields only — see plan.md's field-ownership table for what the iframe writes instead. */
@@ -185,9 +187,24 @@ export async function loadLiveIdentities(db: AppDbBotClient, meetingId: string):
 }
 
 export interface ActionItemInput {
+  type?: 'task' | 'request' | 'question';
   task: string;
   owner?: string | null;
+  ownerUserId?: string | null;
+  requester?: string | null;
+  requesterUserId?: string | null;
+  /** The deadline as said ("Friday"). */
   due?: string | null;
+  /** The same deadline as `YYYY-MM-DD`, when known. */
+  dueDate?: string | null;
+  atSec?: number | null;
+  quote?: string | null;
+}
+
+export interface DecisionInput {
+  text: string;
+  by?: string | null;
+  byUserId?: string | null;
   atSec?: number | null;
 }
 
@@ -212,11 +229,49 @@ export async function replaceActionItems(db: AppDbBotClient, meetingId: string, 
   for (const item of items) {
     await db.create('action_items', 'room', {
       meeting: meetingId,
+      type: item.type ?? 'task',
       task: item.task,
       owner: item.owner ?? undefined,
+      ownerUserId: item.ownerUserId ?? undefined,
+      requester: item.requester ?? undefined,
+      requesterUserId: item.requesterUserId ?? undefined,
       due: item.due ?? undefined,
+      dueDate: item.dueDate ?? undefined,
       atSec: item.atSec ?? undefined,
+      quote: item.quote ?? undefined,
       done: false,
     });
   }
+}
+
+/** True replace of a meeting's `decisions` rows, like {@link replaceActionItems}. */
+export async function replaceDecisions(db: AppDbBotClient, meetingId: string, decisions: readonly DecisionInput[]): Promise<void> {
+  const existing = await db.query('decisions', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 });
+  for (const row of extractDbRecords(existing)) await db.delete('decisions', 'room', row._id);
+  for (const decision of decisions) {
+    await db.create('decisions', 'room', {
+      meeting: meetingId,
+      text: decision.text,
+      by: decision.by ?? undefined,
+      byUserId: decision.byUserId ?? undefined,
+      atSec: decision.atSec ?? undefined,
+    });
+  }
+}
+
+/** Every room-scoped collection whose rows hang off a meeting by its `meeting` field. */
+export const MEETING_CHILD_COLLECTIONS = ['action_items', 'decisions', 'bookmarks', 'meeting_speakers'] as const;
+
+/**
+ * Deletes every row that belongs to a meeting (its children above and its processing jobs) — called
+ * when the meeting itself is deleted, so nothing is left behind: no orphan action item in the
+ * "open items" count, no parked (sealed) speaker embedding.
+ */
+export async function deleteMeetingRecords(db: AppDbBotClient, meetingId: string): Promise<void> {
+  for (const collection of MEETING_CHILD_COLLECTIONS) {
+    const rows = await db.query(collection, 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 });
+    for (const row of extractDbRecords(rows)) await db.delete(collection, 'room', row._id);
+  }
+  const jobs = await db.query('processing_jobs', 'room', { where: [{ field: 'meetingId', op: '==', value: meetingId }], limit: 100 });
+  for (const row of extractDbRecords(jobs)) await db.delete('processing_jobs', 'room', row._id);
 }

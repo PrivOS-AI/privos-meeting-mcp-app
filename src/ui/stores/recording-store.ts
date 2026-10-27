@@ -28,6 +28,8 @@ import { speakerResolve, type RealtimeAssignChoice } from '../data/speaker-api.j
 import { ScreenWakeLock, type WakeLockState } from '../data/screen-wake-lock.js';
 import type { RealtimeCapabilities, RealtimeToken, SttVendor } from '../data/stt-types.js';
 import { TranslateBuffer } from '../data/translate-buffer.js';
+import { loadLocalPreferences } from '../data/local-preferences.js';
+import { parseToolResultOrThrow, toolErrorCode } from '../data/tool-error.js';
 import type { LanguageCode } from '../../shared/languages.js';
 
 export type RecordingStatus = 'idle' | 'recording' | 'paused' | 'ending' | 'uploading' | 'done' | 'error';
@@ -65,6 +67,10 @@ export interface RecordingState {
   captionStatus: CaptionStatus | 'capacity';
   sessionIndex: number;
   pendingParts: number;
+  /** Recording parts given up on after the retry window — their audio is not in the meeting. */
+  lostParts: number;
+  /** Why audio may be missing: too many parts waiting, a part lost after retrying, or the recorder failed. */
+  uploadIssue?: 'cap-reached' | 'window-expired' | 'recorder-error';
   clockSkewMs: number;
   lines: CaptionLine[];
   speakerMap: Record<string, LiveSpeakerBadge>;
@@ -79,6 +85,8 @@ export interface RecordingState {
   /** True once any chunk for this meeting was dropped/failed (S2-08) — "some segments could not be identified". */
   liveSpeakersDegraded: boolean;
   stageCaptionSize: StageCaptionSize;
+  /** Stage view speaker chip (local preference, read when recording starts). */
+  showSpeakerLabels: boolean;
   showTranslation: boolean;
   wakeLock: WakeLockState;
   bookmarkAtSec?: number;
@@ -97,6 +105,8 @@ export interface StartRecordingInput {
   /** Bilingual-translation target language (only used when `translationEnabled`). */
   translationLang: LanguageCode;
   translationEnabled: boolean;
+  /** The recorder confirmed they told participants about voiceprint recognition (only asked while it is on). */
+  voiceprintNoticeAcknowledged?: boolean;
 }
 
 const PALETTE = ['blue', 'gold', 'green', 'purple', 'red', 'teal'];
@@ -116,6 +126,7 @@ function initialState(): RecordingState {
     captionStatus: 'off',
     sessionIndex: 0,
     pendingParts: 0,
+    lostParts: 0,
     clockSkewMs: 0,
     lines: [],
     bookmarkedSecs: [],
@@ -128,6 +139,7 @@ function initialState(): RecordingState {
     liveSpeakers: [],
     liveSpeakersDegraded: false,
     stageCaptionSize: 'medium',
+    showSpeakerLabels: true,
     showTranslation: false,
     wakeLock: { supported: false, active: false },
   };
@@ -174,7 +186,8 @@ export function resolveLineSpeakerKey(
   }
   const serverId = state.lineServerSpeaker[line.id];
   if (serverId) return resolveMergedSpeakerId(serverId, state.liveSpeakers);
-  return line.speakerKey;
+  // The built-in recognizer's captions carry a session speaker id directly, which a later merge may retire.
+  return line.speakerKey ? resolveMergedSpeakerId(line.speakerKey, state.liveSpeakers) : undefined;
 }
 
 /** A settled turn already newer than the previous poll's cursor plus the base label it was embedded under — the shape both `matchTurnsToLines` and `accumulateLabelSpeech`/`ownerForLabel` operate on. */
@@ -306,6 +319,10 @@ function applyCaption(lines: CaptionLine[], event: CaptionEvent, speakerMap: Rec
     }
     return lines;
   }
+  // An empty draft withdraws the draft line of that id (speech that produced no final).
+  if (event.kind === 'draft' && !event.text.trim()) {
+    return lines.some((l) => l.id === event.id && !l.isFinal) ? lines.filter((l) => l.id !== event.id || l.isFinal) : lines;
+  }
   // Register a newly seen speaker BEFORE any early return below — otherwise a
   // line can render with a speaker the map does not know ("speaker 0").
   if (event.speakerKey && !speakerMap[event.speakerKey]) {
@@ -424,8 +441,9 @@ export class RecordingStore {
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new DOMException('Microphone API unavailable in this context', 'NotSupportedError');
     }
+    const { preferredMicDeviceId } = loadLocalPreferences();
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
+      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1, ...(preferredMicDeviceId ? { deviceId: { ideal: preferredMicDeviceId } } : {}) },
     });
     this.micStop = () => {
       for (const track of stream.getTracks()) track.stop();
@@ -501,7 +519,7 @@ export class RecordingStore {
         language: input.language,
         translationEnabled: input.translationEnabled,
         translationLang: input.translationLang,
-        keepAudio: true,
+        ...(input.voiceprintNoticeAcknowledged ? { voiceprintNoticeAt: startedAtIso } : {}),
         ownerUserId: this.ctx.userId,
         startedAt: startedAtIso,
       });
@@ -514,6 +532,7 @@ export class RecordingStore {
       this.clock = new MeetingClock(recorderEpochMs);
       this.nextPartSeq = 0;
       this.allTurns = [];
+      const prefs = loadLocalPreferences();
 
       this.setState({
         meetingId,
@@ -523,6 +542,8 @@ export class RecordingStore {
         recorderEpochMs,
         startedAt: Date.now(),
         showTranslation: input.translationEnabled,
+        stageCaptionSize: prefs.stageCaptionSize,
+        showSpeakerLabels: prefs.showLiveSpeakerLabels,
       });
 
       this.uploadQueue = new PartUploadQueue(
@@ -533,7 +554,8 @@ export class RecordingStore {
           // default rather than a live setting.
           retryWindowMin: 15,
           onPendingCountChange: (count) => this.setState({ pendingParts: count }),
-          onCapReached: () => this.setState({ error: 'upload-cap-reached' }),
+          onCapReached: () => this.setState({ uploadIssue: 'cap-reached' }),
+          onWindowExpired: () => this.setState({ uploadIssue: 'window-expired', lostParts: this.state.lostParts + 1 }),
         },
       );
 
@@ -543,7 +565,7 @@ export class RecordingStore {
         (part) => {
           this.uploadQueue?.enqueue(part.seq, part.blob, part.partStartMs, part.durationMs);
         },
-        () => this.setState({ error: 'recorder-error' }),
+        () => this.setState({ uploadIssue: 'recorder-error' }),
       );
       this.recorder.start();
 
@@ -571,13 +593,13 @@ export class RecordingStore {
     let token: RealtimeToken;
     try {
       const raw = await this.app.callServerTool({ name: 'meeting_realtime_token', arguments: { roomId: this.ctx.roomId, meetingId } });
-      token = parseToolResult(raw) as unknown as RealtimeToken;
+      token = parseToolResultOrThrow(raw) as unknown as RealtimeToken;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      // Only the server's concurrency-cap refusal ("The system is already recording the maximum
-      // of N meetings") is a capacity problem; any other failure is plain "captions off" — never
-      // mislabel it as capacity. Either way the recording itself keeps going.
-      this.setState({ captionStatus: /recording the maximum of \d+ meetings/.test(message) ? 'capacity' : 'off', error: message });
+      // Only the server's concurrency-cap refusal (`CAPACITY_REACHED`) is a capacity problem; any
+      // other failure is plain "captions off" — never mislabel it as capacity. Either way the
+      // recording itself keeps going.
+      this.setState({ captionStatus: toolErrorCode(error) === 'CAPACITY_REACHED' ? 'capacity' : 'off', error: message });
       return;
     }
     this.setState({ provider: token.provider, capabilities: token.capabilities });
@@ -598,7 +620,9 @@ export class RecordingStore {
       });
     }
 
-    if (token.capabilities.speakerLabels) {
+    // Names, colours and merges of live session speakers — for a labelling provider and for the built-in
+    // recognizer, whose captions already carry the session speaker the server picked.
+    if (token.capabilities.liveSpeakers ?? token.capabilities.speakerLabels) {
       this.speakerPoll = new LiveSpeakerPoll(this.app, {
         roomId: this.ctx.roomId,
         meetingId,
@@ -614,7 +638,11 @@ export class RecordingStore {
       translateTo: this.translationTarget,
       mintToken: async () => {
         const raw = await this.app.callServerTool({ name: 'meeting_realtime_token', arguments: { roomId: this.ctx.roomId, meetingId } });
-        return parseToolResult(raw) as unknown as RealtimeToken;
+        return parseToolResultOrThrow(raw) as unknown as RealtimeToken;
+      },
+      pushAudio: async (request) => {
+        const raw = await this.app.callServerTool({ name: 'meeting_audio_push', arguments: { roomId: this.ctx.roomId, meetingId, ...request } });
+        return parseToolResultOrThrow(raw) as unknown as import('../data/local-realtime-client.js').AudioPushResponse;
       },
       onStarted: (sessionIndex) => {
         this.clock?.registerSessionStart(sessionIndex);
@@ -737,7 +765,9 @@ export class RecordingStore {
     this.reconciling = true;
     try {
       for (const [speakerKey, choice] of [...this.pendingAssignments]) {
-        const session = ownerForLabel(speakerKey, this.state.liveSpeakers, this.labelSpeechMsBySpeaker);
+        // The built-in recognizer keys lines by the session speaker itself; a labelling provider by its realtime label.
+        const directId = resolveMergedSpeakerId(speakerKey, this.state.liveSpeakers);
+        const session = this.state.liveSpeakers.find((s) => s.sessionSpeakerId === directId) ?? ownerForLabel(speakerKey, this.state.liveSpeakers, this.labelSpeechMsBySpeaker);
         if (!session) continue; // no session speaker yet — keep it pending
         try {
           const [result] = await speakerResolve(this.app, this.ctx.roomId, this.state.meetingId, [

@@ -16,14 +16,15 @@ import { listToolDefinitions, resolveTool, type ToolRuntime } from './tools/regi
 import { renderUiHtml } from './ui-resource.js';
 
 /** The UI-bearing tool declared first in the manifest. */
-const UI_TOOL = manifest.tools[0] as { name?: string; title?: string; description?: string } | undefined;
+const UI_TOOL = manifest.tools[0] as { name?: string; title?: string; description?: string; inputSchema?: Record<string, unknown> } | undefined;
 const UI_TOOL_NAME = String(UI_TOOL?.name ?? 'meeting_agent');
 const UI_TOOL_TITLE = String(UI_TOOL?.title ?? manifest.title);
 const UI_TOOL_DESCRIPTION = String(UI_TOOL?.description ?? manifest.description);
+const UI_TOOL_INPUT_SCHEMA = UI_TOOL?.inputSchema ?? { type: 'object', properties: {} };
 
 /**
  * `_meta.ui` (resourceUri + permissions + csp + hideAiChat) for the UI tool.
- * The CSP `<PRIVOS_FILES_ORIGIN>` placeholder is resolved from env here too —
+ * The CSP `<FILES_ORIGIN>` placeholder is resolved from env here too —
  * this `_meta` is what `tools/list` advertises to the Hub, which is where the
  * iframe CSP is actually enforced from.
  */
@@ -36,7 +37,7 @@ function assertVerifiedActor(context: ToolCallContext): void {
   const verified = Boolean(context.actor) && context.identityState === 'verified';
   if (verified) return;
   if (isDevelopmentRuntime() && env.allowUnverifiedActor) return;
-  throw new AppError('Request denied: a verified user identity is required.');
+  throw new AppError('Request denied: a verified user identity is required.', 'FORBIDDEN');
 }
 
 export function createMcpHandler(ctx: ServeAppHandlerContext): AppMcpHandler {
@@ -51,7 +52,7 @@ export function createMcpHandler(ctx: ServeAppHandlerContext): AppMcpHandler {
               name: UI_TOOL_NAME,
               title: UI_TOOL_TITLE,
               description: UI_TOOL_DESCRIPTION,
-              inputSchema: { type: 'object', properties: { roomId: { type: 'string' } } },
+              inputSchema: UI_TOOL_INPUT_SCHEMA,
               _meta: UI_TOOL_META,
             },
             ...listToolDefinitions(),
@@ -80,15 +81,23 @@ export function createMcpHandler(ctx: ServeAppHandlerContext): AppMcpHandler {
         if (!tool) {
           throw Object.assign(new Error(`Unknown tool: ${params.name ?? '<missing>'}`), { code: -32601 });
         }
-        assertVerifiedActor(context);
         try {
+          assertVerifiedActor(context);
           const result = await tool.execute(params.arguments ?? {}, context, runtime);
           return { content: [{ type: 'text', text: JSON.stringify(result) }] };
         } catch (error) {
-          // The SDK collapses a thrown error to "-32603 Internal error" with no
-          // message, so every tool failure is otherwise opaque in the logs. Log
-          // the tool + full cause here before rethrowing (AppError preserved).
           console.error(`[tool:${params.name}] failed`, error);
+          // An AppError is meant for the user: return it as an MCP tool error with
+          // its stable code. `serveApp` does not forward a `mapAppError`, so a
+          // thrown one would reach the iframe as a bare "-32603 Internal error".
+          // Anything else is rethrown and the SDK hides its message.
+          if (error instanceof AppError) {
+            return {
+              isError: true,
+              content: [{ type: 'text', text: error.message }],
+              structuredContent: { error: { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) } },
+            };
+          }
           throw error;
         }
       }

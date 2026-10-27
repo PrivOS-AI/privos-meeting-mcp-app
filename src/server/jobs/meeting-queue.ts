@@ -46,7 +46,7 @@ export class MeetingQueue {
     const existing = this.running.get(meetingId);
     if (existing) return existing.promise;
     if (this.draining) {
-      return Promise.reject(new AppError('System is shutting down, not accepting new processing jobs — please try again after restart.'));
+      return Promise.reject(new AppError('System is shutting down, not accepting new processing jobs — please try again after restart.', 'INVALID_STATE'));
     }
 
     const controller = new AbortController();

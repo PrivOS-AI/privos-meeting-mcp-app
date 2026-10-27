@@ -3,13 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { COLLECTION_NAMES, SCHEMAS } from './app-db-schema.js';
 
 describe('app-db schema contract', () => {
-  it('declares exactly the seven Phase-1 collections', () => {
+  it('declares exactly the eight collections the app uses', () => {
     expect(COLLECTION_NAMES).toEqual([
       'speaker_profiles',
       'app_settings',
       'meetings',
       'meeting_speakers',
       'action_items',
+      'decisions',
       'bookmarks',
       'processing_jobs',
     ]);

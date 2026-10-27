@@ -1,17 +1,16 @@
 /**
  * Delivery of the app UI to the Hub iframe.
  *
- * Production inlines the built bundle into one self-contained HTML document —
- * the iframe runs in an opaque origin and cannot fetch sibling asset URLs.
- * Development points the document at a live Vite origin instead, keeping HMR
- * and breakpoints working inside the Hub.
+ * Production serves the Vite split build (`dist/ui`, = `ui.distDir`) through the
+ * SDK's `serveBuiltUi`: a shell whose `./assets/<file>` tags the Hub resolves as
+ * `ui://<manifest name>/assets/<file>` — from the signed bundle on the
+ * Marketplace, over `resources/read` on a relay install. Development points the
+ * document at a live Vite origin instead, keeping HMR and breakpoints working
+ * inside the Hub.
  */
-import fs from 'node:fs';
-import path from 'node:path';
+import { MCP_UI_MIME, serveBuiltUi, type ServeBuiltUi, type UiResourceProvider } from '@privos_ai/app-server';
 
-import { MCP_UI_MIME, type UiResourceProvider } from '@privos_ai/app-server';
-
-import { UI_RESOURCE_URI, manifest } from './manifest.js';
+import { APP_ID, UI_RESOURCE_URI, manifest } from './manifest.js';
 import { uiDistDir } from './paths.js';
 
 let devPublicUrl: string | null = null;
@@ -19,9 +18,6 @@ let devPublicUrl: string | null = null;
 export function setDevPublicUrl(publicUrl: string): void {
   devPublicUrl = publicUrl.replace(/\/$/, '');
 }
-
-let cachedHtml: string | null = null;
-let cachedAssetsMtime = 0;
 
 function devHtml(publicUrl: string): string {
   return `<!DOCTYPE html>
@@ -45,40 +41,25 @@ function devHtml(publicUrl: string): string {
 </html>`;
 }
 
-function inlineHtml(): string {
-  const assetsDir = path.join(uiDistDir, 'assets');
-  if (!fs.existsSync(assetsDir)) {
-    throw new Error('UI is not built. Run `npm run build` before starting in production mode.');
-  }
-  const mtime = fs.statSync(assetsDir).mtimeMs;
-  if (cachedHtml && mtime === cachedAssetsMtime) return cachedHtml;
-
-  const files = fs.readdirSync(assetsDir);
-  const js = files.filter((f) => f.endsWith('.js')).map((f) => fs.readFileSync(path.join(assetsDir, f), 'utf8'));
-  const css = files.filter((f) => f.endsWith('.css')).map((f) => fs.readFileSync(path.join(assetsDir, f), 'utf8'));
-
-  cachedHtml = `<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>${manifest.title}</title>
-  <style>${css.join('\n')}</style>
-</head>
-<body><div id="root"></div>
-<script type="module">${js.join('\n')}</script>
-</body>
-</html>`;
-  cachedAssetsMtime = mtime;
-  return cachedHtml;
+/**
+ * Lazy: `serveBuiltUi` throws when `dist/ui` is missing or malformed — importing
+ * this module (tests, the manifest-only surface) must not require a build.
+ */
+let builtUi: ServeBuiltUi | null = null;
+function getBuiltUi(): ServeBuiltUi {
+  builtUi ??= serveBuiltUi({ distDir: uiDistDir, appSlug: APP_ID });
+  return builtUi;
 }
 
 export function renderUiHtml(): string {
-  return devPublicUrl ? devHtml(devPublicUrl) : inlineHtml();
+  return devPublicUrl ? devHtml(devPublicUrl) : getBuiltUi().renderHtml();
 }
 
 export const uiResourceProvider: UiResourceProvider = {
   uri: UI_RESOURCE_URI,
   mimeType: MCP_UI_MIME,
   renderHtml: () => renderUiHtml(),
+  readAsset: (uri) => (devPublicUrl ? null : getBuiltUi().readAsset(uri)),
+  readAssetsManifest: () => (devPublicUrl ? { files: [] } : getBuiltUi().readAssetsManifest()),
+  assetUriPrefix: `ui://${APP_ID}/assets/`,
 };

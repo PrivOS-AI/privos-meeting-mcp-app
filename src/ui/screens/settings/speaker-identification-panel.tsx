@@ -2,20 +2,18 @@
  * Settings › Speaker identification (plan.md § UI). Lists every workspace
  * profile from `speaker_profile_list`, with rename / link / delete / re-enrol
  * actions through `speaker_profile_update`/`_delete`, and a match-threshold
- * slider. The threshold slider calls `meeting_settings_set` — a tool this
- * phase does NOT build (out of P4's file ownership; owned by a later
- * settings phase per plan.md's tool table) — so saving it surfaces a clear
- * "not available yet" notice instead of pretending to persist silently. Once
- * that tool ships with the same name/shape, this panel starts working
- * without any further change.
+ * slider saved through `meeting_settings_set` — disabled for callers who may
+ * not change the room's settings (the server refuses them anyway).
  */
 import { useCallback, useEffect, useState } from 'react';
-import { usePrivosApp } from '@privos_ai/app-react';
+import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { speakerProfileDelete, speakerProfileList, speakerProfileUpdate, type SpeakerProfileListItem } from '../../data/speaker-api.js';
 import { ConfirmDialog } from '../../components/confirm-dialog.js';
 import { SpeakerAvatar } from '../../components/speaker-avatar.js';
+import { loadWorkspaceSettings, saveWorkspaceSetting } from '../../data/settings-store.js';
 import { useI18n } from '../../i18n/i18n-provider.js';
+import { useCanManageRoomSettings } from './use-can-manage-room-settings.js';
 
 const THRESHOLD_MIN = 0.3;
 const THRESHOLD_MAX = 0.8;
@@ -24,7 +22,9 @@ const DEFAULT_THRESHOLD = 0.5;
 
 export function SpeakerIdentificationPanel() {
   const app = usePrivosApp();
+  const { roomId } = usePrivosContext();
   const { t } = useI18n();
+  const { canManage } = useCanManageRoomSettings();
   const [profiles, setProfiles] = useState<SpeakerProfileListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -32,6 +32,7 @@ export function SpeakerIdentificationPanel() {
   const [rowError, setRowError] = useState<Record<string, string>>({});
   const [renameDrafts, setRenameDrafts] = useState<Record<string, string>>({});
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD);
+  const [recognitionOn, setRecognitionOn] = useState(true);
   const [thresholdNotice, setThresholdNotice] = useState<string | null>(null);
   // Prune/delete both need confirmation; window.confirm is a no-op in the
   // sandboxed iframe, so an in-app ConfirmDialog gates them instead.
@@ -52,6 +53,17 @@ export function SpeakerIdentificationPanel() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // Start the slider at the room's saved threshold, not the default.
+  useEffect(() => {
+    if (!roomId) return;
+    loadWorkspaceSettings(app, roomId)
+      .then((settings) => {
+        setThreshold(settings.speakerMatchThreshold);
+        setRecognitionOn(settings.speakerRecognition);
+      })
+      .catch(() => undefined);
+  }, [app, roomId]);
 
   async function rename(profileId: string): Promise<void> {
     const displayName = (renameDrafts[profileId] ?? '').trim();
@@ -129,6 +141,21 @@ export function SpeakerIdentificationPanel() {
     <section className="ma-speaker-settings">
       <h3 className="ma-speaker-settings__title">{t('speaker.settingsPanel.title')}</h3>
 
+      <label className="ma-settings-field ma-settings-field--checkbox">
+        <input
+          type="checkbox"
+          checked={recognitionOn}
+          disabled={!canManage}
+          onChange={(e) => {
+            const next = e.target.checked;
+            setRecognitionOn(next);
+            void saveWorkspaceSetting(app, 'speakerRecognition', next).catch(() => setRecognitionOn(!next));
+          }}
+        />
+        <span>{t('speaker.settingsPanel.recognitionToggle')}</span>
+      </label>
+      <p className="ma-settings-panel__hint">{t('speaker.settingsPanel.recognitionHint')}</p>
+
       <div className="ma-speaker-settings__threshold">
         <label htmlFor="ma-speaker-threshold">{t('speaker.settingsPanel.thresholdLabel', { value: threshold.toFixed(2) })}</label>
         <input
@@ -138,12 +165,14 @@ export function SpeakerIdentificationPanel() {
           max={THRESHOLD_MAX}
           step={THRESHOLD_STEP}
           value={threshold}
+          disabled={!canManage}
           onChange={(e) => setThreshold(Number(e.target.value))}
         />
-        <button type="button" onClick={() => void saveThreshold()}>
+        <button type="button" disabled={!canManage} onClick={() => void saveThreshold()}>
           {t('speaker.settingsPanel.thresholdSave')}
         </button>
         <p className="ma-speaker-settings__threshold-warning">{t('speaker.settingsPanel.thresholdWarning')}</p>
+        {!canManage ? <p className="ma-settings-panel__hint">{t('settings.adminOnlyNote')}</p> : null}
         {thresholdNotice ? <p className="ma-speaker-settings__threshold-notice">{thresholdNotice}</p> : null}
       </div>
 

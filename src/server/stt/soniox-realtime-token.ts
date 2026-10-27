@@ -17,7 +17,7 @@ export const SONIOX_WS_URL = 'wss://stt-rt.soniox.com/transcribe-websocket';
 /** Vendor hard cap is 300 min/session; this leaves headroom past our ~280 min proactive roll-over. */
 const MAX_SESSION_DURATION_SECONDS = 16_800;
 
-const CAPABILITIES: RealtimeCapabilities = { speakerLabels: true, translation: true };
+const CAPABILITIES: RealtimeCapabilities = { speakerLabels: true, translation: true, liveSpeakers: true };
 
 export const sonioxRealtimeProvider: RealtimeTokenProvider = {
   vendor: 'soniox',
@@ -27,7 +27,7 @@ export const sonioxRealtimeProvider: RealtimeTokenProvider = {
 
   async mint(meetingId: string): Promise<RealtimeToken> {
     if (!env.sonioxApiKey) {
-      throw new AppError('Missing SONIOX_API_KEY — cannot mint a Soniox live-caption token.');
+      throw new AppError('Missing SONIOX_API_KEY — cannot mint a Soniox live-caption token.', 'PROVIDER_NOT_CONFIGURED');
     }
     const expiresInSeconds = Math.min(env.sonioxTempKeyTtlSec, 3600);
 
@@ -45,15 +45,15 @@ export const sonioxRealtimeProvider: RealtimeTokenProvider = {
         }),
       });
     } catch {
-      throw new AppError('Could not connect to Soniox to fetch a live-caption token.');
+      throw new AppError('Could not connect to Soniox to fetch a live-caption token.', 'PROVIDER_UNAVAILABLE');
     }
     if (!response.ok) {
-      throw new AppError(`Soniox refused to issue a live-caption token (HTTP ${response.status}).`);
+      throw new AppError(`Soniox refused to issue a live-caption token (HTTP ${response.status}).`, 'PROVIDER_UNAVAILABLE');
     }
 
     const body = (await response.json().catch(() => null)) as { api_key?: unknown; expires_at?: unknown } | null;
     const apiKey = typeof body?.api_key === 'string' ? body.api_key : undefined;
-    if (!apiKey) throw new AppError('Soniox returned an invalid token.');
+    if (!apiKey) throw new AppError('Soniox returned an invalid token.', 'PROVIDER_UNAVAILABLE');
     const expiresAt =
       typeof body?.expires_at === 'string' ? body.expires_at : new Date(Date.now() + expiresInSeconds * 1000).toISOString();
 

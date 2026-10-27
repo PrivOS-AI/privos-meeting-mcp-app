@@ -28,7 +28,7 @@ export function requireVerifiedActor(context: ToolCallContext): VerifiedActor {
   const verified = Boolean(context.actor) && context.identityState === 'verified';
   if (verified) return context.actor as VerifiedActor;
   if (isDevelopmentRuntime() && env.allowUnverifiedActor && context.actor) return context.actor;
-  throw new AppError('Request denied: a verified user identity is required.');
+  throw new AppError('Request denied: a verified user identity is required.', 'FORBIDDEN');
 }
 
 /**
@@ -44,14 +44,14 @@ export async function requireMeetingOwner(
   meetingId: string,
 ): Promise<DbRow> {
   if (actor.roomId !== roomId) {
-    throw new AppError('Invalid request for this room.');
+    throw new AppError('Invalid request for this room.', 'ROOM_MISMATCH');
   }
   const meeting = await db.getById('meetings', 'room', meetingId);
   if (!meeting || meeting.roomId !== roomId) {
-    throw new AppError('Meeting not found in this room.');
+    throw new AppError('Meeting not found in this room.', 'NOT_FOUND');
   }
   if (meeting.ownerUserId !== actor.userId) {
-    throw new AppError('Only the meeting owner can perform this action.');
+    throw new AppError('Only the meeting owner can perform this action.', 'NOT_MEETING_OWNER');
   }
   return meeting;
 }
@@ -68,11 +68,11 @@ export async function requireRoomMeeting(
   meetingId: string,
 ): Promise<DbRow> {
   if (actor.roomId !== roomId) {
-    throw new AppError('Invalid request for this room.');
+    throw new AppError('Invalid request for this room.', 'ROOM_MISMATCH');
   }
   const meeting = await db.getById('meetings', 'room', meetingId);
   if (!meeting || meeting.roomId !== roomId) {
-    throw new AppError('Meeting not found in this room.');
+    throw new AppError('Meeting not found in this room.', 'NOT_FOUND');
   }
   return meeting;
 }
@@ -86,7 +86,7 @@ export async function requireRoomMeeting(
 export async function assertFileInRoom(hub: RoomBoundHubClient, fileId: string, roomId: string, signal?: AbortSignal) {
   const meta = await getFileMetadata(hub, fileId, signal);
   if (!meta || meta.channel_id !== roomId) {
-    throw new AppError(`File not found or does not belong to this room (fileId=${fileId}).`);
+    throw new AppError(`File not found or does not belong to this room (fileId=${fileId}).`, 'NOT_FOUND');
   }
   return meta;
 }

@@ -2,8 +2,8 @@
  * Dev-mode UI server: runs an in-process Vite dev server (HMR + source maps) so
  * `npm run dev` stays one process. The browser rendering the Hub talks to Vite
  * directly (over `PUBLIC_URL`, or `http://localhost:<port>` on the same
- * machine), not to an inlined bundle. Production keeps the inline-bundle path
- * (`ui-resource.ts`'s `inlineHtml`); this module only runs when `npm run dev`
+ * machine), not to a built bundle. Production serves the split build
+ * (`ui-resource.ts`, `serveBuiltUi`); this module only runs when `npm run dev`
  * sets `PRIVOS_DEV_UI=1`.
  */
 const DEFAULT_VITE_PORT = 5179;

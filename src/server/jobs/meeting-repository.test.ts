@@ -9,7 +9,7 @@ vi.mock('../hub/resolve-own-mcp-app-id.js', () => ({ resolveOwnMcpAppId: async (
 
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
 import { installFakeHub, type Store } from '../tools/test-support/fake-hub.js';
-import { deleteUnmappedLiveSpeakers, loadLiveIdentities, mergeLiveIntoAsyncSpeaker, replaceActionItems } from './meeting-repository.js';
+import { deleteMeetingRecords, deleteUnmappedLiveSpeakers, loadLiveIdentities, mergeLiveIntoAsyncSpeaker, replaceActionItems, replaceDecisions } from './meeting-repository.js';
 
 let store: Store;
 let fakeHub: ReturnType<typeof installFakeHub>;
@@ -150,5 +150,44 @@ describe('replaceActionItems', () => {
     await replaceActionItems(db(), 'm1', [{ task: 'A2' }]);
     const other = extractDbRecords(await db().query('action_items', 'room', { where: [{ field: 'meeting', op: '==', value: 'm2' }] }));
     expect(other).toHaveLength(1);
+  });
+});
+
+describe('action items, decisions and meeting deletion', () => {
+  beforeEach(() => {
+    store = { action_items: [], decisions: [], bookmarks: [], meeting_speakers: [], processing_jobs: [] };
+    fakeHub = installFakeHub({ store });
+  });
+
+  const rowsOf = async (collection: string, meetingId: string) =>
+    extractDbRecords(await db().query(collection, 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }] }));
+
+  it('stores who asked, who does it, the deadline as said and as a date, and the quote', async () => {
+    await replaceActionItems(db(), 'm1', [
+      { type: 'request', task: 'Gửi báo giá', owner: 'Thanh', ownerUserId: 'u-thanh', requester: 'Nhân', due: 'thứ Năm', dueDate: '2026-10-29', atSec: 61, quote: 'Thanh gửi báo giá giúp anh' },
+    ]);
+    expect(await rowsOf('action_items', 'm1')).toMatchObject([
+      { type: 'request', task: 'Gửi báo giá', owner: 'Thanh', ownerUserId: 'u-thanh', requester: 'Nhân', due: 'thứ Năm', dueDate: '2026-10-29', atSec: 61, quote: 'Thanh gửi báo giá giúp anh', done: false },
+    ]);
+  });
+
+  it('replaces the decisions of a meeting instead of adding to them', async () => {
+    await replaceDecisions(db(), 'm1', [{ text: 'Ra mắt thứ Sáu', by: 'Nhân', atSec: 300 }]);
+    await replaceDecisions(db(), 'm1', [{ text: 'Ra mắt thứ Hai', by: null }]);
+    expect((await rowsOf('decisions', 'm1')).map((r) => r.text)).toEqual(['Ra mắt thứ Hai']);
+  });
+
+  it('deletes every row of a meeting, and only that meeting', async () => {
+    for (const collection of ['action_items', 'decisions', 'bookmarks', 'meeting_speakers'] as const) {
+      store[collection].push({ _id: `${collection}-1`, meeting: 'm1' }, { _id: `${collection}-2`, meeting: 'm2' });
+    }
+    store.processing_jobs.push({ _id: 'job-1', meetingId: 'm1' }, { _id: 'job-2', meetingId: 'm2' });
+
+    await deleteMeetingRecords(db(), 'm1');
+
+    for (const collection of ['action_items', 'decisions', 'bookmarks', 'meeting_speakers'] as const) {
+      expect(store[collection].map((r) => r.meeting)).toEqual(['m2']);
+    }
+    expect(store.processing_jobs.map((r) => r.meetingId)).toEqual(['m2']);
   });
 });

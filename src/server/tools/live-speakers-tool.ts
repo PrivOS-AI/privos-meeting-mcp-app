@@ -25,6 +25,7 @@ import { resolveRealtimeVendor, realtimeProviderFor } from '../stt/stt-provider-
 import { ensureRegistry } from '../live-speakers/live-speaker-repository.js';
 import { requireRoomMeeting, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
+import { MS, ROOM_AND_MEETING } from './schema-parts.js';
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -38,7 +39,7 @@ function asStringArray(value: unknown): string[] {
 function parseSinceMs(value: unknown): number | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    throw new AppError('sinceMs must be a finite number >= 0 when provided.');
+    throw new AppError('sinceMs must be a finite number >= 0 when provided.', 'INVALID_INPUT');
   }
   return value;
 }
@@ -71,23 +72,22 @@ export const liveSpeakersTool: AppTool = {
     type: 'object',
     required: ['roomId', 'meetingId'],
     properties: {
-      roomId: { type: 'string' },
-      meetingId: { type: 'string' },
-      sinceMs: { type: 'number', description: 'Only return settled turns newer than this meeting-clock timestamp. Omitted -> the most recent turns.' },
+      ...ROOM_AND_MEETING,
+      sinceMs: { ...MS, description: 'Only return settled turns newer than this meeting-clock timestamp. Omitted -> the most recent turns.' },
     },
   },
   async execute(args, context, runtime) {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.', 'INVALID_INPUT');
     const sinceMs = parseSinceMs(args.sinceMs);
 
     const db = new AppDbBotClient(roomId);
     const meeting = await requireRoomMeeting(db, actor, roomId, meetingId);
 
     const vendor = await resolveRealtimeVendor(db);
-    if (!realtimeProviderFor(vendor).capabilities.speakerLabels) {
+    if (!realtimeProviderFor(vendor).capabilities.liveSpeakers) {
       return { sessionSpeakers: [], turns: [], labelsSupported: false, updatedAt: new Date().toISOString() };
     }
 

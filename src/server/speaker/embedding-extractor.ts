@@ -43,7 +43,7 @@ async function loadExtractor(): Promise<ExtractorHandle> {
   if (!existsSync(env.speakerModelPath)) {
     throw new AppError(
       `Speaker recognition model not found at "${env.speakerModelPath}" (env var SPEAKER_MODEL_PATH). `
-        + 'The ONNX model is fetched at deploy time (see docs/deployment-guide.md), it is not part of the source code.',
+        + 'The ONNX model is fetched at deploy time (see docs/deployment-guide.md), it is not part of the source code.', 'NOT_FOUND',
     );
   }
 

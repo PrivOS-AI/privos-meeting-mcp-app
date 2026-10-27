@@ -12,22 +12,33 @@
 import { AppError } from './app-error.js';
 import { SUPPORTED_LANGUAGES, type LanguageCode } from './languages.js';
 
-export type SttVendor = 'soniox' | 'elevenlabs';
+export type SttVendor = 'local' | 'soniox' | 'elevenlabs';
 export type SummaryLength = 'short' | 'normal' | 'detailed';
-export type SettingsLanguage = LanguageCode;
+/** `auto` = the meeting's own spoken language. */
+export type SettingsLanguage = LanguageCode | 'auto';
 
 /** Every key `meeting_settings_set` accepts, exactly plan.md's `app_settings` row (minus `knownRooms`, which is bootstrap-internal, never admin-tunable). */
 export interface WorkspaceAppSettings {
   sttRealtimeProvider: SttVendor;
   sttAsyncProvider: SttVendor;
+  /**
+   * Voiceprint speaker recognition (embeddings, profile matching, enrolment) for this room.
+   * Off: speaker labels come from the speech-to-text provider only and no biometric data is
+   * computed or stored.
+   */
+  speakerRecognition: boolean;
   speakerMatchThreshold: number;
-  speakerSessionMatchThreshold: number;
-  speakerSessionMergeThreshold: number;
   summaryLength: SummaryLength;
   summaryLanguage: SettingsLanguage;
   keepOriginalAudio: boolean;
   autoDeleteAudioDays: number;
   interruptedPartsRetentionDays: number;
+  /** Days after which a finished meeting is deleted entirely (Files, voice samples, records); `0` = keep. */
+  autoDeleteMeetingsDays: number;
+  /** Minutes between live summaries while recording; `0` = only on demand. */
+  liveSummaryMinutes: number;
+  /** Post the summary to the room chat (as the bot) as soon as processing finishes. */
+  autoSendSummaryToChat: boolean;
 }
 
 /**
@@ -44,16 +55,18 @@ export interface WorkspaceAppSettings {
 export const SPEAKER_MATCH_THRESHOLD_FLOOR = 0.35;
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceAppSettings = {
-  sttRealtimeProvider: 'soniox',
-  sttAsyncProvider: 'soniox',
+  sttRealtimeProvider: 'local',
+  sttAsyncProvider: 'local',
+  speakerRecognition: true,
   speakerMatchThreshold: 0.5,
-  speakerSessionMatchThreshold: 0.4,
-  speakerSessionMergeThreshold: 0.6,
   summaryLength: 'normal',
-  summaryLanguage: 'vi',
+  summaryLanguage: 'auto',
   keepOriginalAudio: false,
   autoDeleteAudioDays: 90,
   interruptedPartsRetentionDays: 7,
+  autoDeleteMeetingsDays: 0,
+  liveSummaryMinutes: 5,
+  autoSendSummaryToChat: false,
 };
 
 export const WORKSPACE_SETTING_KEYS = Object.keys(DEFAULT_WORKSPACE_SETTINGS) as ReadonlyArray<keyof WorkspaceAppSettings>;
@@ -87,6 +100,16 @@ function nonNegativeIntValidator(name: string): Validator {
   };
 }
 
+/** The live-summary cadences offered; `0` = only on demand. */
+export const LIVE_SUMMARY_MINUTES = [0, 3, 5, 10, 15] as const;
+
+function enumNumberValidator(name: string, allowed: readonly number[]): Validator {
+  return (value) => {
+    if (typeof value !== 'number' || !allowed.includes(value)) throw new AppError(`${name} must be one of: ${allowed.join(', ')}.`);
+    return value;
+  };
+}
+
 function booleanValidator(name: string): Validator {
   return (value) => {
     if (typeof value !== 'boolean') throw new AppError(`${name} must be true/false.`);
@@ -96,16 +119,18 @@ function booleanValidator(name: string): Validator {
 
 /** One validator per `WorkspaceAppSettings` key — the exact allowlist `meeting_settings_set` enforces. */
 export const WORKSPACE_SETTING_VALIDATORS: Record<keyof WorkspaceAppSettings, Validator> = {
-  sttRealtimeProvider: enumValidator('sttRealtimeProvider', ['soniox', 'elevenlabs']),
-  sttAsyncProvider: enumValidator('sttAsyncProvider', ['soniox', 'elevenlabs']),
+  sttRealtimeProvider: enumValidator('sttRealtimeProvider', ['local', 'soniox', 'elevenlabs']),
+  sttAsyncProvider: enumValidator('sttAsyncProvider', ['local', 'soniox', 'elevenlabs']),
+  speakerRecognition: booleanValidator('speakerRecognition'),
   speakerMatchThreshold: unitFractionValidator('speakerMatchThreshold'),
-  speakerSessionMatchThreshold: unitFractionValidator('speakerSessionMatchThreshold'),
-  speakerSessionMergeThreshold: unitFractionValidator('speakerSessionMergeThreshold'),
   summaryLength: enumValidator('summaryLength', ['short', 'normal', 'detailed']),
-  summaryLanguage: enumValidator('summaryLanguage', SUPPORTED_LANGUAGES),
+  summaryLanguage: enumValidator('summaryLanguage', ['auto', ...SUPPORTED_LANGUAGES]),
   autoDeleteAudioDays: nonNegativeIntValidator('autoDeleteAudioDays'),
   interruptedPartsRetentionDays: nonNegativeIntValidator('interruptedPartsRetentionDays'),
+  autoDeleteMeetingsDays: nonNegativeIntValidator('autoDeleteMeetingsDays'),
   keepOriginalAudio: booleanValidator('keepOriginalAudio'),
+  liveSummaryMinutes: enumNumberValidator('liveSummaryMinutes', LIVE_SUMMARY_MINUTES),
+  autoSendSummaryToChat: booleanValidator('autoSendSummaryToChat'),
 };
 
 export function isWorkspaceSettingKey(key: string): key is keyof WorkspaceAppSettings {

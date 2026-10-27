@@ -137,6 +137,7 @@
   padding: 2px var(--space-3);
   font-size: var(--caption-size);
   font-weight: var(--weight-medium);
+  white-space: nowrap;
 }
 
 .ma-status-badge--success {
@@ -254,8 +255,41 @@
   vertical-align: middle;
 }
 
-.ma-history-row__title {
+.ma-history-screen__table th {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--ma-border-2);
+  color: var(--ma-fg-3);
+  font-size: var(--caption-size);
+  font-weight: var(--weight-medium);
+  font-family: inherit;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ma-history-row:hover td {
+  background: var(--bg-hover);
+}
+
+.ma-history-row__open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
+}
+
+.ma-history-row__open:hover .ma-history-row__title-text {
+  color: var(--privos-blue);
+}
+
+.ma-history-row__open:focus-visible {
+  outline: 2px solid var(--privos-blue);
+  outline-offset: 2px;
+  border-radius: var(--ma-radius-sm);
 }
 
 .ma-history-row__title-text {
@@ -311,7 +345,20 @@
     display: block;
     max-width: 100%;
     overflow-x: auto;
-    white-space: nowrap;
     -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Phone width: drop the secondary columns so status and the row menu stay on screen. */
+@media (max-width: 600px) {
+  .ma-history-row__speakers,
+  .ma-history-row__actions-count {
+    display: none;
+  }
+
+  .ma-history-row td,
+  .ma-history-screen__table th {
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
   }
 }

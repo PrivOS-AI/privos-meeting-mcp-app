@@ -1,7 +1,8 @@
 /**
  * Settings › Speech recognition (plan.md § Settings item 2, D-08): no API
- * key input field, ever. Two admin-only selects (realtime/async provider)
- * write through `meeting_settings_set`; the status table comes straight from
+ * key input field, ever. Two admin-only groups of provider cards (live
+ * captions / after the meeting) write through `meeting_settings_set`; each
+ * card's readiness comes straight from
  * `meeting_stt_status`, which itself decides how much detail to return based
  * on whether the caller is a workspace admin (`{ok}` only for everyone else)
  * — this panel simply renders whatever shape it gets back rather than trying
@@ -10,12 +11,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { parseToolResult, usePrivosApp } from '@privos_ai/app-react';
 
+import { Icon } from '../../components/icon.js';
 import { useI18n } from '../../i18n/i18n-provider.js';
 import { saveWorkspaceSetting } from '../../data/settings-store.js';
 import type { WorkspaceAppSettings } from '../../../shared/app-settings.js';
 
 interface ProviderStatusDto {
-  provider: 'soniox' | 'elevenlabs';
+  provider: 'local' | 'soniox' | 'elevenlabs';
   kind: 'realtime' | 'async';
   configured: boolean;
   ok: boolean;
@@ -27,8 +29,8 @@ interface ProviderStatusDto {
 
 interface SttStatusAdmin {
   ok: true;
-  activeRealtimeProvider: 'soniox' | 'elevenlabs';
-  activeAsyncProvider: 'soniox' | 'elevenlabs';
+  activeRealtimeProvider: 'local' | 'soniox' | 'elevenlabs';
+  activeAsyncProvider: 'local' | 'soniox' | 'elevenlabs';
   providers: ProviderStatusDto[];
   liveConcurrency: { active?: number; max: number };
   checkedAt: string;
@@ -39,6 +41,18 @@ interface SttStatusMember {
 }
 
 type SttStatus = SttStatusAdmin | SttStatusMember;
+
+type Vendor = 'local' | 'soniox' | 'elevenlabs';
+type ProviderKind = 'realtime' | 'async';
+
+const VENDORS: readonly Vendor[] = ['local', 'soniox', 'elevenlabs'];
+
+/** What each provider is good at, per role: the tags on its card. */
+const VENDOR_TAGS: Record<Vendor, Record<ProviderKind, string[]>> = {
+  local: { realtime: ['private', 'viEn', 'free'], async: ['private', 'viEn', 'speakers', 'free'] },
+  soniox: { realtime: ['cloud', 'manyLanguages', 'liveSpeakers'], async: ['cloud', 'manyLanguages', 'speakers'] },
+  elevenlabs: { realtime: ['cloud', 'manyLanguages'], async: ['cloud', 'manyLanguages', 'speakers'] },
+};
 
 function isAdminStatus(status: SttStatus): status is SttStatusAdmin {
   return 'providers' in status;
@@ -92,46 +106,76 @@ export function SpeechRecognitionPanel() {
     );
   }
 
-  const byKind = (kind: 'realtime' | 'async') => status.providers.filter((p) => p.kind === kind);
+  const statusOf = (kind: ProviderKind, vendor: Vendor) => status.providers.find((p) => p.kind === kind && p.provider === vendor);
 
   return (
     <section className="ma-settings-panel">
       <h3 className="ma-settings-panel__title">{t('settings.speech.title')}</h3>
-      <p className="ma-settings-panel__hint">{t('settings.speech.noApiKeyNote')}</p>
 
-      <label className="ma-settings-field">
-        <span>{t('settings.speech.realtimeProvider')}</span>
-        <select
-          value={status.activeRealtimeProvider}
-          disabled={saving === 'sttRealtimeProvider'}
-          onChange={(e) => void changeProvider('sttRealtimeProvider', e.target.value as WorkspaceAppSettings['sttRealtimeProvider'])}
-        >
-          <option value="soniox">Soniox — {t('settings.speech.hasSpeakerLabels')}</option>
-          <option value="elevenlabs">ElevenLabs — {t('settings.speech.noSpeakerLabels')}</option>
-        </select>
-      </label>
+      {(['realtime', 'async'] as const).map((kind) => {
+        const settingKey = kind === 'realtime' ? 'sttRealtimeProvider' : 'sttAsyncProvider';
+        const active = kind === 'realtime' ? status.activeRealtimeProvider : status.activeAsyncProvider;
+        return (
+          <fieldset key={kind} className="ma-provider-group" disabled={saving === settingKey}>
+            <legend className="ma-provider-group__title">{t(`settings.speech.section.${kind}`)}</legend>
+            <p className="ma-settings-panel__hint">{t(`settings.speech.section.${kind}Hint`)}</p>
+            <div className="ma-provider-cards">
+              {VENDORS.map((vendor) => {
+                const providerStatus = statusOf(kind, vendor);
+                // The built-in provider needs no key; a missing status row means it was not reported, not that it is down.
+                const ready = vendor === 'local' ? providerStatus?.ok !== false : Boolean(providerStatus?.configured && providerStatus.ok);
+                const selected = active === vendor;
+                const state = selected ? 'active' : ready ? 'ready' : !providerStatus?.configured ? 'notConfigured' : 'failed';
+                return (
+                  <label key={vendor} className={`ma-provider-card${selected ? ' ma-provider-card--selected' : ''}${!ready && !selected ? ' ma-provider-card--unavailable' : ''}`}>
+                    <input
+                      type="radio"
+                      className="ma-visually-hidden"
+                      name={`provider-${kind}`}
+                      value={vendor}
+                      checked={selected}
+                      disabled={!ready && !selected}
+                      onChange={() => void changeProvider(settingKey, vendor)}
+                    />
+                    <span className="ma-provider-card__head">
+                      <span className="ma-provider-card__name">
+                        <Icon name={vendor === 'local' ? 'shield-keyhole' : 'globe'} size={16} />
+                        {t(`settings.speech.vendor.${vendor}.name`)}
+                      </span>
+                      <span className={`ma-provider-card__state ma-provider-card__state--${state}`}>
+                        {selected ? <Icon name="checkmark-circle" size={14} /> : null}
+                        {t(`settings.speech.state.${state}`)}
+                      </span>
+                    </span>
+                    <span className="ma-provider-card__desc">{t(`settings.speech.vendor.${vendor}.${kind}`)}</span>
+                    <span className="ma-provider-card__tags">
+                      {VENDOR_TAGS[vendor][kind].map((tag) => (
+                        <span key={tag} className="ma-provider-card__tag">
+                          {t(`settings.speech.tag.${tag}`)}
+                        </span>
+                      ))}
+                    </span>
+                    {state === 'notConfigured' ? (
+                      <span className="ma-provider-card__note">{t('settings.speech.needsKey')}</span>
+                    ) : null}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        );
+      })}
       {status.activeRealtimeProvider === 'elevenlabs' ? <p className="ma-settings-panel__warning">{t('settings.speech.elevenlabsRealtimeWarning')}</p> : null}
-
-      <label className="ma-settings-field">
-        <span>{t('settings.speech.asyncProvider')}</span>
-        <select
-          value={status.activeAsyncProvider}
-          disabled={saving === 'sttAsyncProvider'}
-          onChange={(e) => void changeProvider('sttAsyncProvider', e.target.value as WorkspaceAppSettings['sttAsyncProvider'])}
-        >
-          <option value="soniox">Soniox</option>
-          <option value="elevenlabs">ElevenLabs</option>
-        </select>
-      </label>
       <p className="ma-settings-panel__hint">{t('settings.speech.changeAppliesToNewMeetings')}</p>
 
-      <div className="ma-settings-panel__actions">
-        <button type="button" onClick={reload} disabled={loading}>
-          {t('settings.speech.testConnection')}
-        </button>
-        <span className="ma-settings-panel__hint">
+      <div className="ma-provider-health">
+        <span className="ma-provider-health__usage">
+          <Icon name="person-multiple" size={16} />
           {t('settings.speech.concurrency', { active: status.liveConcurrency.active ?? '?', max: status.liveConcurrency.max })}
         </span>
+        <button type="button" className="ma-provider-health__check" onClick={reload} disabled={loading}>
+          {loading ? t('settings.speech.loading') : t('settings.speech.testConnection')}
+        </button>
       </div>
 
       {error ? (
@@ -140,38 +184,31 @@ export function SpeechRecognitionPanel() {
         </p>
       ) : null}
 
-      <table className="ma-settings-table">
-        <thead>
-          <tr>
-            <th>{t('settings.speech.colKind')}</th>
-            <th>{t('settings.speech.colProvider')}</th>
-            <th>{t('settings.speech.colStatus')}</th>
-            <th>{t('settings.speech.colModel')}</th>
-            <th>{t('settings.speech.colUsage')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(['realtime', 'async'] as const).flatMap((kind) =>
-            byKind(kind).map((p) => (
-              <tr key={`${kind}-${p.provider}`}>
-                <td>{t(`settings.speech.kind.${kind}`)}</td>
-                <td>{p.provider}</td>
-                <td>
-                  {!p.configured
-                    ? t('settings.speech.statusNotConfigured')
-                    : p.ok
-                      ? t('settings.speech.statusOk')
-                      : t('settings.speech.statusFailed', { reason: p.reason ?? p.detail ?? '' })}
-                </td>
-                <td>{p.models.join(', ')}</td>
-                <td>{p.usage?.characterCount != null ? `${p.usage.characterCount}/${p.usage.characterLimit ?? '?'} (${p.usage.tier ?? '—'})` : '—'}</td>
-              </tr>
-            )),
-          )}
-        </tbody>
-      </table>
-
-      <p className="ma-settings-panel__hint">{t('settings.speech.keyNote')}</p>
+      <details className="ma-provider-details">
+        <summary>{t('settings.speech.details')}</summary>
+        <ul>
+          {status.providers.map((p) => (
+            <li key={`${p.kind}-${p.provider}`}>
+              <strong>
+                {t(`settings.speech.vendor.${p.provider}.name`)} · {t(`settings.speech.kind.${p.kind}`)}
+              </strong>
+              {': '}
+              {!p.configured
+                ? t('settings.speech.statusNotConfigured')
+                : p.ok
+                  ? t('settings.speech.statusOk')
+                  : t('settings.speech.statusFailed', { reason: p.reason ?? p.detail ?? '' })}
+              {p.models.length ? <span className="ma-provider-details__models">{p.models.join(', ')}</span> : null}
+              {p.usage?.characterCount != null ? (
+                <span className="ma-provider-details__models">
+                  {p.usage.characterCount}/{p.usage.characterLimit ?? '?'} ({p.usage.tier ?? '—'})
+                </span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+        <p className="ma-settings-panel__hint">{t('settings.speech.keyNote')}</p>
+      </details>
     </section>
   );
 }

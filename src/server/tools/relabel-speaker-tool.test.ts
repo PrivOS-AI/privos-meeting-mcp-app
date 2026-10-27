@@ -69,6 +69,19 @@ describe('meeting_relabel_speaker', () => {
     expect(store.meeting_speakers[0].displayName).toBe('Correct name');
   });
 
+  it("relabels onto another person's profile without adding this meeting's vector to it", async () => {
+    store.speaker_profiles.push({ _id: 'profile-alice', displayName: 'Alice', displayNameNormalized: 'alice', createdByUserId: 'someone-else', embeddings: [], centroid: '', dim: 0, sampleCount: 0 });
+    const result = (await relabelSpeakerTool.execute(
+      { roomId: 'room-1', meetingId: 'meeting-1', speakerId: 'spk1', profileId: 'profile-alice' },
+      ctx(),
+      {} as never,
+    )) as { updated: boolean; profileId: string; enrolled: boolean; reason?: string };
+
+    expect(result).toMatchObject({ updated: true, profileId: 'profile-alice', enrolled: false, reason: 'enrol_not_permitted' });
+    expect(store.speaker_profiles.find((p) => p._id === 'profile-alice')?.embeddings).toHaveLength(0);
+    expect(store.meeting_speakers[0].profileId).toBe('profile-alice');
+  });
+
   it('creates a new profile by name when no profileId is given', async () => {
     await relabelSpeakerTool.execute({ roomId: 'room-1', meetingId: 'meeting-1', speakerId: 'spk1', displayName: 'New person' }, ctx(), {} as never);
     const created = store.speaker_profiles.find((p) => p.displayName === 'New person');

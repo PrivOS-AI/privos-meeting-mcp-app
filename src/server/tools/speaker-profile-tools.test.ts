@@ -20,8 +20,8 @@ let fakeHub: ReturnType<typeof installFakeHub>;
 
 const { speakerProfileDeleteTool, speakerProfileListTool, speakerProfileUpdateTool } = await import('./speaker-profile-tools.js');
 
-function ctx(userId: string, claims: Record<string, unknown> = {}): ToolCallContext {
-  return { transport: 'direct', identityState: 'verified', sessionScope: 'test', actor: { userId, roomId: 'room-1', claims, provenance: 'user-token' } };
+function ctx(userId: string, workspaceRoles?: string[]): ToolCallContext {
+  return { transport: 'direct', identityState: 'verified', sessionScope: 'test', actor: { userId, roomId: 'room-1', claims: {}, provenance: 'user-token', ...(workspaceRoles ? { workspaceRoles } : {}) } };
 }
 
 function profileRow(overrides: Record<string, unknown>) {
@@ -87,8 +87,18 @@ describe('speaker_profile_list/_update/_delete', () => {
     expect(store.speaker_profiles[0].displayName).toBe('Binh');
   });
 
-  it('update allows a workspace admin (via claims) even when not the creator', async () => {
-    await speakerProfileUpdateTool.execute({ profileId: 'profile-1', displayName: 'Binh' }, ctx('admin-1', { role: 'admin' }), {} as never);
+  it("update binds every App DB call to the caller's room (a room-less call resolves to a context the Hub never grants)", async () => {
+    await speakerProfileUpdateTool.execute({ profileId: 'profile-1', action: 'pruneOutliers' }, ctx('owner-1'), {} as never);
+    const toolCalls = vi
+      .mocked(fakeHub.authorizedFetch)
+      .mock.calls.filter(([path]) => path === '/api/v1/mcp-apps.tool-call')
+      .map(([, init]) => JSON.parse(String(init.body)) as { toolName: string; roomId?: string });
+    expect(toolCalls.length).toBeGreaterThan(0);
+    expect(toolCalls.filter((call) => call.roomId !== 'room-1')).toEqual([]);
+  });
+
+  it('update allows a workspace admin (signed workspace_roles) even when not the creator', async () => {
+    await speakerProfileUpdateTool.execute({ profileId: 'profile-1', displayName: 'Binh' }, ctx('admin-1', ['admin']), {} as never);
     expect(store.speaker_profiles[0].displayName).toBe('Binh');
   });
 

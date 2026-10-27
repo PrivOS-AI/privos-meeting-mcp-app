@@ -9,7 +9,7 @@
  */
 import { resolveRuntimeMode } from '@privos_ai/app-server';
 
-type SttVendor = 'soniox' | 'elevenlabs';
+type SttVendor = 'local' | 'soniox' | 'elevenlabs';
 
 function str(key: string): string | undefined {
   const v = process.env[key];
@@ -24,7 +24,7 @@ function num(key: string, fallback: number): number {
 
 function vendor(key: string, fallback: SttVendor): SttVendor {
   const v = str(key)?.toLowerCase();
-  return v === 'soniox' || v === 'elevenlabs' ? v : fallback;
+  return v === 'local' || v === 'soniox' || v === 'elevenlabs' ? v : fallback;
 }
 
 export type SessionScoreMode = 'max' | 'centroid';
@@ -115,8 +115,8 @@ export function loadEnv(): AppEnv {
   const speakerMatchThreshold = num('SPEAKER_MATCH_THRESHOLD', 0.5);
   return {
     port: num('PORT', 3012),
-    realtimeProvider: vendor('STT_REALTIME_PROVIDER', 'soniox'),
-    asyncProvider: vendor('STT_ASYNC_PROVIDER', 'soniox'),
+    realtimeProvider: vendor('STT_REALTIME_PROVIDER', 'local'),
+    asyncProvider: vendor('STT_ASYNC_PROVIDER', 'local'),
     sonioxApiKey: str('SONIOX_API_KEY'),
     elevenLabsApiKey: str('ELEVENLABS_API_KEY'),
     sonioxRtModel: str('SONIOX_RT_MODEL') ?? 'stt-rt-v5',
@@ -150,7 +150,8 @@ export function loadEnv(): AppEnv {
     summaryProvider: str('SUMMARY_PROVIDER'),
     translateModel: str('TRANSLATE_MODEL'),
     translateProvider: str('TRANSLATE_PROVIDER'),
-    privosFilesOrigin: str('PRIVOS_FILES_ORIGIN'),
+    // `PRIVOS_FILES_ORIGIN` is the pre-Marketplace name (reserved prefix), still read on existing installs.
+    privosFilesOrigin: str('FILES_ORIGIN') ?? str('PRIVOS_FILES_ORIGIN'),
     meetingJobConcurrency: num('MEETING_JOB_CONCURRENCY', 1),
     meetingJobTimeoutMs: num('MEETING_JOB_TIMEOUT_MS', 3_600_000),
     allowUnverifiedActor: str('ALLOW_UNVERIFIED_ACTOR') === '1',
@@ -177,33 +178,35 @@ export function isDevelopmentRuntime(): boolean {
   }
 }
 
+/** The key a vendor needs; `local` runs in this container and needs none. */
 function keyForProvider(config: AppEnv, provider: SttVendor): string | undefined {
+  if (provider === 'local') return 'local';
   return provider === 'soniox' ? config.sonioxApiKey : config.elevenLabsApiKey;
 }
 
 /**
- * Fail-fast at boot IN PRODUCTION when the selected realtime/async provider has
- * no key, or when `VOICEPRINT_ENC_KEY` is missing. The message names the setting
- * that points at the provider so the operator knows which key to add. Returns a
- * list of warnings (non-fatal in dev) rather than throwing there.
+ * Boot-time configuration check. A missing `VOICEPRINT_ENC_KEY` is fatal outside
+ * development (voiceprints must never be sealed with the public default key).
+ * A missing speech-to-text key is only a warning: the app still boots and serves
+ * everything else, and live captions / processing fail with
+ * `PROVIDER_NOT_CONFIGURED` until an operator adds the key. Returns the warnings.
  */
 export function assertProviderKeysAtBoot(config: AppEnv = env): string[] {
-  const problems: string[] = [];
+  const warnings: string[] = [];
   if (!keyForProvider(config, config.realtimeProvider)) {
-    problems.push(
-      `STT_REALTIME_PROVIDER=${config.realtimeProvider} but missing ${config.realtimeProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'}.`,
+    warnings.push(
+      `STT_REALTIME_PROVIDER=${config.realtimeProvider} but missing ${config.realtimeProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'} — live captions are unavailable.`,
     );
   }
   if (!keyForProvider(config, config.asyncProvider)) {
-    problems.push(
-      `STT_ASYNC_PROVIDER=${config.asyncProvider} but missing ${config.asyncProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'}.`,
+    warnings.push(
+      `STT_ASYNC_PROVIDER=${config.asyncProvider} but missing ${config.asyncProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'} — meeting processing is unavailable.`,
     );
   }
   if (!config.voiceprintEncKey) {
-    problems.push('missing VOICEPRINT_ENC_KEY (required outside development; voiceprints are encrypted with it).');
+    const problem = 'missing VOICEPRINT_ENC_KEY (required outside development; voiceprints are encrypted with it).';
+    if (!isDevelopmentRuntime()) throw new Error(`Invalid configuration at boot:\n- ${problem}`);
+    warnings.push(problem);
   }
-  if (problems.length && !isDevelopmentRuntime()) {
-    throw new Error(`Invalid configuration at boot:\n- ${problems.join('\n- ')}`);
-  }
-  return problems;
+  return warnings;
 }

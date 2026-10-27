@@ -14,7 +14,7 @@ const moduleDir = path.dirname(fileURLToPath(import.meta.url));
  */
 export const repoRoot = path.resolve(moduleDir, '..', '..');
 
-/** Vite build output that gets inlined into the served UI document. */
+/** Vite split-build output (`ui.distDir`), served by `serveBuiltUi`. */
 export const uiDistDir = path.join(repoRoot, 'dist', 'ui');
 
 /**

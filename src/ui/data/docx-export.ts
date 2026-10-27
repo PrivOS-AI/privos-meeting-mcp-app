@@ -25,6 +25,7 @@ export interface DocxSegment {
 export interface DocxActionItem {
   task: string;
   owner: string | null;
+  requester?: string | null;
   due: string | null;
 }
 
@@ -78,7 +79,8 @@ export function buildMeetingDocx(input: BuildMeetingDocxInput): Document {
     if (input.summary.action_items.length === 0) children.push(new Paragraph({ text: labels.none }));
     else {
       for (const item of input.summary.action_items) {
-        const meta = [item.owner, item.due].filter(Boolean).join(' · ');
+        const people = item.requester && item.owner ? `${item.requester} → ${item.owner}` : (item.owner ?? item.requester);
+        const meta = [people, item.due].filter(Boolean).join(' · ');
         children.push(new Paragraph({ text: meta ? `• ${item.task} (${meta})` : `• ${item.task}` }));
       }
     }

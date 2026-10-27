@@ -12,6 +12,7 @@ import { DegradedLabelsNotice } from '../components/degraded-labels-notice.js';
 import { EmptyState } from '../components/empty-state.js';
 import { Icon } from '../components/icon.js';
 import { KeepAwakeNotice } from '../components/keep-awake-notice.js';
+import { UploadStatusNotice } from '../components/upload-status-notice.js';
 import { LiveSummaryPanel } from '../components/live-summary-panel.js';
 import { VoiceWaveform } from '../components/voice-waveform.js';
 import { RecIndicator } from '../components/rec-indicator.js';
@@ -84,7 +85,8 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
     <>
       {!state.wakeLock.supported || state.wakeLock.error ? <KeepAwakeNotice /> : null}
       {state.captionStatus === 'capacity' ? <CapacityNotice /> : null}
-      {state.capabilities && !state.capabilities.speakerLabels ? <DegradedLabelsNotice /> : null}
+      <UploadStatusNotice pendingParts={state.pendingParts} lostParts={state.lostParts} issue={state.uploadIssue} />
+      {state.capabilities && !(state.capabilities.liveSpeakers ?? state.capabilities.speakerLabels) ? <DegradedLabelsNotice /> : null}
     </>
   );
 
@@ -102,7 +104,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
           </button>
         </div>
         {notices}
-        <StageCaption lines={state.lines} speakerMap={state.speakerMap} size={state.stageCaptionSize} resolveSpeakerKey={(line) => resolveLineSpeakerKey(state, line)} />
+        <StageCaption lines={state.lines} speakerMap={state.speakerMap} size={state.stageCaptionSize} showSpeaker={state.showSpeakerLabels} resolveSpeakerKey={(line) => resolveLineSpeakerKey(state, line)} />
         <div className="ma-stage__footer">{footer}</div>
       </div>
     );
@@ -180,7 +182,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
                   speaker={effectiveKey ? state.speakerMap[effectiveKey] : undefined}
                   speakerIndex={effectiveKey ? speakerKeys.indexOf(effectiveKey) + 1 : 0}
                   roomId={roomId}
-                  speakers={state.capabilities?.speakerLabels ? pickerSpeakers : []}
+                  speakers={(state.capabilities?.liveSpeakers ?? state.capabilities?.speakerLabels) ? pickerSpeakers : []}
                   onReassign={(toKey, applyToVoice) => store.reassignLine(line.id, toKey, applyToVoice)}
                   onAddSpeaker={(name, applyToVoice) => store.reassignLine(line.id, store.addManualSpeaker(name), applyToVoice)}
                   onRename={(speakerKey, choice) => store.assignRealtimeSpeaker(speakerKey, choice)}

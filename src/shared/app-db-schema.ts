@@ -90,6 +90,8 @@ export const SCHEMAS: readonly CollectionSchema[] = [
       { name: 'partCount', type: 'number' },
       { name: 'lastPartAt', type: 'date' },
       { name: 'keepAudio', type: 'boolean' },
+      // When the recorder confirmed they told participants that voices may be matched to voiceprints.
+      { name: 'voiceprintNoticeAt', type: 'date' },
       // JSON {recorderEpochMs, sessions:[{index,wsSessionOffsetMs,startedAt,clockSkewMs}]}
       { name: 'sttSessionMeta', type: 'string', maxLength: 20000 },
       { name: 'liveTurnsFileId', type: 'string' },
@@ -145,16 +147,40 @@ export const SCHEMAS: readonly CollectionSchema[] = [
     scope: 'room',
     fields: [
       { name: 'meeting', type: 'string' },
+      /** `task` | `request` | `question` — absent on rows written before it existed (read as `task`). */
+      { name: 'type', type: 'string', maxLength: 20 },
       { name: 'task', type: 'string', required: true, maxLength: 2000 },
       { name: 'owner', type: 'string', maxLength: 200 },
+      /** The PrivOS user behind `owner`, when that speaker's voiceprint is linked to an account. */
+      { name: 'ownerUserId', type: 'string' },
+      /** Who asked for it or assigned it. */
+      { name: 'requester', type: 'string', maxLength: 200 },
+      { name: 'requesterUserId', type: 'string' },
       // Free-text due as the summarizer emits it ("Friday", "next sprint"), not a
       // strict date — a `date` field would reject those and fail the whole insert.
       { name: 'due', type: 'string', maxLength: 200 },
+      /** `due` resolved to `YYYY-MM-DD` when the meeting date made that possible. */
+      { name: 'dueDate', type: 'string', maxLength: 10 },
       { name: 'atSec', type: 'number' },
+      /** The words that state the item, verified to be in the transcript. */
+      { name: 'quote', type: 'string', maxLength: 400 },
       { name: 'done', type: 'boolean' },
       { name: 'listItemId', type: 'string' },
     ],
     indexes: [{ fields: { meeting: 1 } }, { fields: { done: 1 } }],
+  },
+  {
+    // One row per decision of a meeting's summary — written by the job next to `action_items`.
+    collection: 'decisions',
+    scope: 'room',
+    fields: [
+      { name: 'meeting', type: 'string' },
+      { name: 'text', type: 'string', required: true, maxLength: 2000 },
+      { name: 'by', type: 'string', maxLength: 200 },
+      { name: 'byUserId', type: 'string' },
+      { name: 'atSec', type: 'number' },
+    ],
+    indexes: [{ fields: { meeting: 1 } }],
   },
   {
     collection: 'bookmarks',
@@ -192,6 +218,7 @@ export const SCHEMAS: readonly CollectionSchema[] = [
       { name: 'startedAt', type: 'date' },
       { name: 'heartbeatAt', type: 'date' },
       { name: 'finishedAt', type: 'date' },
+      { name: 'autoRetries', type: 'number' },
     ],
     indexes: [{ fields: { meetingId: 1 }, unique: true }, { fields: { jobId: 1 } }, { fields: { status: 1 } }],
   },

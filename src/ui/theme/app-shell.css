@@ -275,6 +275,19 @@
   background: rgba(0, 0, 0, 0.06);
 }
 
+.ma-banner__action {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  color: var(--ma-accent-on);
+  background: var(--ma-accent);
+  border: none;
+  border-radius: var(--ma-radius-sm);
+}
+
+.ma-banner__action:disabled {
+  opacity: 0.6;
+}
+
 /* ---------- Icon primitive ---------- */
 
 .ma-icon {
@@ -451,4 +464,17 @@
   .ma-live {
     grid-template-columns: 1fr;
   }
+}
+
+/* Read by screen readers, not shown. */
+.ma-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }

@@ -142,6 +142,7 @@ function freshJob(overrides: Partial<JobRecord> = {}): JobRecord {
     progress: 0,
     startedAt: now,
     heartbeatAt: now,
+    autoRetries: 0,
     ...overrides,
   };
 }
@@ -193,6 +194,23 @@ describe('runMeetingJob — integration (real ffmpeg decode)', () => {
     expect(deletedFileIds).toContain('part-0');
     // keepAudio:true — audio.webm itself must NOT be deleted afterward.
     expect(deletedFileIds).not.toContain('uploaded-1');
+  });
+
+  it('still completes with a transcript when speaker recognition fails (no model in the image)', async () => {
+    const { computeEmbedding } = await import('../speaker/embedding-extractor.js');
+    vi.mocked(computeEmbedding).mockRejectedValue(new Error('Speaker recognition model not found'));
+    try {
+      const hub = buildJobHub(fixtureBytes);
+      const parts = [{ fileId: 'part-0', seq: 0, name: `audio.part-0000-${DIGEST}.webm` }];
+      await runMeetingJob({ job: freshJob(), roomId: ROOM_ID, folderId: FOLDER_ID, parts, agentBotHub: hub, signal: new AbortController().signal });
+
+      expect(store.processing_jobs.find((r) => r._id === 'job-row-1')?.status).toBe('completed');
+      expect(store.meetings.find((m) => m._id === MEETING_ID)?.status).toBe('summarized');
+      expect(uploadedFiles.length).toBe(5);
+      expect(store.speaker_profiles ?? []).toHaveLength(0);
+    } finally {
+      vi.mocked(computeEmbedding).mockImplementation(async () => new Float32Array([1, 0, 0, 0]));
+    }
   });
 
   it('a job whose transcribe step fails is recorded failed(...) without uploading a half-finished result', async () => {

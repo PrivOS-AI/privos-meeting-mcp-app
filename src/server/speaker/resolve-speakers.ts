@@ -202,6 +202,35 @@ function averageVectors(vectors: readonly Float32Array[]): Float32Array {
  * server-side floor"). The env default itself is operator-controlled, never
  * member-writable, so it is not clamped.
  */
+/** The workspace-default match threshold (env, floored) — for workspace-global profile health and pruning, which no single room tunes. */
+export function workspaceMatchThreshold(): number {
+  return Math.max(env.speakerMatchThreshold, SPEAKER_MATCH_THRESHOLD_FLOOR);
+}
+
+/** The room's `speakerRecognition` setting (default on). Off = no embedding, matching or enrolment anywhere. */
+export async function isSpeakerRecognitionEnabled(db: AppDbBotClient): Promise<boolean> {
+  return (await getSetting<boolean>(db, 'speakerRecognition')) !== false;
+}
+
+/**
+ * The post-meeting speaker list when speaker recognition is off: no audio is read and nothing
+ * biometric is computed or stored. A speaker the owner named during the meeting keeps that name;
+ * everyone else stays unresolved ("Speaker N").
+ */
+export function resolveSpeakersWithoutVoiceprints(
+  segments: readonly Segment[],
+  userIdentityBySpeakerId?: ReadonlyMap<string, UserIdentity>,
+): ResolvedSpeaker[] {
+  const totals = new Map<string, number>();
+  for (const segment of segments) totals.set(segment.speakerId, (totals.get(segment.speakerId) ?? 0) + Math.max(0, segment.endSec - segment.startSec));
+  return [...totals].map(([speakerId, totalSpeakSec]) => {
+    const identity = userIdentityBySpeakerId?.get(speakerId);
+    return identity
+      ? { speakerId, totalSpeakSec, sampleSec: 0, resolved: true, displayName: identity.displayName, nameSource: 'user' as const }
+      : { speakerId, totalSpeakSec, sampleSec: 0, resolved: false };
+  });
+}
+
 export async function readMatchThreshold(db: AppDbBotClient): Promise<number> {
   const stored = await getSetting<number>(db, 'speakerMatchThreshold');
   const candidate = typeof stored === 'number' && stored > 0 && stored < 1 ? stored : env.speakerMatchThreshold;
@@ -311,16 +340,18 @@ export async function resolveSpeakers(
         out.push({ speakerId: plan.speakerId, totalSpeakSec: plan.totalSpeakSec, sampleSec: plan.totalSec, sampleRange, resolved: true, displayName: userIdentity.displayName, nameSource: 'user' });
         continue;
       }
-      await logEvent(meetingId, {
-        t: Date.now(),
-        meetingId,
-        type: 'enrol',
-        profile: enrolResult.profile.id,
-        source: 'user-post',
-        coherence,
-        durationSec: plan.totalSec,
-        vectorCountAfter: enrolResult.vectorCountAfter,
-      });
+      if (enrolResult.enrolled) {
+        await logEvent(meetingId, {
+          t: Date.now(),
+          meetingId,
+          type: 'enrol',
+          profile: enrolResult.profile.id,
+          source: 'user-post',
+          coherence,
+          durationSec: plan.totalSec,
+          vectorCountAfter: enrolResult.vectorCountAfter,
+        });
+      }
       out.push({
         speakerId: plan.speakerId,
         totalSpeakSec: plan.totalSpeakSec,

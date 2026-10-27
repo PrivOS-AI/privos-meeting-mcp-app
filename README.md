@@ -59,6 +59,20 @@ The voiceprint store is encrypted with `VOICEPRINT_ENC_KEY`, which is required
 outside development (the server refuses to start without it). Back that key up:
 losing it loses every stored voiceprint.
 
+## Troubleshooting on a tenant
+
+Backend work runs as the app's installation bot, and the Hub grants the bot's
+scopes only inside rooms the bot is a member of. A bot outside the room gets
+`Insufficient scope` for every scope even when an admin approved them all, so
+that message usually means "add the bot", not "grant more". The app tells the
+two apart: it shows **Add to room** for `ASSISTANT_NOT_IN_ROOM` and points at
+Admin > Apps for `PERMISSION_NOT_GRANTED`.
+
+On a paired install, `npm run diagnose:scopes -- --room <roomId>` walks the
+checks in order (credential, manifest approval, Hub scopes, installation, bot
+membership, each scope) and stops at the first failure. It is read-only unless
+`--write` is passed and never prints the credential.
+
 ## Contributing
 
 `PRIVOS.md` holds the working notes for contributors and AI coding agents

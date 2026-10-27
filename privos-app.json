@@ -12,9 +12,15 @@
     "url": "https://privos.ai"
   },
   "homepage": "https://privos.ai",
-  "repository": "https://github.com/privos-ai/privos-meeting-mcp-app",
+  "repository": "https://github.com/PrivOS-AI/privos-meeting-mcp-app",
   "port": 3012,
   "stateless": false,
+  "volumes": [
+    {
+      "name": "data",
+      "mountPath": "/app/data"
+    }
+  ],
   "capabilities": {
     "verifiedActor": true
   },
@@ -25,12 +31,16 @@
   "resources": {
     "memoryMb": 2048,
     "cpus": 2,
-    "tmpSizeMb": 2048
+    "tmpSizeMb": 1024
   },
   "dataPolicy": {
-    "version": "2026-09-17",
+    "version": "2026-10-26",
     "externalProcessing": true,
-    "retention": "Attendee audio is streamed and uploaded to the STT provider selected in Settings (Soniox: realtime zero-retention, async auto-deleted after 30 days; or ElevenLabs). Transcripts and summaries are processed by Hub AI inside the workspace and stored in the room's Files; original audio is deleted after processing unless Keep original audio is enabled."
+    "externalDestinations": [
+      "Soniox (speech-to-text)",
+      "ElevenLabs (speech-to-text)"
+    ],
+    "retention": "By default speech is recognised inside the app container (built-in Vietnamese/English models) and audio never leaves the workspace. Only if a room selects Soniox or ElevenLabs is audio streamed and uploaded to that provider, which keeps it under its own terms; the app deletes its Soniox upload after transcription. Recording parts are deleted once merged. The merged audio is deleted right after processing unless the room enables Keep original audio; audio kept on purpose, or left because the summary failed, is deleted after the room's auto-delete period (default 90 days, 0 disables). Parts of an interrupted recording are deleted after 7 days by default. Transcripts and summaries are produced with Hub AI inside the workspace and stored in the room's Files until the meeting is deleted, by its owner or after the room's meeting auto-delete period (off by default). Voiceprints (speaker embeddings, biometric data) can be turned off per room, in which case none are computed or stored; while on, the recorder must confirm before each recording that participants were told, and the confirmation time is kept on the meeting. Voiceprints are encrypted with AES-256-GCM, stored in the workspace App DB and never sent outside the workspace; deleting a meeting also removes the voice samples taken from it, and a profile stays until its creator or a workspace admin deletes it. Unconfirmed speaker embeddings are cleared 30 days after the meeting. Temporary files on the app volume are deleted after each job; operator diagnostics are kept for 90 days. Uninstalling the app does not delete data already stored in the room's Files or App DB."
   },
   "permissions": [
     {
@@ -87,7 +97,7 @@
       "context": "room",
       "executionContext": "both",
       "feature": "meeting.db.write",
-      "reason": "Write meetings, speakers, encrypted voiceprint profiles, action items, and job status."
+      "reason": "Write meetings, speakers, encrypted voiceprint profiles, action items, decisions, and job status."
     },
     {
       "scope": "sandbox:generate",
@@ -114,6 +124,15 @@
       "feature": "meeting.rooms.read",
       "reason": "Show the room member list when assigning speaker names.",
       "degradedBehavior": "The user types a name freely instead of picking from the member list."
+    },
+    {
+      "scope": "rooms:roles:read",
+      "requirement": "optional",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.settings.manage",
+      "reason": "Let only the room's owners and moderators, and workspace admins, change the room's speech-to-text, speaker and retention settings.",
+      "degradedBehavior": "Nobody can change the room's settings in the app; the room keeps its current values or the defaults, and the Settings screen shows them read-only."
     },
     {
       "scope": "lists:read",
@@ -170,12 +189,14 @@
         "type": "object",
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       },
       "ui": {
-        "resourceUri": "ui://meeting-agent/app.html",
+        "resourceUri": "ui://ai.privos.meeting-agent/app.html",
         "hideAiChat": true,
         "permissions": [
           "microphone",
@@ -185,16 +206,16 @@
           "connect-src": [
             "wss://stt-rt.soniox.com",
             "wss://api.elevenlabs.io",
-            "<PRIVOS_FILES_ORIGIN>"
+            "<FILES_ORIGIN>"
           ],
           "media-src": [
-            "<PRIVOS_FILES_ORIGIN>"
+            "<FILES_ORIGIN>"
           ]
         }
       },
       "_meta": {
         "ui": {
-          "resourceUri": "ui://meeting-agent/app.html",
+          "resourceUri": "ui://ai.privos.meeting-agent/app.html",
           "hideAiChat": true,
           "permissions": [
             "microphone",
@@ -204,10 +225,10 @@
             "connect-src": [
               "wss://stt-rt.soniox.com",
               "wss://api.elevenlabs.io",
-              "<PRIVOS_FILES_ORIGIN>"
+              "<FILES_ORIGIN>"
             ],
             "media-src": [
-              "<PRIVOS_FILES_ORIGIN>"
+              "<FILES_ORIGIN>"
             ]
           }
         }
@@ -233,7 +254,9 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -241,7 +264,7 @@
     {
       "name": "meeting_stt_status",
       "title": "Speech-to-text status",
-      "description": "Status of both STT providers for admins to compare.",
+      "description": "Status of both STT providers for room owners, moderators and workspace admins to compare.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -259,10 +282,14 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -282,24 +309,60 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "seq": {
-            "type": "number"
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000
           },
           "durationMs": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120000
           },
           "partStartMs": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 86400000
           },
           "segments": {
             "type": "array",
+            "maxItems": 200,
             "items": {
-              "type": "object"
+              "type": "object",
+              "required": [
+                "speaker",
+                "startMs",
+                "endMs"
+              ],
+              "properties": {
+                "speaker": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "startMs": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 86400000
+                },
+                "endMs": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 86400000
+                },
+                "final": {
+                  "type": "boolean"
+                }
+              }
             }
           }
         }
@@ -317,13 +380,19 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "sinceMs": {
             "type": "number",
+            "minimum": 0,
+            "maximum": 86400000,
             "description": "Only return settled turns newer than this meeting-clock timestamp. Omitted -> the most recent turns."
           }
         }
@@ -343,18 +412,52 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "target": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "vi",
+              "en",
+              "fr",
+              "zh",
+              "ko",
+              "ja",
+              "de",
+              "tr"
+            ]
           },
           "segments": {
             "type": "array",
+            "maxItems": 40,
             "items": {
-              "type": "object"
+              "type": "object",
+              "required": [
+                "id",
+                "text"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "lang": {
+                  "type": "string",
+                  "maxLength": 16
+                }
+              }
             }
           }
         }
@@ -372,10 +475,14 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -392,10 +499,14 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -412,10 +523,14 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -433,21 +548,59 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "title": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 200
           },
           "language": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "vi",
+              "en",
+              "fr",
+              "zh",
+              "ko",
+              "ja",
+              "de",
+              "tr"
+            ]
           },
           "segments": {
             "type": "array",
+            "maxItems": 8000,
             "items": {
-              "type": "object"
+              "type": "object",
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "speakerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "speakerName": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "startSec": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 2000
+                }
+              }
             }
           }
         }
@@ -465,18 +618,22 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
     },
     {
       "name": "meeting_settings_set",
-      "title": "Update workspace settings",
-      "description": "Write a workspace-wide setting (STT provider, speaker-match thresholds, retention…) — workspace admins only.",
+      "title": "Update room settings",
+      "description": "Write a setting for the caller's room (STT provider, speaker-match thresholds, retention…) — room owners, moderators and workspace admins only.",
       "inputSchema": {
         "type": "object",
         "required": [
@@ -485,9 +642,17 @@
         ],
         "properties": {
           "key": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 64
           },
-          "value": {}
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ],
+            "maxLength": 64
+          }
         }
       }
     },
@@ -504,13 +669,19 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "assignments": {
             "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
             "items": {
               "type": "object",
               "required": [
@@ -519,7 +690,9 @@
               ],
               "properties": {
                 "speakerId": {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
                 },
                 "mode": {
                   "type": "string",
@@ -531,14 +704,18 @@
                   ]
                 },
                 "privosUserId": {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
                 },
                 "displayName": {
                   "type": "string",
                   "maxLength": 80
                 },
                 "profileId": {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
                 }
               }
             }
@@ -566,17 +743,22 @@
         ],
         "properties": {
           "profileId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "displayName": {
             "type": "string",
             "maxLength": 80
           },
           "privosUserId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
           },
           "privosUsername": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 64
           },
           "action": {
             "type": "string",
@@ -599,7 +781,9 @@
         ],
         "properties": {
           "profileId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }
@@ -617,16 +801,24 @@
         ],
         "properties": {
           "roomId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "meetingId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "speakerId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "profileId": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           },
           "displayName": {
             "type": "string",
@@ -634,41 +826,116 @@
           }
         }
       }
-    }
-  ],
-  "env": [
-    {
-      "key": "PORT",
-      "description": "The app's listen port (default 3012).",
-      "required": false,
-      "secret": false,
-      "default": "3012"
     },
     {
+      "name": "meeting_forget_voiceprints",
+      "title": "Forget meeting voiceprints",
+      "description": "Remove every voice sample taken from this meeting from the workspace's voiceprint profiles — run before deleting the meeting; only the meeting owner.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "roomId",
+          "meetingId"
+        ],
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "meetingId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "name": "meeting_audio_push",
+      "title": "Push live audio",
+      "description": "Send a short chunk of the meeting's live audio to the app's own speech recognizer and receive the new captions — only the meeting owner, while recording.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "roomId",
+          "meetingId",
+          "seq",
+          "chunkStartSec",
+          "sampleRate",
+          "pcm"
+        ],
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "meetingId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "chunkStartSec": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 86400000,
+            "description": "Meeting-clock seconds of the first sample in this chunk."
+          },
+          "sampleRate": {
+            "type": "integer",
+            "enum": [
+              16000
+            ]
+          },
+          "pcm": {
+            "type": "string",
+            "maxLength": 174764,
+            "description": "Base64 little-endian PCM16 mono."
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000
+          }
+        }
+      }
+    }
+  ],
+  "ui": {
+    "distDir": "dist/ui"
+  },
+  "env": [
+    {
       "key": "SONIOX_API_KEY",
-      "description": "Soniox API key. Required if Soniox is the selected provider.",
+      "description": "Soniox API key — only when a room selects Soniox (optional).",
       "required": false,
       "secret": true
     },
     {
       "key": "ELEVENLABS_API_KEY",
-      "description": "ElevenLabs API key. Required if ElevenLabs is the selected provider.",
+      "description": "ElevenLabs API key — only when a room selects ElevenLabs (optional).",
       "required": false,
       "secret": true
     },
     {
       "key": "STT_REALTIME_PROVIDER",
-      "description": "Default realtime provider: soniox | elevenlabs.",
+      "description": "Default realtime caption provider: local (built in) | soniox | elevenlabs.",
       "required": false,
       "secret": false,
-      "default": "soniox"
+      "default": "local"
     },
     {
       "key": "STT_ASYNC_PROVIDER",
-      "description": "Default async provider: soniox | elevenlabs.",
+      "description": "Default post-meeting transcription provider: local (built in) | soniox | elevenlabs.",
       "required": false,
       "secret": false,
-      "default": "soniox"
+      "default": "local"
     },
     {
       "key": "SONIOX_RT_MODEL",
@@ -728,8 +995,8 @@
     },
     {
       "key": "SPEAKER_MODEL_PATH",
-      "description": "Path to the speaker-embedding ONNX model (downloaded at deploy time).",
-      "required": true,
+      "description": "Path to the speaker-embedding ONNX model (baked into the image at this default path).",
+      "required": false,
       "secret": false,
       "default": "models/3dspeaker_speaker-embedding_advanced.onnx"
     },
@@ -795,9 +1062,9 @@
       "secret": false
     },
     {
-      "key": "PRIVOS_FILES_ORIGIN",
-      "description": "Origin of presigned Files downloads (declared in CSP connect-src/media-src).",
-      "required": true,
+      "key": "FILES_ORIGIN",
+      "description": "Origin of presigned Files downloads; replaces <FILES_ORIGIN> in the UI CSP. Optional: audio falls back to Files /download.",
+      "required": false,
       "secret": false
     },
     {

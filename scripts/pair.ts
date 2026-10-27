@@ -36,6 +36,8 @@ function runStandaloneServer(): Promise<number> {
       cwd: repositoryRoot,
       stdio: 'inherit',
       env: { ...process.env, NODE_ENV: 'production' },
+      // On Windows npm/pnpm/yarn are .cmd shims that spawn only finds through a shell (else ENOENT).
+      shell: process.platform === 'win32',
     });
     child.on('error', reject);
     child.on('exit', (code, signal) => resolve(signal ? 1 : (code ?? 0)));
@@ -46,7 +48,7 @@ async function main(): Promise<void> {
   const pairUrl = await prompt('Enter the one-time pairing URL from Hub Admin: ');
   if (!pairUrl) throw new Error('No pairing URL provided');
 
-  // Resolve the CSP `<PRIVOS_FILES_ORIGIN>` placeholder from env before announcing,
+  // Resolve the CSP `<FILES_ORIGIN>` placeholder from env before announcing,
   // so the paired install carries the real Files origin (not the literal token).
   const manifest = resolveFilesOrigin(JSON.parse(await readFile(path.join(repositoryRoot, 'privos-app.json'), 'utf8')));
   console.log('\nRegistering… once registered, approve the permission ceiling in Hub Admin > Apps.');

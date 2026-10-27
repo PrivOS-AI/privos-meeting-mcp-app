@@ -7,9 +7,10 @@
  * real screens; its result/failure never blocks the shell from rendering.
  */
 import { useEffect, useRef, useState } from 'react';
-import { parseToolResult, usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
+import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { AppRail } from './components/app-rail.js';
+import { AssistantRoomBanner } from './components/assistant-room-banner.js';
 import { BotCredentialBanner } from './components/bot-credential-banner.js';
 import { Icon } from './components/icon.js';
 import { HistoryScreen } from './screens/history-screen.js';
@@ -22,6 +23,7 @@ import { SettingsScreen } from './screens/settings-screen.js';
 import { useI18n } from './i18n/i18n-provider.js';
 import { RecordingStoreProvider, useRecordingState } from './stores/recording-store.js';
 import { ensureSandboxBotKey } from './data/sandbox-bot-key.js';
+import { parseToolResultOrThrow, ToolCallError } from './data/tool-error.js';
 
 export type Route = 'new' | 'live' | 'processing' | 'detail' | 'history' | 'settings';
 
@@ -34,6 +36,8 @@ export function App() {
   // History → detail navigation carries the picked meeting id; owned here (not in RecordingStore) since it has
   // nothing to do with the in-progress recording state machine (phase-07 § Related Code Files: `app.tsx` route `detail/:meetingId`).
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null);
+  /** Set when bootstrap found the installation bot outside this room (`ASSISTANT_NOT_IN_ROOM`). */
+  const [missingAssistant, setMissingAssistant] = useState<{ botSlug: string } | null>(null);
 
   function openMeeting(meetingId: string): void {
     setSelectedMeetingId(meetingId);
@@ -45,6 +49,19 @@ export function App() {
   // room itself has not, and re-running the tool per render would be wasteful
   // (it is idempotent server-side, but still a network round trip).
   const bootstrapped = useRef(false);
+
+  async function runBootstrap(): Promise<void> {
+    try {
+      parseToolResultOrThrow(await app.callServerTool({ name: 'meeting_bootstrap', arguments: { roomId: context.roomId } }));
+      setMissingAssistant(null);
+    } catch (error) {
+      if (error instanceof ToolCallError && error.code === 'ASSISTANT_NOT_IN_ROOM') {
+        setMissingAssistant({ botSlug: typeof error.details?.botSlug === 'string' ? error.details.botSlug : '' });
+        return;
+      }
+      throw error;
+    }
+  }
   useEffect(() => {
     if (bootstrapped.current) return;
     if (!context.roomId) return;
@@ -58,8 +75,7 @@ export function App() {
     app
       .callServerTool({ name: 'mcpapp.bot.joinCurrentRoom', arguments: {} })
       .catch((error: unknown) => console.warn('mcpapp.bot.joinCurrentRoom failed', error))
-      .then(() => app.callServerTool({ name: 'meeting_bootstrap', arguments: { roomId: context.roomId } }))
-      .then((raw) => parseToolResult(raw))
+      .then(() => runBootstrap())
       .catch((error: unknown) => {
         // Bootstrap failure must not block the shell from rendering; later
         // phases that depend on it will surface their own errors.
@@ -77,6 +93,9 @@ export function App() {
         <AppRail current={route} onNavigate={setRoute} open={railOpen} onClose={() => setRailOpen(false)} />
         <div className="ma-app__column">
           <BotCredentialBanner />
+          {missingAssistant ? (
+            <AssistantRoomBanner botSlug={missingAssistant.botSlug} onJoined={() => void runBootstrap().catch(() => undefined)} />
+          ) : null}
           <RecoveryBanner />
           <RoutedScreens route={route} setRoute={setRoute} selectedMeetingId={selectedMeetingId} openMeeting={openMeeting} />
         </div>

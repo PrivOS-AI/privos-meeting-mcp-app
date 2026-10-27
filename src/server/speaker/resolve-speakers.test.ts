@@ -276,3 +276,18 @@ describe('readMatchThreshold (server-side floor clamp)', () => {
     expect(await readMatchThreshold(db())).toBe(0.5);
   });
 });
+
+describe('resolveSpeakersWithoutVoiceprints', () => {
+  it('keeps live-assigned names, leaves the rest unresolved, and computes no sample', async () => {
+    const { resolveSpeakersWithoutVoiceprints } = await import('./resolve-speakers.js');
+    const seg = (speakerId: string, startSec: number, endSec: number) => ({ id: `${speakerId}-${startSec}`, speakerId, startSec, endSec, text: 'x', lang: 'en', tokenCount: 1 });
+    const out = resolveSpeakersWithoutVoiceprints(
+      [seg('a', 0, 10), seg('b', 10, 15), seg('a', 15, 20)],
+      new Map([['a', { displayName: 'Alex', createdByUserId: 'owner-1' }]]),
+    );
+    expect(out).toEqual([
+      { speakerId: 'a', totalSpeakSec: 15, sampleSec: 0, resolved: true, displayName: 'Alex', nameSource: 'user' },
+      { speakerId: 'b', totalSpeakSec: 5, sampleSec: 0, resolved: false },
+    ]);
+  });
+});

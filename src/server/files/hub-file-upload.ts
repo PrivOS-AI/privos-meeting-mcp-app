@@ -12,6 +12,7 @@ import { openAsBlob } from 'node:fs';
 import type { RoomBoundHubClient } from '@privos_ai/app-server';
 
 import { AppError } from '../../shared/app-error.js';
+import { botNotInRoomFileError, isBotNotInRoomFileError } from '../media/hub-file-download.js';
 
 export interface UploadBotFileInput {
   hub: RoomBoundHubClient;
@@ -58,12 +59,13 @@ export async function uploadBotFile(input: UploadBotFileInput): Promise<UploadBo
   const body = await readJson(response);
   if (!response.ok || body?.success !== true) {
     const message = typeof body?.error === 'string' ? body.error : typeof body?.message === 'string' ? body.message : `HTTP ${response.status}`;
-    throw new AppError(`Failed to save file "${input.fileName}" to the room: ${message}`);
+    if (isBotNotInRoomFileError(message)) throw botNotInRoomFileError();
+    throw new AppError(`Failed to save file "${input.fileName}" to the room: ${message}`, 'HUB_ERROR');
   }
   const file = body.file;
   const fileId = file && typeof file === 'object' ? (file as Record<string, unknown>)._id : undefined;
   if (typeof fileId !== 'string' || !fileId) {
-    throw new AppError(`Hub did not return a file id after saving "${input.fileName}".`);
+    throw new AppError(`Hub did not return a file id after saving "${input.fileName}".`, 'HUB_ERROR');
   }
   return { fileId };
 }

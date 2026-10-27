@@ -23,7 +23,7 @@ const BYTES_PER_SEC = SAMPLE_RATE * BYTES_PER_SAMPLE;
 
 /** Spawn ffmpeg, keeping the child handle so an abort can `SIGKILL` it instead of merely rejecting the promise. */
 export async function decodeToWav16k(inputPath: string, outputPath: string, signal: AbortSignal): Promise<DecodeResult> {
-  if (signal.aborted) throw new AppError('Job was cancelled before decoding audio.');
+  if (signal.aborted) throw new AppError('Job was cancelled before decoding audio.', 'INVALID_STATE');
 
   const durationSec = await new Promise<number | null>((resolve, reject) => {
     const child = spawn(ffmpeg.path, [
@@ -55,7 +55,7 @@ export async function decodeToWav16k(inputPath: string, outputPath: string, sign
     child.on('close', (code) => {
       signal.removeEventListener('abort', onAbort);
       if (aborted) {
-        reject(new AppError('Job was cancelled while decoding audio.'));
+        reject(new AppError('Job was cancelled while decoding audio.', 'INVALID_STATE'));
         return;
       }
       if (code !== 0) {

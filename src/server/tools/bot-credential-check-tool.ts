@@ -11,6 +11,7 @@
  * for any authenticated bot and carries its own identity.
  */
 import type { AppTool } from './registry.js';
+import { NO_ARGUMENTS } from './schema-parts.js';
 
 interface MeBody {
   _id?: unknown;
@@ -21,7 +22,7 @@ export const botCredentialCheckTool: AppTool = {
   name: 'meeting_agent_bot_credential_check',
   title: 'Check bot credential',
   description: "Check the installation bot's credential against the Hub.",
-  inputSchema: { type: 'object', properties: {} },
+  inputSchema: NO_ARGUMENTS,
   async execute(_args, _context, runtime) {
     try {
       const response = await runtime.agentBotHub.authorizedFetch('/api/v1/me', {

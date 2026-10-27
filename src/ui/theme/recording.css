@@ -78,6 +78,23 @@
   font-size: var(--body-sm-size);
 }
 
+.ma-new-meeting__hint {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  color: var(--ma-fg-3);
+  font-size: var(--body-sm-size);
+  text-align: center;
+}
+
+.ma-new-meeting__consent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ma-new-meeting__consent .ma-notice {
+  margin: 0;
+}
+
 .ma-new-meeting__start {
   display: flex;
   align-items: center;
@@ -110,6 +127,11 @@
 .ma-notice--info {
   color: var(--ma-fg-2);
   background: var(--bg-sunken);
+}
+
+.ma-notice--error {
+  color: var(--ma-status-danger);
+  background: var(--ma-status-danger-bg);
 }
 
 /* ---------- REC indicator ---------- */
@@ -422,11 +444,16 @@
 
 .ma-side-panel__tabs {
   display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
   border-bottom: 1px solid var(--ma-border-1);
 }
 
 .ma-side-panel__tab {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 var(--space-1);
+  white-space: nowrap;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1003,7 +1030,6 @@
   font-size: var(--body-sm-size);
   line-height: 1.55;
   color: var(--ma-fg-1);
-  white-space: pre-wrap;
 }
 
 .ma-live-summary__actions {

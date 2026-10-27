@@ -75,7 +75,8 @@ function sessionIndexFromLabel(label: string): number {
 export const invalidateProfileCache = profileStore.invalidateProfileCache;
 export const resetProfileCacheForTests = profileStore.resetProfileCacheForTests;
 
-async function matchPendingAgainstProfiles(db: AppDbBotClient, registry: MeetingSessionRegistry): Promise<void> {
+/** Names sticky, unnamed session speakers from `speaker_profiles` (never enrols). Shared with the built-in recognizer's per-utterance path. */
+export async function matchPendingAgainstProfiles(db: AppDbBotClient, registry: MeetingSessionRegistry): Promise<void> {
   const candidateIds = registry.candidatesForProfileMatch();
   if (candidateIds.length === 0) return;
   const [threshold, profiles] = await Promise.all([readMatchThreshold(db), profileStore.cachedProfiles(db)]);
@@ -101,7 +102,7 @@ async function matchPendingAgainstProfiles(db: AppDbBotClient, registry: Meeting
 }
 
 /** `ObserveFact`/`MergeFact` (registry-internal, opaque to diagnostics) -> the full timestamped `DiagnosticEvent` this chunk logs. */
-function toDiagnosticEvent(meetingId: string, seq: number, fact: SpeakerRegistryFact): DiagnosticEvent {
+export function toDiagnosticEvent(meetingId: string, seq: number, fact: SpeakerRegistryFact): DiagnosticEvent {
   const t = Date.now();
   if (fact.kind === 'observe') {
     return {
@@ -234,13 +235,13 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
         { seq: req.seq, partStartMs: req.partStartMs, durationMs: req.durationMs },
         registry.lastPartStampForValidation(),
       );
-      if (violation) throw new AppError(`Rejected client part stamp — ${violation}`);
+      if (violation) throw new AppError(`Rejected client part stamp — ${violation}`, 'INVALID_INPUT');
       registry.noteValidPartStamp(req.seq, req.partStartMs, req.durationMs);
       uploadLagMs = registry.estimateUploadLagMs(req.arrivedAtMs ?? Date.now(), req.partStartMs, req.durationMs);
     }
 
     await mkdir(tmpDir, { recursive: true });
-    if (signal.aborted) throw new AppError('Chunk was cancelled before downloading the recording part.');
+    if (signal.aborted) throw new AppError('Chunk was cancelled before downloading the recording part.', 'INVALID_STATE');
 
     const partPath = path.join(tmpDir, 'part.webm');
     await downloadPartBySeq(ctx.hub, req.roomId, ctx.folderId, req.meetingId, req.seq, partPath, signal);
@@ -249,7 +250,7 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
     const wavPath = path.join(tmpDir, 'chunk.wav');
     const decoded = await decodeToWav16k(decodeInput, wavPath, signal);
     decodedDurationSec = decoded.durationSec;
-    if (signal.aborted) throw new AppError('Chunk was cancelled during decode.');
+    if (signal.aborted) throw new AppError('Chunk was cancelled during decode.', 'INVALID_STATE');
 
     const chunkPcm = await readWavPcm(wavPath, 0, decoded.durationSec);
     const overlap = registry.ringTake();
@@ -270,7 +271,7 @@ export async function processChunk(ctx: ChunkWorkerCtx, req: ChunkReadyRequest, 
      * off THIS request get that check.
      */
     async function handleSegment(seg: ChunkSegment, checkWindow: boolean): Promise<void> {
-      if (signal.aborted) throw new AppError('Chunk was cancelled while processing the turn.');
+      if (signal.aborted) throw new AppError('Chunk was cancelled while processing the turn.', 'INVALID_STATE');
       if (registry.alreadyProcessed(seg)) return;
 
       if (checkWindow && !isWithinPartWindow(seg, partStartMs, req.durationMs)) {
@@ -429,7 +430,7 @@ export function runOnMeetingQueue<T>(meetingId: string, fn: (signal: AbortSignal
       }
     })
     .then(() => {
-      if (!outcome) throw new AppError('This meeting is too busy to process that right now — try again in a moment.');
+      if (!outcome) throw new AppError('This meeting is too busy to process that right now — try again in a moment.', 'RATE_LIMITED');
       if (!outcome.ok) throw outcome.error;
       return outcome.value;
     });

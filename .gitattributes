@@ -1,0 +1,21 @@
+# LF everywhere, also in `git archive` from a Windows checkout with core.autocrlf
+# (a CRLF Dockerfile breaks multi-line RUN commands on the build node).
+* text=auto eol=lf
+*.onnx binary
+*.wav binary
+
+# Excluded from `git archive` (npm run package / privos-app publish): the Portal
+# rejects .env* files, and agent-context and design material is not app source.
+/.env.example export-ignore
+/.claude export-ignore
+/.agents export-ignore
+/.gemini export-ignore
+/.privos export-ignore
+/.privos/skills export-ignore
+/AGENTS.md export-ignore
+/CLAUDE.md export-ignore
+/GEMINI.md export-ignore
+/PRIVOS.md export-ignore
+/resources export-ignore
+/scripts/spikes export-ignore
+/dist-source export-ignore

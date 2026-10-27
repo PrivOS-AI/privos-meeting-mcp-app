@@ -19,8 +19,10 @@ import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { enqueueChunk } from '../live-speakers/chunk-worker.js';
 import { resolveRealtimeVendor, realtimeProviderFor } from '../stt/stt-provider-registry.js';
-import { asChunkSegment, assertStructuralSpans, type ChunkSegment } from './span-validation.js';
+import { isSpeakerRecognitionEnabled } from '../speaker/resolve-speakers.js';
+import { asChunkSegment, assertStructuralSpans, MAX_PART_DURATION_MS, MAX_SEGMENTS_PER_CHUNK, type ChunkSegment } from './span-validation.js';
 import type { AppTool } from './registry.js';
+import { ID, MS, ROOM_AND_MEETING } from './schema-parts.js';
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -34,16 +36,22 @@ export const chunkReadyTool: AppTool = {
     type: 'object',
     required: ['roomId', 'meetingId', 'seq', 'durationMs', 'segments'],
     properties: {
-      roomId: { type: 'string' },
-      meetingId: { type: 'string' },
-      seq: { type: 'number' },
-      durationMs: { type: 'number' },
-      // New, optional: the client's absolute part-boundary stamp
-      // (`performance.now() - recorderEpochMs` at blob-emit time). Absent for
-      // an older tab still open across a deploy — the worker falls back to
-      // its own cumulative clock for that meeting; see `chunk-worker.ts`.
-      partStartMs: { type: 'number' },
-      segments: { type: 'array', items: { type: 'object' } },
+      ...ROOM_AND_MEETING,
+      seq: { type: 'integer', minimum: 0, maximum: 100_000 },
+      durationMs: { type: 'number', minimum: 0, maximum: MAX_PART_DURATION_MS },
+      // Optional: the client's absolute part-boundary stamp (`performance.now() - recorderEpochMs`
+      // at blob-emit time). Absent for an older tab open across a deploy — the worker then falls
+      // back to its own cumulative clock for that meeting; see `chunk-worker.ts`.
+      partStartMs: MS,
+      segments: {
+        type: 'array',
+        maxItems: MAX_SEGMENTS_PER_CHUNK,
+        items: {
+          type: 'object',
+          required: ['speaker', 'startMs', 'endMs'],
+          properties: { speaker: { ...ID, maxLength: 64 }, startMs: MS, endMs: MS, final: { type: 'boolean' } },
+        },
+      },
     },
   },
   async execute(args, context, runtime) {
@@ -67,24 +75,24 @@ export const chunkReadyTool: AppTool = {
       durationMs <= 0 ||
       (partStartMs !== undefined && !Number.isFinite(partStartMs))
     ) {
-      throw new AppError('Invalid meeting_chunk_ready parameters.');
+      throw new AppError('Invalid meeting_chunk_ready parameters.', 'INVALID_INPUT');
     }
 
     const actor = context.actor;
     if (!actor || actor.roomId !== roomId) {
-      throw new AppError('Invalid request for this room.');
+      throw new AppError('Invalid request for this room.', 'ROOM_MISMATCH');
     }
 
     const db = new AppDbBotClient(roomId);
     const meeting = await db.getById('meetings', 'room', meetingId);
     if (!meeting || meeting.roomId !== roomId) {
-      throw new AppError('Meeting not found in this room.');
+      throw new AppError('Meeting not found in this room.', 'NOT_FOUND');
     }
     if (meeting.ownerUserId !== actor.userId) {
-      throw new AppError('Only the meeting owner can send meeting_chunk_ready.');
+      throw new AppError('Only the meeting owner can send meeting_chunk_ready.', 'NOT_MEETING_OWNER');
     }
     if (meeting.status !== 'recording' && meeting.status !== 'uploading') {
-      throw new AppError('Meeting is not in a state that accepts recording parts.');
+      throw new AppError('Meeting is not in a state that accepts recording parts.', 'INVALID_STATE');
     }
 
     const vendor = await resolveRealtimeVendor(db);
@@ -92,17 +100,21 @@ export const chunkReadyTool: AppTool = {
       // D-18 degraded mode — not an error, just nothing to do.
       return { accepted: false, reason: 'labels_not_supported' };
     }
+    if (!(await isSpeakerRecognitionEnabled(db))) {
+      // The room turned voiceprint recognition off: no embedding is computed for live turns.
+      return { accepted: false, reason: 'speaker_recognition_disabled' };
+    }
 
     const segmentsRaw = Array.isArray(args.segments) ? args.segments : [];
     const segments = segmentsRaw.map(asChunkSegment).filter((s): s is ChunkSegment => s !== null);
     if (segments.length !== segmentsRaw.length) {
-      throw new AppError('Some turns contain invalid data.');
+      throw new AppError('Some turns contain invalid data.', 'INVALID_INPUT');
     }
     const structuralError = assertStructuralSpans(segments, durationMs);
-    if (structuralError) throw new AppError(structuralError);
+    if (structuralError) throw new AppError(structuralError, 'INVALID_INPUT');
 
     const folderId = typeof meeting.folderId === 'string' && meeting.folderId ? meeting.folderId : '';
-    if (!folderId) throw new AppError('Meeting has no storage folder yet.');
+    if (!folderId) throw new AppError('Meeting has no storage folder yet.', 'INVALID_STATE');
 
     enqueueChunk({ db, hub: runtime.agentBotHub, folderId }, { roomId, meetingId, seq, durationMs, partStartMs, arrivedAtMs, segments });
 

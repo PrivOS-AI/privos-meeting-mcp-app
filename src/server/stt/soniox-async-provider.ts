@@ -80,7 +80,7 @@ async function uploadFile(filePath: string, signal?: AbortSignal): Promise<strin
   if (!response.ok) throw new SonioxHttpError(response.status, `Soniox refused to accept the audio file (HTTP ${response.status}).`);
   const body = await readJson(response);
   const id = typeof body?.id === 'string' ? body.id : undefined;
-  if (!id) throw new AppError('Soniox did not return a file id after upload.');
+  if (!id) throw new AppError('Soniox did not return a file id after upload.', 'PROVIDER_UNAVAILABLE');
   return id;
 }
 
@@ -106,7 +106,7 @@ async function createTranscription(
   if (!response.ok) throw new SonioxHttpError(response.status, `Soniox refused to create a processing session (HTTP ${response.status}).`);
   const body = await readJson(response);
   const id = typeof body?.id === 'string' ? body.id : undefined;
-  if (!id) throw new AppError('Soniox did not return a processing session id.');
+  if (!id) throw new AppError('Soniox did not return a processing session id.', 'PROVIDER_UNAVAILABLE');
   return { id };
 }
 
@@ -114,7 +114,7 @@ async function pollTranscription(id: string, signal?: AbortSignal): Promise<void
   const deadline = Date.now() + POLL_TIMEOUT_MS;
   let interval = POLL_INTERVAL_START_MS;
   while (Date.now() < deadline) {
-    if (signal?.aborted) throw new AppError('Job was cancelled while waiting for Soniox to finish processing.');
+    if (signal?.aborted) throw new AppError('Job was cancelled while waiting for Soniox to finish processing.', 'INVALID_STATE');
     const response = await fetch(`${BASE_URL}/v1/transcriptions/${encodeURIComponent(id)}`, { headers: authHeaders(), signal });
     if (!response.ok) throw new SonioxHttpError(response.status, `Soniox returned an error while checking progress (HTTP ${response.status}).`);
     const body = await readJson(response);
@@ -122,13 +122,13 @@ async function pollTranscription(id: string, signal?: AbortSignal): Promise<void
     if (status === 'completed') return;
     if (status === 'error') {
       const message = typeof body?.error_message === 'string' ? body.error_message : 'Soniox reported a processing error with no known cause.';
-      throw new AppError(`Soniox processing failed: ${message}`);
+      throw new AppError(`Soniox processing failed: ${message}`, 'PROVIDER_UNAVAILABLE');
     }
-    if (signal?.aborted) throw new AppError('Job was cancelled while waiting for Soniox to finish processing.');
+    if (signal?.aborted) throw new AppError('Job was cancelled while waiting for Soniox to finish processing.', 'INVALID_STATE');
     await new Promise((resolve) => setTimeout(resolve, interval));
     interval = Math.min(interval * 1.5, POLL_INTERVAL_MAX_MS);
   }
-  throw new AppError('Soniox processing exceeded the allowed wait time.');
+  throw new AppError('Soniox processing exceeded the allowed wait time.', 'PROVIDER_UNAVAILABLE');
 }
 
 function mapToken(raw: Record<string, unknown>): SttToken | null {
@@ -185,7 +185,7 @@ export const sonioxAsyncProvider: AsyncSttProvider = {
   vendor: 'soniox',
 
   async transcribeFile(input: TranscribeInput): Promise<SttResult> {
-    if (!env.sonioxApiKey) throw new AppError('Missing SONIOX_API_KEY — cannot run soniox-async.');
+    if (!env.sonioxApiKey) throw new AppError('Missing SONIOX_API_KEY — cannot run soniox-async.', 'PROVIDER_NOT_CONFIGURED');
     const languageHints = input.languageHints?.length ? input.languageHints : ['vi', 'en'];
 
     let fileId = input.resumeProviderFileId;

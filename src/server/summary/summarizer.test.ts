@@ -8,7 +8,7 @@ vi.mock('../hub/hub-ai-client.js', () => ({
   SYSTEM_LIMIT: 200_000,
 }));
 
-const { summarizeTranscript } = await import('./summarizer.js');
+const { summarizeTranscript, verifySummary, verifiedDueDate } = await import('./summarizer.js');
 const { chunkTranscript } = await import('./chunker.js');
 import type { Segment } from '../transcript/segment-builder.js';
 
@@ -46,8 +46,9 @@ describe('summarizeTranscript', () => {
 
     expect(generateAsyncWithHubAi).toHaveBeenCalledTimes(2);
     expect(result.summary).toBe('Nhóm đã bàn kế hoạch quý 3.');
-    expect(result.decisions).toEqual(['Ra mắt thứ Sáu']);
-    expect(result.action_items).toEqual([{ task: 'Viết tài liệu', owner: 'Thanh', due: null, at: 5 }]);
+    // An old-style reply (plain-string decisions, no type/requester/quote) still parses, into the full shape.
+    expect(result.decisions).toEqual([{ text: 'Ra mắt thứ Sáu', by: null, at: null }]);
+    expect(result.action_items).toEqual([{ type: 'task', task: 'Viết tài liệu', owner: 'Thanh', requester: null, due: null, due_date: null, at: 5, quote: null }]);
     expect(result.key_topics).toEqual(['kế hoạch quý 3']);
   });
 
@@ -101,6 +102,47 @@ describe('summarizeTranscript', () => {
   it('rejects when there are no chunks to summarize', async () => {
     await expect(
       summarizeTranscript(hub, { roomId: 'room-1', chunks: [], language: 'vi', title: 'T', speakerNames: [] }),
-    ).rejects.toThrow(/transcript/);
+    ).rejects.toThrow(/No speech was recognised/);
+  });
+});
+
+describe('buildReducePrompt length', () => {
+  it('asks for the room\'s summary length', async () => {
+    const { buildReducePrompt } = await import('./prompts.js');
+    const base = { title: 'T', speakerNames: [], language: 'en' as const, notesWithTimestamps: [] };
+    expect(buildReducePrompt({ ...base, length: 'short' })).toContain('2-3 sentences');
+    expect(buildReducePrompt({ ...base, length: 'detailed' })).toContain('thorough');
+    expect(buildReducePrompt(base)).toContain('one or two short paragraphs');
+  });
+});
+
+describe('verifySummary', () => {
+  const base = { summary: 's', key_topics: [], decisions: [] };
+  const item = { type: 'request' as const, task: 'Viết tài liệu', owner: 'Nhân', requester: 'Thanh', due: 'thứ Sáu', due_date: null, at: 5, quote: null };
+
+  it('keeps a quote only when it is really in the transcript (punctuation and case do not matter)', () => {
+    const real = verifySummary({ ...base, action_items: [{ ...item, quote: 'mình sẽ viết tài liệu trước thứ Sáu' }] }, chunks(), ['Thanh', 'Nhân']);
+    expect(real.action_items[0].quote).toBe('mình sẽ viết tài liệu trước thứ Sáu');
+    const invented = verifySummary({ ...base, action_items: [{ ...item, quote: 'Nhân hứa xong trong hôm nay' }] }, chunks(), ['Thanh', 'Nhân']);
+    expect(invented.action_items[0].quote).toBeNull();
+  });
+
+  it('drops a timestamp outside the meeting and a deadline that is not a real date', () => {
+    const out = verifySummary({ ...base, action_items: [{ ...item, at: 9999, due_date: '2026-02-30' }] }, chunks(), ['Thanh', 'Nhân']);
+    expect(out.action_items[0].at).toBeNull();
+    expect(out.action_items[0].due_date).toBeNull();
+    expect(out.action_items[0].due).toBe('thứ Sáu');
+    expect(verifiedDueDate('2026-10-30')).toBe('2026-10-30');
+  });
+
+  it('keeps who asked and who does it, and drops an unverifiable name', () => {
+    const long = 'x'.repeat(120);
+    const out = verifySummary(
+      { ...base, decisions: [{ text: 'Ra mắt', by: long, at: 2 }], action_items: [{ ...item, requester: long }] },
+      chunks(),
+      ['Thanh', 'Nhân'],
+    );
+    expect(out.action_items[0]).toMatchObject({ owner: 'Nhân', requester: null });
+    expect(out.decisions[0]).toEqual({ text: 'Ra mắt', by: null, at: 2 });
   });
 });

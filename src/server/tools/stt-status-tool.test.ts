@@ -16,8 +16,8 @@ let fakeHub: ReturnType<typeof installFakeHub>;
 const { env } = await import('../env.js');
 const { sttStatusTool } = await import('./stt-status-tool.js');
 
-function context(claims: Record<string, unknown> = {}): ToolCallContext {
-  return { transport: 'direct', identityState: 'verified', sessionScope: 'test', actor: { userId: 'user-1', roomId: 'room-1', claims, provenance: 'user-token' } };
+function context(roles: { roomRoles?: string[]; workspaceRoles?: string[] } = {}): ToolCallContext {
+  return { transport: 'direct', identityState: 'verified', sessionScope: 'test', actor: { userId: 'user-1', roomId: 'room-1', claims: {}, provenance: 'user-token', ...roles } };
 }
 
 describe('meeting_stt_status', () => {
@@ -44,8 +44,16 @@ describe('meeting_stt_status', () => {
     expect(Object.keys(result)).toEqual(['ok']);
   });
 
+  it.each([
+    ['a plain room member', { roomRoles: [] as string[] }],
+    ['a caller whose dispatch carries no role signal', {}],
+  ])('%s only gets {ok}', async (_label, roles) => {
+    const result = (await sttStatusTool.execute({}, context(roles), {} as never)) as Record<string, unknown>;
+    expect(Object.keys(result)).toEqual(['ok']);
+  });
+
   it('an admin caller gets the full status shape with both vendors, never a key', async () => {
-    const result = (await sttStatusTool.execute({}, context({ isAdmin: true }), {} as never)) as {
+    const result = (await sttStatusTool.execute({}, context({ workspaceRoles: ['admin'] }), {} as never)) as {
       ok: boolean;
       activeRealtimeProvider: string;
       activeAsyncProvider: string;
@@ -55,7 +63,7 @@ describe('meeting_stt_status', () => {
     expect(result.ok).toBe(true);
     expect(result.activeRealtimeProvider).toBe('soniox');
     expect(result.activeAsyncProvider).toBe('soniox');
-    expect(result.providers).toHaveLength(4);
+    expect(result.providers).toHaveLength(6);
     expect(result.providers.every((p) => p.configured === false)).toBe(true);
     expect(result.liveConcurrency.max).toBe(env.liveMaxConcurrentRecordings);
     // The detail message legitimately NAMES the missing env var (SONIOX_API_KEY) — that is not a secret.
@@ -67,7 +75,7 @@ describe('meeting_stt_status', () => {
     env.sonioxApiKey = 'test-key';
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) }) as Response));
 
-    const result = (await sttStatusTool.execute({}, context({ role: 'admin' }), {} as never)) as {
+    const result = (await sttStatusTool.execute({}, context({ roomRoles: ['owner'] }), {} as never)) as {
       providers: Array<{ provider: string; kind: string; configured: boolean; ok: boolean }>;
     };
     const sonioxRealtime = result.providers.find((p) => p.provider === 'soniox' && p.kind === 'realtime');
@@ -78,7 +86,7 @@ describe('meeting_stt_status', () => {
     env.elevenLabsApiKey = 'bad-key';
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 401, json: async () => ({}) }) as Response));
 
-    const result = (await sttStatusTool.execute({}, context({ roles: ['admin'] }), {} as never)) as {
+    const result = (await sttStatusTool.execute({}, context({ roomRoles: ['moderator'] }), {} as never)) as {
       providers: Array<{ provider: string; kind: string; ok: boolean; reason?: string }>;
     };
     const elevenAsync = result.providers.find((p) => p.provider === 'elevenlabs' && p.kind === 'async');

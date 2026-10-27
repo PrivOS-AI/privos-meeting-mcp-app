@@ -24,6 +24,7 @@ import { asLanguageCode } from '../../shared/languages.js';
 import type { Segment } from '../transcript/segment-builder.js';
 import type { AppTool, ToolRuntime } from './registry.js';
 import { checkRateLimit } from './rate-limiter.js';
+import { DISPLAY_NAME, ID, LANGUAGE, MAX_LINE_CHARS, ROOM_AND_MEETING, TEXT_LINE } from './schema-parts.js';
 
 /** Auto-refresh cadence is ~10 min; this ceiling only guards a runaway client while still allowing a manual "refresh now". */
 const LIVE_SUMMARY_LIMIT_PER_5MIN = 6;
@@ -49,7 +50,7 @@ function asLanguage(value: unknown): SummaryLanguage {
 function asInputSegment(value: unknown, index: number): InputSegment | null {
   if (!value || typeof value !== 'object') return null;
   const raw = value as Record<string, unknown>;
-  const text = typeof raw.text === 'string' ? raw.text.trim() : '';
+  const text = typeof raw.text === 'string' ? raw.text.trim().slice(0, MAX_LINE_CHARS) : '';
   if (!text) return null;
   const speakerName = asString(raw.speakerName);
   const speakerId = asString(raw.speakerId) || speakerName || 'unknown';
@@ -65,42 +66,49 @@ export const liveSummaryTool: AppTool = {
     type: 'object',
     required: ['roomId', 'meetingId', 'segments'],
     properties: {
-      roomId: { type: 'string' },
-      meetingId: { type: 'string' },
-      title: { type: 'string' },
-      language: { type: 'string' },
-      segments: { type: 'array', items: { type: 'object' } },
+      ...ROOM_AND_MEETING,
+      title: { type: 'string', maxLength: 200 },
+      language: LANGUAGE,
+      segments: {
+        type: 'array',
+        maxItems: MAX_SEGMENTS,
+        items: {
+          type: 'object',
+          required: ['text'],
+          properties: { speakerId: ID, speakerName: DISPLAY_NAME, startSec: { type: 'number', minimum: 0 }, text: TEXT_LINE },
+        },
+      },
     },
   },
   async execute(args, context, runtime: ToolRuntime) {
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
-    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.');
+    if (!roomId || !meetingId) throw new AppError('roomId and meetingId are required.', 'INVALID_INPUT');
 
     const actor = context.actor;
     if (!actor || actor.roomId !== roomId) {
-      throw new AppError('Invalid request for this room.');
+      throw new AppError('Invalid request for this room.', 'ROOM_MISMATCH');
     }
 
     const rawSegments = Array.isArray(args.segments) ? args.segments : [];
-    if (rawSegments.length === 0) throw new AppError('No caption content to summarize yet.');
-    if (rawSegments.length > MAX_SEGMENTS) throw new AppError('Too many caption lines in one summary batch.');
+    if (rawSegments.length === 0) throw new AppError('No caption content to summarize yet.', 'INVALID_STATE');
+    if (rawSegments.length > MAX_SEGMENTS) throw new AppError('Too many caption lines in one summary batch.', 'INVALID_INPUT');
 
     const db = new AppDbBotClient(roomId);
     const meeting = await db.getById('meetings', 'room', meetingId);
     if (!meeting || meeting.roomId !== roomId) {
-      throw new AppError('Meeting not found in this room.');
+      throw new AppError('Meeting not found in this room.', 'NOT_FOUND');
     }
 
     if (!checkRateLimit('meeting_live_summary', meetingId, LIVE_SUMMARY_LIMIT_PER_5MIN, 5 * 60_000)) {
-      throw new AppError('Live summary is rate-limited for this meeting. Please try again later.');
+      throw new AppError('Live summary is rate-limited for this meeting. Please try again later.', 'RATE_LIMITED');
     }
 
     const lines = rawSegments
       .map((value, index) => asInputSegment(value, index))
       .filter((s): s is InputSegment => s !== null)
       .sort((a, b) => a.startSec - b.startSec);
-    if (lines.length === 0) throw new AppError('No caption content to summarize yet.');
+    if (lines.length === 0) throw new AppError('No caption content to summarize yet.', 'INVALID_STATE');
 
     // Build the Segment[] + names map the shared chunker/summarizer expect. endSec
     // is the next line's start (last line: its own start) — only used for the

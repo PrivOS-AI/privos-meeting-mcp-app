@@ -56,6 +56,8 @@ export interface RealtimeConnectionOptions extends RealtimeConnectionCallbacks {
   /** Meeting (spoken) language + bilingual target — Soniox two_way pairs them; ElevenLabs uses the target only. */
   translateFrom?: import('../../shared/languages.js').LanguageCode;
   translateTo?: import('../../shared/languages.js').LanguageCode;
+  /** `local` provider only: sends one audio chunk to `meeting_audio_push` and returns its answer. */
+  pushAudio?: (request: import('./local-realtime-client.js').AudioPushRequest) => Promise<import('./local-realtime-client.js').AudioPushResponse>;
 }
 
 export interface RealtimeConnection {
@@ -71,6 +73,7 @@ export const SESSION_ROLL_MS = 280 * 60 * 1000;
 export type RealtimeClientFactory = (opts: RealtimeConnectionOptions) => RealtimeConnection;
 
 const FACTORIES: Record<SttVendor, () => Promise<RealtimeClientFactory>> = {
+  local: async () => (await import('./local-realtime-client.js')).createLocalConnection,
   soniox: async () => (await import('./soniox-realtime-client.js')).createSonioxConnection,
   elevenlabs: async () => (await import('./elevenlabs-realtime-client.js')).createElevenLabsConnection,
 };

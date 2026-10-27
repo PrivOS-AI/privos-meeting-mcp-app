@@ -18,10 +18,11 @@ import { sanitizeDisplayName } from '../../shared/sanitize-display-name.js';
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
 import * as profileStore from '../speaker/profile-store.js';
-import { isPostMeetingCoherent, openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
+import { isPostMeetingCoherent, isSpeakerRecognitionEnabled, openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
 import { logEvent } from '../speaker/speaker-diagnostics-log.js';
-import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
+import { isWorkspaceAdmin, requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
+import { DISPLAY_NAME, ID, ROOM_AND_MEETING } from './schema-parts.js';
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -34,23 +35,17 @@ export const relabelSpeakerTool: AppTool = {
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId', 'speakerId'],
-    properties: {
-      roomId: { type: 'string' },
-      meetingId: { type: 'string' },
-      speakerId: { type: 'string' },
-      profileId: { type: 'string' },
-      displayName: { type: 'string', maxLength: 80 },
-    },
+    properties: { ...ROOM_AND_MEETING, speakerId: ID, profileId: ID, displayName: DISPLAY_NAME },
   },
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
     const roomId = asString(args.roomId);
     const meetingId = asString(args.meetingId);
     const speakerId = asString(args.speakerId);
-    if (!roomId || !meetingId || !speakerId) throw new AppError('roomId, meetingId, and speakerId are required.');
+    if (!roomId || !meetingId || !speakerId) throw new AppError('roomId, meetingId, and speakerId are required.', 'INVALID_INPUT');
     const targetProfileId = asString(args.profileId);
     const rawDisplayName = typeof args.displayName === 'string' ? sanitizeDisplayName(args.displayName) : '';
-    if (!targetProfileId && !rawDisplayName) throw new AppError('Must provide profileId or displayName.');
+    if (!targetProfileId && !rawDisplayName) throw new AppError('Must provide profileId or displayName.', 'INVALID_INPUT');
 
     const db = new AppDbBotClient(roomId);
     await requireMeetingOwner(db, actor, roomId, meetingId);
@@ -60,7 +55,7 @@ export const relabelSpeakerTool: AppTool = {
       limit: 1,
     });
     const row = extractDbRecords(existingResult)[0];
-    if (!row) throw new AppError('This speaker was not found in the meeting.');
+    if (!row) throw new AppError('This speaker was not found in the meeting.', 'NOT_FOUND');
 
     const oldProfileId = typeof row.profileId === 'string' && row.profileId ? row.profileId : undefined;
 
@@ -68,7 +63,7 @@ export const relabelSpeakerTool: AppTool = {
     let target: profileStore.SpeakerProfile | null = null;
     if (targetProfileId) {
       target = await profileStore.getProfile(db, targetProfileId);
-      if (!target) throw new AppError('Target voiceprint profile not found.');
+      if (!target) throw new AppError('Target voiceprint profile not found.', 'NOT_FOUND');
     } else {
       target = await profileStore.findProfileByName(db, rawDisplayName);
       if (!target) target = await profileStore.createProfile(db, { displayName: rawDisplayName, createdByUserId: actor.userId, createdInRoomId: roomId });
@@ -104,7 +99,10 @@ export const relabelSpeakerTool: AppTool = {
       }
     }
 
-    if (movedVector) {
+    // Someone else's profile keeps its samples: the meeting is relabelled, the vector is not added (see `mayEnrolInto`).
+    const mayEnrol = profileStore.mayEnrolInto(target, actor.userId, isWorkspaceAdmin(actor)) && (await isSpeakerRecognitionEnabled(db));
+    const enrolled = Boolean(movedVector) && mayEnrol;
+    if (movedVector && mayEnrol) {
       const vectorCountAfter = await profileStore.enrolEmbedding(db, target.id, {
         vector: movedVector,
         meetingId,
@@ -132,6 +130,6 @@ export const relabelSpeakerTool: AppTool = {
       resolved: true,
     });
 
-    return { updated: true, profileId: target.id, displayName, enrolled: Boolean(movedVector) };
+    return { updated: true, profileId: target.id, displayName, enrolled, ...(movedVector && !mayEnrol ? { reason: 'enrol_not_permitted' } : {}) };
   },
 };

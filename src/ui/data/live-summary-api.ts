@@ -14,15 +14,23 @@ export interface LiveSummaryLine {
 }
 
 export interface LiveSummaryActionItem {
+  type?: 'task' | 'request' | 'question';
   task: string;
   owner: string | null;
+  requester?: string | null;
   due: string | null;
+  at: number | null;
+}
+
+export interface LiveSummaryDecision {
+  text: string;
+  by: string | null;
   at: number | null;
 }
 
 export interface LiveSummaryResult {
   summary: string;
-  decisions: string[];
+  decisions: LiveSummaryDecision[];
   action_items: LiveSummaryActionItem[];
   key_topics: string[];
 }

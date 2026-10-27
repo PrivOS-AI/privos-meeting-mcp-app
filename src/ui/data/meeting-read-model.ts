@@ -8,6 +8,7 @@
 import type { McpApp } from '@privos_ai/app-react';
 
 import { AppDbClient } from './app-db-client.js';
+import { parseToolResultOrThrow } from './tool-error.js';
 
 export interface MeetingReadModel {
   _id: string;
@@ -115,11 +116,17 @@ export async function renameMeeting(app: McpApp, meetingId: string, title: strin
  * `meeting` reference field registered with `onDelete:'cascade'`
  * (`shared/app-db-schema.ts`), so the Hub removes them automatically.
  *
+ * Voice samples taken from the meeting are withdrawn FIRST, on the server
+ * (`meeting_forget_voiceprints`): the cascade below removes the rows that link
+ * them to the meeting. If that fails, nothing is deleted (the error surfaces).
+ *
  * All Files cleanup is best-effort — a file/folder already gone, or storage
  * the user lacks rights to, must never block the record delete the user
  * explicitly confirmed. The DB row is removed last regardless.
  */
 export async function deleteMeeting(app: McpApp, meeting: MeetingReadModel): Promise<void> {
+  parseToolResultOrThrow(await app.callServerTool({ name: 'meeting_forget_voiceprints', arguments: { roomId: meeting.roomId, meetingId: meeting._id } }));
+
   let folderDeleted = false;
   if (meeting.folderId) {
     try {
@@ -139,12 +146,20 @@ export async function deleteMeeting(app: McpApp, meeting: MeetingReadModel): Pro
     await Promise.all(trackedIds.map((id) => app.rest({ method: 'DELETE', path: `file-management.files/${id}` }).catch(() => undefined)));
   }
 
-  await new AppDbClient(app).delete('meetings', meeting._id);
+  // Its rows: no orphan action item left in the "open items" count, no parked speaker embedding.
+  const db = new AppDbClient(app);
+  for (const collection of ['action_items', 'decisions', 'bookmarks', 'meeting_speakers']) {
+    const result = await db.query({ collection, where: [{ field: 'meeting', op: '==', value: meeting._id }], limit: 1000 }).catch(() => null);
+    await Promise.all((result?.records ?? []).map((row) => db.delete(collection, row._id).catch(() => undefined)));
+  }
+  await db.delete('meetings', meeting._id);
 }
 
 export interface MeetingSpeakerSummary {
   speakerId: string;
+  /** The saved name, or the raw `speakerId` while `named` is false (screens show "Speaker N" then, see `labelUnnamedSpeakers`). */
   displayName: string;
+  named: boolean;
   colorKey: string;
 }
 
@@ -164,10 +179,11 @@ export async function listSpeakersForMeetings(app: McpApp, meetingIds: readonly 
   for (const record of records) {
     const meetingId = String(record.meeting ?? '');
     if (!meetingId) continue;
-    const displayName = typeof record.displayName === 'string' && record.displayName ? record.displayName : String(record.speakerId ?? '?');
+    const named = typeof record.displayName === 'string' && record.displayName.trim() !== '';
     (byMeeting[meetingId] ??= []).push({
       speakerId: String(record.speakerId ?? ''),
-      displayName,
+      displayName: named ? String(record.displayName) : String(record.speakerId ?? '?'),
+      named,
       colorKey: typeof record.colorKey === 'string' && record.colorKey ? record.colorKey : 'blue',
     });
   }

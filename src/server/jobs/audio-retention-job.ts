@@ -2,16 +2,22 @@
  * Retention sweep, single source of configuration = `app_settings` (never an
  * env var — plan.md § cleanup job: "no more MEETING_AUDIO_RETENTION_DAYS env var"):
  *
- *  1. Kept audio past `autoDeleteAudioDays` (default 90, `0` = disabled): a
- *     `summarized` meeting with `keepAudio` whose `endedAt` is old enough and
- *     not yet `audioDeletedAt` gets its `audioFileId` deleted from Files, then
- *     `audioDeletedAt` is stamped — audio of a `keepAudio:false` meeting was
- *     already deleted right after summarization (P3/P6), this only ever
- *     touches audio that was deliberately kept.
+ *  1. Remaining audio past `autoDeleteAudioDays` (default 90, `0` = disabled): a
+ *     `summarized` meeting whose `endedAt` is old enough and not yet
+ *     `audioDeletedAt` gets its `audioFileId` deleted from Files, then
+ *     `audioDeletedAt` is stamped. That covers audio kept on purpose
+ *     (`keepOriginalAudio`) and audio of a `keepAudio:false` meeting the job
+ *     could not delete because its summary failed, which would otherwise
+ *     stay forever.
  *  2. Orphaned parts of an `interrupted` meeting past
  *     `interruptedPartsRetentionDays` (default 7): every `audio.part-*` file
  *     still in the meeting's folder gets deleted (best-effort per file).
- *  3. `pendingEmbedding` left over on a `meeting_speakers` row whose meeting
+ *  3. Whole meetings past `autoDeleteMeetingsDays` (default 0 = keep forever): a
+ *     `summarized` or `failed` meeting whose `endedAt` is old enough loses its
+ *     voice samples, every file in its folder, then its row (children cascade).
+ *     A meeting whose files could not all be deleted keeps its row, so the next
+ *     sweep retries instead of leaving files nothing points to.
+ *  4. `pendingEmbedding` left over on a `meeting_speakers` row whose meeting
  *     ended 30+ days ago and was never confirmed via `speaker_resolve` — the
  *     deferred item from phase-04's risk table ("`meeting_bootstrap` clears
  *     `pendingEmbedding` older than 30 days"). The row keeps its "Speaker N"
@@ -28,7 +34,9 @@ import { DEFAULT_WORKSPACE_SETTINGS } from '../../shared/app-settings.js';
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
 import { getSetting } from '../hub/app-settings.js';
 import { deleteRoomFile, listRoomFolderFiles } from '../media/hub-file-download.js';
+import { forgetMeetingVoiceprints } from '../speaker/profile-store.js';
 import { sweepLocal } from '../speaker/speaker-diagnostics-log.js';
+import { deleteMeetingRecords } from './meeting-repository.js';
 import { readKnownRooms } from './known-rooms-store.js';
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
@@ -37,6 +45,7 @@ const PENDING_EMBEDDING_TTL_DAYS = 30;
 export interface RetentionSummary {
   audioDeleted: number;
   orphanPartsDeleted: number;
+  meetingsDeleted: number;
   pendingEmbeddingsCleared: number;
 }
 
@@ -44,14 +53,13 @@ function daysAgoIso(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
-/** Kept audio past `autoDeleteAudioDays` — `days <= 0` disables this branch entirely. */
+/** Remaining audio past `autoDeleteAudioDays`, kept or left behind by a failed summary — `days <= 0` disables this branch entirely. */
 async function purgeKeptAudio(hub: RoomBoundHubClient, roomId: string, days: number): Promise<number> {
   if (days <= 0) return 0;
   const db = new AppDbBotClient(roomId);
   const result = await db.query('meetings', 'room', {
     where: [
       { field: 'status', op: '==', value: 'summarized' },
-      { field: 'keepAudio', op: '==', value: true },
       { field: 'endedAt', op: '<', value: daysAgoIso(days) },
     ],
     limit: 1000,
@@ -67,6 +75,40 @@ async function purgeKeptAudio(hub: RoomBoundHubClient, roomId: string, days: num
       deleted++;
     } catch (error) {
       console.warn('[audio-retention-job] failed to delete audio:', meeting._id, error instanceof Error ? error.message : error);
+    }
+  }
+  return deleted;
+}
+
+/** Whole meetings past `autoDeleteMeetingsDays` — `days <= 0` (the default) disables this branch. */
+async function purgeExpiredMeetings(hub: RoomBoundHubClient, roomId: string, days: number): Promise<number> {
+  if (days <= 0) return 0;
+  const db = new AppDbBotClient(roomId);
+  const cutoff = daysAgoIso(days);
+  const expired = [];
+  for (const status of ['summarized', 'failed']) {
+    const result = await db.query('meetings', 'room', {
+      where: [
+        { field: 'status', op: '==', value: status },
+        { field: 'endedAt', op: '<', value: cutoff },
+      ],
+      limit: 1000,
+    });
+    expired.push(...extractDbRecords(result));
+  }
+  let deleted = 0;
+  for (const meeting of expired) {
+    try {
+      await forgetMeetingVoiceprints(db, meeting._id);
+      const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
+      if (folderId) {
+        for (const file of await listRoomFolderFiles(hub, roomId, folderId)) await deleteRoomFile(hub, file._id);
+      }
+      await deleteMeetingRecords(db, meeting._id);
+      await db.delete('meetings', 'room', meeting._id);
+      deleted++;
+    } catch (error) {
+      console.warn('[audio-retention-job] failed to delete expired meeting (retried next sweep):', meeting._id, error instanceof Error ? error.message : error);
     }
   }
   return deleted;
@@ -131,6 +173,10 @@ export async function purgeExpiredAudio(hub: RoomBoundHubClient, roomId: string)
   const interruptedPartsRetentionDays =
     (await getSetting<number>(settingsDb, 'interruptedPartsRetentionDays')) ?? DEFAULT_WORKSPACE_SETTINGS.interruptedPartsRetentionDays;
 
+  const autoDeleteMeetingsDays = (await getSetting<number>(settingsDb, 'autoDeleteMeetingsDays')) ?? DEFAULT_WORKSPACE_SETTINGS.autoDeleteMeetingsDays;
+
+  // Whole meetings first: their audio goes with them, so the audio branch skips them.
+  const meetingsDeleted = await purgeExpiredMeetings(hub, roomId, autoDeleteMeetingsDays);
   const audioDeleted = await purgeKeptAudio(hub, roomId, autoDeleteAudioDays);
   const orphanPartsDeleted = await purgeInterruptedParts(hub, roomId, interruptedPartsRetentionDays);
   const pendingEmbeddingsCleared = await purgeStalePendingEmbeddings(roomId).catch((error) => {
@@ -138,7 +184,7 @@ export async function purgeExpiredAudio(hub: RoomBoundHubClient, roomId: string)
     return 0;
   });
 
-  return { audioDeleted, orphanPartsDeleted, pendingEmbeddingsCleared };
+  return { audioDeleted, orphanPartsDeleted, meetingsDeleted, pendingEmbeddingsCleared };
 }
 
 /** Exported for tests — the boot + 6h interval both go through this. */

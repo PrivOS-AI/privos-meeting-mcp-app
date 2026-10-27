@@ -17,6 +17,7 @@ vi.mock('./known-rooms-store.js', () => ({ readKnownRooms: vi.fn(async () => [])
 let store: Store;
 let baseHub: ReturnType<typeof installFakeHub>;
 let deletedFileIds: string[];
+let failDeleteFor = new Set<string>();
 let folderFiles: Record<string, Array<{ _id: string; name: string; channel_id: string; folder_id: string | null }>>;
 
 const { purgeExpiredAudio, sweepAllKnownRooms } = await import('./audio-retention-job.js');
@@ -27,6 +28,7 @@ function buildHub(): RoomBoundHubClient {
     authorizedFetch: vi.fn(async (path: string, init: RoomBoundHubFetchInit) => {
       if (init.method === 'DELETE' && path.startsWith('/api/v1/file-management.files/')) {
         const fileId = decodeURIComponent(path.slice(path.lastIndexOf('/') + 1));
+        if (failDeleteFor.has(fileId)) return { ok: false, status: 500, json: async () => ({ success: false, error: 'boom' }) } as unknown as Response;
         deletedFileIds.push(fileId);
         return { ok: true, status: 200, json: async () => ({ success: true }) } as unknown as Response;
       }
@@ -45,7 +47,8 @@ describe('purgeExpiredAudio', () => {
   beforeEach(() => {
     deletedFileIds = [];
     folderFiles = {};
-    store = { meetings: [], meeting_speakers: [], app_settings: [] };
+    failDeleteFor = new Set();
+    store = { meetings: [], meeting_speakers: [], app_settings: [], speaker_profiles: [] };
     baseHub = installFakeHub({ store });
   });
 
@@ -59,6 +62,54 @@ describe('purgeExpiredAudio', () => {
     expect(result.audioDeleted).toBe(1);
     expect(deletedFileIds).toContain('audio-1');
     expect(store.meetings[0].audioDeletedAt).toBeTruthy();
+  });
+
+  it('also deletes audio a keepAudio:false meeting left behind because its summary failed', async () => {
+    store.app_settings = [{ _id: 's1', key: 'room:room-1:autoDeleteAudioDays', valueJson: JSON.stringify(1) }];
+    store.meetings = [
+      { _id: 'm1', roomId: 'room-1', status: 'summarized', keepAudio: false, endedAt: oldIso(10), audioFileId: 'audio-1', summaryError: 'Hub AI unavailable' },
+      { _id: 'm2', roomId: 'room-1', status: 'summarized', keepAudio: false, endedAt: oldIso(0), audioFileId: 'audio-2' },
+    ];
+    const hub = buildHub();
+    const result = await purgeExpiredAudio(hub, 'room-1');
+    expect(result.audioDeleted).toBe(1);
+    expect(deletedFileIds).toEqual(['audio-1']);
+  });
+
+  describe('autoDeleteMeetingsDays', () => {
+    const file = (id: string) => ({ _id: id, name: `${id}.json`, channel_id: 'room-1', folder_id: 'folder-1' });
+
+    it('keeps every meeting by default (0)', async () => {
+      store.meetings = [{ _id: 'm1', roomId: 'room-1', status: 'summarized', endedAt: oldIso(5000), folderId: 'folder-1' }];
+      folderFiles = { 'folder-1': [file('t1')] };
+      const result = await purgeExpiredAudio(buildHub(), 'room-1');
+      expect(result.meetingsDeleted).toBe(0);
+      expect(store.meetings).toHaveLength(1);
+    });
+
+    it('deletes the files of an expired meeting and then its row; a recent one stays', async () => {
+      store.app_settings = [{ _id: 's1', key: 'room:room-1:autoDeleteMeetingsDays', valueJson: '30' }];
+      store.meetings = [
+        { _id: 'm1', roomId: 'room-1', status: 'summarized', endedAt: oldIso(40), folderId: 'folder-1' },
+        { _id: 'm2', roomId: 'room-1', status: 'failed', endedAt: oldIso(40) },
+        { _id: 'm3', roomId: 'room-1', status: 'summarized', endedAt: oldIso(5), folderId: 'folder-3' },
+      ];
+      folderFiles = { 'folder-1': [file('t1'), file('s1')] };
+      const result = await purgeExpiredAudio(buildHub(), 'room-1');
+      expect(result.meetingsDeleted).toBe(2);
+      expect(deletedFileIds).toEqual(['t1', 's1']);
+      expect(store.meetings.map((m) => m._id)).toEqual(['m3']);
+    });
+
+    it('keeps the row when a file could not be deleted, so the next sweep retries', async () => {
+      store.app_settings = [{ _id: 's1', key: 'room:room-1:autoDeleteMeetingsDays', valueJson: '30' }];
+      store.meetings = [{ _id: 'm1', roomId: 'room-1', status: 'summarized', endedAt: oldIso(40), folderId: 'folder-1' }];
+      folderFiles = { 'folder-1': [file('t1')] };
+      failDeleteFor = new Set(['t1']);
+      const result = await purgeExpiredAudio(buildHub(), 'room-1');
+      expect(result.meetingsDeleted).toBe(0);
+      expect(store.meetings).toHaveLength(1);
+    });
   });
 
   it('does not touch audio when autoDeleteAudioDays is 0 (disabled)', async () => {

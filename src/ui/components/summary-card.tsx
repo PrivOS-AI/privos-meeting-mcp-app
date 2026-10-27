@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { parseToolResult, usePrivosApp } from '@privos_ai/app-react';
 
 import { useI18n } from '../i18n/i18n-provider.js';
+import { MarkdownText } from './markdown-text.js';
 import { Icon } from './icon.js';
 
 export interface SummaryCardProps {
@@ -83,7 +84,7 @@ export function SummaryCard({ roomId, meetingId, summaryText, keyTopics, summary
         </p>
       ) : null}
 
-      {summaryText ? <p className="ma-summary-card__text">{summaryText}</p> : <p className="ma-summary-card__empty">{t('summary.empty')}</p>}
+      {summaryText ? <MarkdownText source={summaryText} className="ma-summary-card__text" /> : <p className="ma-summary-card__empty">{t('summary.empty')}</p>}
 
       {keyTopics && keyTopics.length > 0 ? (
         <ul className="ma-summary-card__topics">

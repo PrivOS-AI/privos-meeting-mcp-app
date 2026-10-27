@@ -250,3 +250,197 @@
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* ---------- Speech recognition: provider cards ---------- */
+
+.ma-settings-panel__subtitle {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: var(--body-size);
+  font-weight: var(--weight-semibold);
+  color: var(--ma-fg-1);
+}
+
+.ma-provider-group {
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.ma-provider-group__title {
+  padding: 0;
+  font-size: var(--body-size);
+  font-weight: var(--weight-semibold);
+  color: var(--ma-fg-1);
+}
+
+.ma-provider-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.ma-provider-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--ma-border-1);
+  border-radius: var(--ma-radius-md);
+  background: var(--ma-surface);
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.ma-provider-card:hover {
+  border-color: var(--ma-border-2);
+}
+
+.ma-provider-card:has(input:focus-visible) {
+  outline: 2px solid var(--ma-brand-blue);
+  outline-offset: 2px;
+}
+
+.ma-provider-card--selected {
+  border-color: var(--ma-brand-blue);
+  box-shadow: 0 0 0 1px var(--ma-brand-blue);
+}
+
+.ma-provider-card--unavailable {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.ma-provider-group:disabled .ma-provider-card {
+  cursor: progress;
+}
+
+.ma-provider-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.ma-provider-card__name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-semibold);
+  color: var(--ma-fg-1);
+  white-space: nowrap;
+}
+
+.ma-provider-card__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--ma-radius-pill);
+  font-size: var(--caption-size);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  color: var(--ma-fg-3);
+  background: var(--ma-bg-canvas);
+}
+
+.ma-provider-card__state--active {
+  color: var(--ma-fg-inverse);
+  background: var(--ma-brand-blue);
+}
+
+.ma-provider-card__state--ready {
+  color: var(--ma-status-success);
+  background: var(--ma-status-success-bg);
+}
+
+.ma-provider-card__state--failed {
+  color: var(--ma-status-danger);
+  background: var(--ma-status-danger-bg);
+}
+
+.ma-provider-card__desc {
+  color: var(--ma-fg-2);
+  font-size: var(--body-sm-size);
+  line-height: 1.5;
+}
+
+.ma-provider-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: auto;
+}
+
+.ma-provider-card__tag {
+  padding: 1px var(--space-2);
+  border: 1px solid var(--ma-border-1);
+  border-radius: var(--ma-radius-pill);
+  font-size: var(--caption-size);
+  color: var(--ma-fg-3);
+}
+
+.ma-provider-card__note {
+  font-size: var(--caption-size);
+  color: var(--ma-status-warning);
+}
+
+.ma-provider-health {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--ma-radius-md);
+  background: var(--ma-surface);
+  border: 1px solid var(--ma-border-1);
+}
+
+.ma-provider-health__usage {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ma-fg-2);
+  font-size: var(--body-sm-size);
+}
+
+.ma-provider-health__check {
+  background: none;
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  padding: var(--space-1) var(--space-3);
+  min-height: auto;
+  font-size: var(--body-sm-size);
+}
+
+.ma-provider-details {
+  font-size: var(--body-sm-size);
+  color: var(--ma-fg-2);
+}
+
+.ma-provider-details summary {
+  cursor: pointer;
+  color: var(--ma-fg-3);
+}
+
+.ma-provider-details ul {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-5);
+}
+
+.ma-provider-details li + li {
+  margin-top: var(--space-1);
+}
+
+.ma-provider-details__models {
+  display: block;
+  color: var(--ma-fg-3);
+  font-family: var(--ma-font-mono);
+  font-size: var(--caption-size);
+  overflow-wrap: anywhere;
+}

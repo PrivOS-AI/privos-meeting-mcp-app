@@ -17,6 +17,8 @@ import type { RoomBoundHubClient } from '@privos_ai/app-server';
 import { AppError } from '../../shared/app-error.js';
 import { env } from '../env.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
+import { getSetting } from '../hub/app-settings.js';
+import { sendSummaryToChat } from '../tools/send-to-chat-tool.js';
 import { uploadBotFile } from '../files/hub-file-upload.js';
 import { concatParts, deletePartFiles, type PartRef } from '../media/concat-parts.js';
 import { decodeToWav16k } from '../media/decode-audio.js';
@@ -24,15 +26,23 @@ import { deleteRoomFile } from '../media/hub-file-download.js';
 import { readLiveTurns, type LiveTurnSpan } from '../media/live-turns-store.js';
 import { dataDir } from '../paths.js';
 import { abortMeetingQueue } from '../live-speakers/chunk-worker.js';
-import { resolveSpeakers as resolveSpeakersEmbed, type UserIdentity } from '../speaker/resolve-speakers.js';
+import {
+  isSpeakerRecognitionEnabled,
+  resolveSpeakers as resolveSpeakersEmbed,
+  resolveSpeakersWithoutVoiceprints,
+  type UserIdentity,
+} from '../speaker/resolve-speakers.js';
+import { getProfile } from '../speaker/profile-store.js';
 import { sessionRegistries } from '../speaker/session-speaker-registry.js';
 import { uploadRoomCopy } from '../speaker/speaker-diagnostics-log.js';
 import { chunkTranscript } from '../summary/chunker.js';
+import type { SummaryLength } from '../summary/prompts.js';
 import { renderSummaryMarkdown } from '../summary/summary-markdown.js';
 import { summarizeTranscript as runSummarizer, type SummaryPayload } from '../summary/summarizer.js';
 import { translateSegmentsBatch } from '../summary/translator.js';
 import { asyncProviderFor } from '../stt/stt-provider-registry.js';
 import { alignByMaxOverlap } from '../transcript/caption-aligner.js';
+import { sanitizeDisplayName } from '../summary/sanitize.js';
 import { buildSegments, type Segment } from '../transcript/segment-builder.js';
 import { buildTranscriptMarkdown } from '../transcript/markdown-writer.js';
 import { buildTranscriptJson, serializeTranscriptJson } from '../transcript/transcript-json.js';
@@ -43,6 +53,7 @@ import {
   loadLiveIdentities,
   mergeLiveIntoAsyncSpeaker,
   replaceActionItems,
+  replaceDecisions,
   upsertMeeting,
   upsertMeetingSpeakers,
   type LiveIdentity,
@@ -179,10 +190,21 @@ async function applyLiveReconciliation(
 }
 
 /** Best-effort parse of the model's free-text `due` into an ISO date App DB's `date` field accepts; unparseable text is dropped rather than sent as an invalid date (the task text itself still carries any human phrasing like "this weekend"). */
-function parseDueDate(due: string | null): string | undefined {
-  if (!due) return undefined;
-  const parsed = new Date(due);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+/** `YYYY-MM-DD` of the meeting's start, for resolving relative deadlines; undefined when the stamp is unusable. */
+function meetingDateOf(startedAt: string): string | undefined {
+  const date = new Date(startedAt);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString().slice(0, 10);
+}
+
+/** Speaker display name -> the PrivOS user its voiceprint profile is linked to. */
+async function privosUserIdsBySpeakerName(db: AppDbBotClient, speakers: readonly JobResultSpeaker[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (const speaker of speakers) {
+    if (!speaker.profileId || !speaker.displayName) continue;
+    const profile = await getProfile(db, speaker.profileId).catch(() => null);
+    if (profile?.privosUserId) out.set(sanitizeDisplayName(speaker.displayName), profile.privosUserId);
+  }
+  return out;
 }
 
 export interface SummarizeStepResult {
@@ -234,9 +256,14 @@ export async function summarizeTranscript(input: {
     }
   }
 
-  const summaryLanguage = asLanguageCode(input.language);
+  // The room's settings: `summaryLanguage` `auto` (default) keeps the meeting's own language.
+  const settingsDb = new AppDbBotClient(roomId);
+  const languageSetting = await getSetting<string>(settingsDb, 'summaryLanguage');
+  const summaryLanguage = asLanguageCode(languageSetting && languageSetting !== 'auto' && isLanguageCode(languageSetting) ? languageSetting : input.language);
+  const lengthSetting = await getSetting<SummaryLength>(settingsDb, 'summaryLength');
+  const length: SummaryLength = lengthSetting === 'short' || lengthSetting === 'detailed' ? lengthSetting : 'normal';
   const chunks = chunkTranscript(translatedSegments, displayNameBySpeaker);
-  const payload = await runSummarizer(hub, { roomId, chunks, language: summaryLanguage, title, speakerNames }, signal);
+  const payload = await runSummarizer(hub, { roomId, chunks, language: summaryLanguage, length, title, speakerNames, meetingDate: meetingDateOf(startedAt) }, signal);
 
   const markdown = renderSummaryMarkdown({ title, startedAt, durationSec, speakers: speakerNames, payload, language: summaryLanguage });
   const summaryUpload = await uploadBotFile({
@@ -250,10 +277,30 @@ export async function summarizeTranscript(input: {
     signal,
   });
 
+  // A name in the summary links to a PrivOS account only through a speaker of this meeting whose
+  // voiceprint profile is linked to one — never by guessing from a name.
+  const userIdByName = await privosUserIdsBySpeakerName(db, speakers);
+  const userIdFor = (name: string | null) => (name ? userIdByName.get(sanitizeDisplayName(name)) : undefined);
   await replaceActionItems(
     db,
     meetingId,
-    payload.action_items.map((item) => ({ task: item.task, owner: item.owner, due: parseDueDate(item.due), atSec: item.at ?? undefined })),
+    payload.action_items.map((item) => ({
+      type: item.type,
+      task: item.task,
+      owner: item.owner,
+      ownerUserId: userIdFor(item.owner),
+      requester: item.requester,
+      requesterUserId: userIdFor(item.requester),
+      due: item.due,
+      dueDate: item.due_date,
+      atSec: item.at,
+      quote: item.quote,
+    })),
+  );
+  await replaceDecisions(
+    db,
+    meetingId,
+    payload.decisions.map((d) => ({ text: d.text, by: d.by, byUserId: userIdFor(d.by), atSec: d.at })),
   );
 
   return { payload, summaryFileId: summaryUpload.fileId, translatedSegments: [...translatedSegments] };
@@ -307,11 +354,13 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
     const wavPath = path.join(scratch, 'audio-16k.wav');
     const decoded = await decodeToWav16k(webmPath, wavPath, signal);
 
-    // 3. transcribe via the job's pinned provider ('elevenlabs-batch' wants the wav, 'soniox-async' the raw webm).
+    // 3. transcribe via the job's pinned provider ('local' and 'elevenlabs-batch' want the wav, 'soniox-async' the raw webm).
     await jobRepo.patch(job._id, { step: 'transcribe', progress: 0.35 });
-    const providerVendor = job.sttProvider === 'elevenlabs-batch' ? 'elevenlabs' : 'soniox';
+    const providerVendor = job.sttProvider === 'local' ? 'local' : job.sttProvider === 'elevenlabs-batch' ? 'elevenlabs' : 'soniox';
     const provider = asyncProviderFor(providerVendor);
-    const audioPath = job.sttProvider === 'elevenlabs-batch' ? wavPath : webmPath;
+    const audioPath = providerVendor === 'soniox' ? webmPath : wavPath;
+    // soniox-async and local tokens carry their own spacing; elevenlabs-batch tokens are bare words.
+    const tokensCarrySpacing = providerVendor !== 'elevenlabs';
     const sttResult = await provider.transcribeFile({
       audioPath,
       languageHints: job.language ? [job.language] : undefined,
@@ -325,9 +374,7 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
 
     // 4. segments — ONE builder for both providers, they already share `SttToken`.
     await jobRepo.patch(job._id, { step: 'segment', progress: 0.6 });
-    // soniox-async tokens carry their own spacing (concatenate); elevenlabs-batch
-    // tokens are bare words (join with a space) — see segment-builder options.
-    const segments = buildSegments(sttResult.tokens, { pauseSplitSec: 1.5, tokensCarrySpacing: providerVendor === 'soniox' });
+    const segments = buildSegments(sttResult.tokens, { pauseSplitSec: 1.5, tokensCarrySpacing });
 
     // 5. P4 embed + match/enrol against `speaker_profiles`; P5 reconciles against live-turns.json.
     // Mapping-before-resolve (plan.md § Requirements): the async<->live map and
@@ -347,7 +394,20 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
     const userIdentityBySpeakerId = deriveUserIdentities(asyncToLiveMap, liveIdentities, meetingOwnerUserId);
 
     await jobRepo.patch(job._id, { step: 'embed', progress: 0.7 });
-    const resolved = await resolveSpeakersEmbed(db, wavPath, segments, job.meetingId, userIdentityBySpeakerId);
+    // Speaker recognition is an enhancement: a missing model or a failed embedding must never cost
+    // the meeting its transcript, so it falls back to the names assigned during the meeting.
+    let resolved: Awaited<ReturnType<typeof resolveSpeakersEmbed>>;
+    if (await isSpeakerRecognitionEnabled(db)) {
+      try {
+        resolved = await resolveSpeakersEmbed(db, wavPath, segments, job.meetingId, userIdentityBySpeakerId);
+      } catch (error) {
+        if (signal.aborted) throw error;
+        console.warn('[meeting-job] speaker recognition failed, continuing without voiceprints:', error instanceof Error ? error.message : error);
+        resolved = resolveSpeakersWithoutVoiceprints(segments, userIdentityBySpeakerId);
+      }
+    } else {
+      resolved = resolveSpeakersWithoutVoiceprints(segments, userIdentityBySpeakerId);
+    }
     const speakerUpserts: SpeakerUpsertInput[] = resolved.map((s, i) => ({
       speakerId: s.speakerId,
       totalSpeakSec: s.totalSpeakSec,
@@ -438,7 +498,7 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       segments: finalSegments,
       displayNameBySpeaker,
     });
-    const srt = buildSrt(finalSegments, sttResult.tokens, providerVendor === 'soniox');
+    const srt = buildSrt(finalSegments, sttResult.tokens, tokensCarrySpacing);
 
     const [jsonUpload, mdUpload, srtUpload] = await Promise.all([
       uploadBotFile({
@@ -467,6 +527,10 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       // Clears a PREVIOUS run's summaryError on success, records this run's on failure — always a fresh write, never stale.
       summaryError: summaryError ?? '',
     });
+
+    // 7b. the room may ask for the summary in chat as soon as it exists. Best-effort: a refusal
+    // (no `bot:message:send`, bot outside the room) leaves the manual "Send to chat" button.
+    if (summarized) await autoSendSummary(db, roomId, job.meetingId);
 
     // 8. cleanup — delete audio.webm ONLY when keepAudio===false AND summarize succeeded (plan.md: never delete the
     // only remaining source of truth when the AI step failed, even if the user opted out of keeping audio).
@@ -498,5 +562,15 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
     // Runs on BOTH success and failure — the logs from a job that just failed matter most (plan.md § diagnostics).
     await uploadRoomCopy(agentBotHub, roomId, folderId, job.meetingId);
     await rm(scratch, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+async function autoSendSummary(db: AppDbBotClient, roomId: string, meetingId: string): Promise<void> {
+  try {
+    if ((await getSetting<boolean>(new AppDbBotClient(roomId), 'autoSendSummaryToChat')) !== true) return;
+    const meeting = await db.getById('meetings', 'room', meetingId);
+    if (meeting) await sendSummaryToChat(db, roomId, meetingId, meeting);
+  } catch (error) {
+    console.warn('[meeting-job] auto-send of the summary to chat failed (the button still works):', error instanceof Error ? error.message : error);
   }
 }

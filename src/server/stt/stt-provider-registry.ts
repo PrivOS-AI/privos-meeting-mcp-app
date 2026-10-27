@@ -9,22 +9,26 @@ import { getSetting } from '../hub/app-settings.js';
 import { env } from '../env.js';
 import { elevenLabsBatchProvider } from './elevenlabs-batch-provider.js';
 import { elevenLabsRealtimeProvider } from './elevenlabs-realtime-token.js';
+import { localAsyncProvider } from './local-async-provider.js';
+import { localRealtimeProvider } from './local-realtime-provider.js';
 import { sonioxAsyncProvider } from './soniox-async-provider.js';
 import { sonioxRealtimeProvider } from './soniox-realtime-token.js';
 import type { AsyncSttProvider, ProviderStatus, RealtimeTokenProvider, SttVendor } from './stt-provider.js';
 
 const REALTIME: Record<SttVendor, RealtimeTokenProvider> = {
+  local: localRealtimeProvider,
   soniox: sonioxRealtimeProvider,
   elevenlabs: elevenLabsRealtimeProvider,
 };
 
 const ASYNC: Record<SttVendor, AsyncSttProvider> = {
+  local: localAsyncProvider,
   soniox: sonioxAsyncProvider,
   elevenlabs: elevenLabsBatchProvider,
 };
 
 function asVendor(value: unknown, fallback: SttVendor): SttVendor {
-  return value === 'soniox' || value === 'elevenlabs' ? value : fallback;
+  return value === 'local' || value === 'soniox' || value === 'elevenlabs' ? value : fallback;
 }
 
 export function realtimeProviderFor(vendor: SttVendor): RealtimeTokenProvider {
@@ -47,9 +51,11 @@ export async function resolveAsyncVendor(db?: AppDbBotClient): Promise<SttVendor
   return asVendor(override, env.asyncProvider);
 }
 
-/** Status of BOTH vendors' realtime + async surfaces — for the status tool. */
+/** Status of every provider's realtime + async surface — for the status tool. */
 export async function allProviderStatuses(): Promise<ProviderStatus[]> {
   return Promise.all([
+    localRealtimeProvider.status(),
+    localAsyncProvider.status(),
     sonioxRealtimeProvider.status(),
     elevenLabsRealtimeProvider.status(),
     sonioxAsyncProvider.status(),
