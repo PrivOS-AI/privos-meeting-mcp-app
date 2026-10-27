@@ -1,16 +1,13 @@
 /**
  * "Save to PrivOS Files" confirmation modal (phase-06 § Requirements): shows
  * the meeting folder path and each of the 5 stored artifacts' saved/pending
- * state, plus a best-effort "Open in Files" deep link.
- *
- * OPEN QUESTION (static-only phase, no live pairing): the exact URI scheme
- * the Hub resolves for a cross-app folder deep link was never observed.
- * `privos://files/<id>` mirrors `send-to-chat-tool.ts`'s own best-effort file
- * link convention (plan default); if the host does not handle it the button
- * just opens a blank/failed tab, degrading silently rather than breaking the
- * modal.
+ * state, plus "Open in Files", which asks the host to open the folder in the
+ * room's Files tab (`data/open-in-files.ts`).
  */
+import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
+
 import { folderName } from '../../shared/meeting-slug.js';
+import { openInFiles } from '../data/open-in-files.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 import { Icon } from './icon.js';
 
@@ -30,6 +27,8 @@ export interface SaveToFilesModalProps {
 
 export function SaveToFilesModal({ title, meetingId, startedAt, folderId, artifacts, onClose }: SaveToFilesModalProps) {
   const { t } = useI18n();
+  const app = usePrivosApp();
+  const { roomId, roomName } = usePrivosContext();
   const path = folderName(title, meetingId, startedAt ? new Date(startedAt) : new Date());
 
   return (
@@ -57,7 +56,7 @@ export function SaveToFilesModal({ title, meetingId, startedAt, folderId, artifa
             <button
               type="button"
               className="ma-save-to-files__open"
-              onClick={() => window.open(`privos://files/${encodeURIComponent(folderId)}`, '_blank')}
+              onClick={() => void openInFiles(app, { id: roomId, name: roomName }, folderId)}
             >
               <Icon name="arrow-export" size={14} /> {t('saveToFiles.openInFiles')}
             </button>

@@ -18,6 +18,7 @@
     "start": "tsx src/server/index.ts",
     "start:standalone": "NODE_ENV=production npm start",
     "pair": "tsx scripts/pair.ts",
+    "diagnose:local-stt": "tsx scripts/diagnose-local-stt.ts",
     "diagnose:scopes": "tsx scripts/diagnose-scopes.ts",
     "build": "vite build && tsx scripts/generate-manifest.ts && npm run manifest:lint",
     "manifest:lint": "node scripts/lint-manifest.mjs",

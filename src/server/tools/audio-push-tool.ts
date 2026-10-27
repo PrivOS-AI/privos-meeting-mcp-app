@@ -15,8 +15,11 @@ import { checkRateLimit } from './rate-limiter.js';
 import type { AppTool } from './registry.js';
 import { MS, ROOM_AND_MEETING } from './schema-parts.js';
 
-/** One push carries at most ~1 s of 16 kHz PCM16 (32 KB), base64-encoded. */
-const MAX_PCM_BYTES = 32_768;
+/**
+ * One push carries at most ~4 s of 16 kHz PCM16 (128 KB), base64-encoded. A relay round trip takes
+ * ~1.5 s, so the client sends whatever piled up meanwhile; at 1 s per push it fell further behind each time.
+ */
+const MAX_PCM_BYTES = 131_072;
 const MAX_PCM_BASE64 = Math.ceil(MAX_PCM_BYTES / 3) * 4;
 /** Pushes per meeting per window: ~2/s expected, room for a burst of retries. */
 const PUSH_LIMIT = 12;
@@ -50,7 +53,7 @@ export const audioPushTool: AppTool = {
       throw new AppError('Invalid meeting_audio_push parameters.', 'INVALID_INPUT');
     }
     if (Number(args.sampleRate) !== SAMPLE_RATE) throw new AppError(`Audio must be ${SAMPLE_RATE} Hz mono PCM16.`, 'INVALID_INPUT');
-    if (pcm.length > MAX_PCM_BASE64) throw new AppError('Audio chunk is too large (at most about 1 second per push).', 'INVALID_INPUT');
+    if (pcm.length > MAX_PCM_BASE64) throw new AppError('Audio chunk is too large (at most about 4 seconds per push).', 'INVALID_INPUT');
 
     const db = new AppDbBotClient(roomId);
     const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
@@ -68,7 +71,7 @@ export const audioPushTool: AppTool = {
     }
 
     const bytes = Buffer.from(pcm, 'base64');
-    if (bytes.length > MAX_PCM_BYTES || bytes.length % 2 !== 0) throw new AppError('Audio chunk must be whole PCM16 samples, at most 32 KB.', 'INVALID_INPUT');
+    if (bytes.length > MAX_PCM_BYTES || bytes.length % 2 !== 0) throw new AppError('Audio chunk must be whole PCM16 samples, at most 128 KB.', 'INVALID_INPUT');
     await session.push(seq, chunkStartSec, pcm16ToFloat32(bytes));
     return { ...session.captionsSince(cursor), degraded: session.degraded };
   },

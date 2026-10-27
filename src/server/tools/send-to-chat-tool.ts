@@ -20,6 +20,7 @@
  * concurrent calls in this process share one send.
  */
 import { AppError } from '../../shared/app-error.js';
+import { folderName } from '../../shared/meeting-slug.js';
 import { AppDbBotClient, type DbRow } from '../hub/app-db-bot-client.js';
 import { callAppPlatformTool } from '../hub/bot-tool-call.js';
 import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
@@ -47,12 +48,18 @@ function truncate(text: string, maxChars: number): string {
   return `${lastSpace > maxChars * 0.6 ? cut.slice(0, lastSpace) : cut}…`;
 }
 
+/** The meeting's start (its Files folder is named after that UTC day), or now when the row lacks a valid one. */
+function startedAtDate(value: unknown): Date {
+  const date = typeof value === 'string' ? new Date(value) : new Date(NaN);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
 /** Server-built chat message — summary text is Hub AI's own output (already safe), the title is escaped defensively since it is raw user input. */
 function buildChatSummary(meeting: DbRow, fileLink: string | undefined): string {
   const title = escapeMarkdown(typeof meeting.title === 'string' && meeting.title ? meeting.title : 'Meeting');
   const summary = typeof meeting.summaryText === 'string' ? meeting.summaryText : '';
   const header = `**Summary: ${title}**\n\n`;
-  const footer = fileLink ? `\n\n[Open summary.md](${fileLink})` : '';
+  const footer = fileLink ? `\n\n📄 ${fileLink}` : '';
   const bodyBudget = Math.max(0, MAX_CHAT_CHARS - header.length - footer.length);
   return `${header}${truncate(summary, bodyBudget)}${footer}`;
 }
@@ -79,9 +86,10 @@ export const sendToChatTool: AppTool = {
       throw new AppError('Meeting has no summary to send yet.', 'INVALID_STATE');
     }
 
+    // The Hub renders `@Files:<roomId>/<path>` as a link into the room's Files (its own chat syntax).
     const fileLink =
       typeof meeting.summaryFileId === 'string' && meeting.summaryFileId
-        ? `privos://files/${encodeURIComponent(meeting.summaryFileId)}`
+        ? `@Files:${roomId}/${folderName(String(meeting.title ?? ''), meetingId, startedAtDate(meeting.startedAt))}/summary.md`
         : undefined;
     const text = buildChatSummary(meeting, fileLink);
 

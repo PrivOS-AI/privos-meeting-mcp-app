@@ -895,7 +895,7 @@
           },
           "pcm": {
             "type": "string",
-            "maxLength": 43692,
+            "maxLength": 174764,
             "description": "Base64 little-endian PCM16 mono."
           },
           "cursor": {

@@ -143,7 +143,7 @@ export async function summarizeTranscript(
   signal?: AbortSignal,
 ): Promise<SummaryPayload> {
   if (input.chunks.length === 0) {
-    throw new AppError('No transcript content to summarize.', 'INVALID_STATE');
+    throw new AppError('No speech was recognised in the recording, so there is nothing to summarize. Check that the right microphone is selected and not muted.', 'INVALID_STATE');
   }
 
   const notesByChunk: ChunkNotes[] = [];

@@ -29,7 +29,7 @@ describe('meeting_send_to_chat', () => {
   beforeEach(() => {
     sentMessages = [];
     store = {
-      meetings: [{ _id: 'meeting-1', roomId: 'room-1', ownerUserId: 'user-1', title: 'Weekly meeting', summaryText: 'Meeting summary.', summaryFileId: 'file-1' }],
+      meetings: [{ _id: 'meeting-1', roomId: 'room-1', ownerUserId: 'user-1', title: 'Weekly meeting', summaryText: 'Meeting summary.', summaryFileId: 'file-1', startedAt: '2026-10-27T04:00:00.000Z' }],
     };
     fakeHub = installFakeHub({
       store,
@@ -51,6 +51,7 @@ describe('meeting_send_to_chat', () => {
     expect(sentMessages).toHaveLength(1);
     expect(String(sentMessages[0].text)).toContain('Meeting summary.');
     expect(String(sentMessages[0].text)).toContain('Weekly meeting');
+    expect(String(sentMessages[0].text)).toMatch(/@Files:room-1\/Meetings\/2026-10-27-weekly-meeting-\w+\/summary\.md$/);
 
     const rows = store.meetings.filter((m) => m._id === 'meeting-1');
     expect(rows[0].sentToChatAt).toBe(result.sentAt);

@@ -101,7 +101,7 @@ describe('summarizeTranscript', () => {
   it('rejects when there are no chunks to summarize', async () => {
     await expect(
       summarizeTranscript(hub, { roomId: 'room-1', chunks: [], language: 'vi', title: 'T', speakerNames: [] }),
-    ).rejects.toThrow(/transcript/);
+    ).rejects.toThrow(/No speech was recognised/);
   });
 });
 

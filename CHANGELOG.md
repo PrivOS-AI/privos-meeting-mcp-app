@@ -90,3 +90,16 @@ Marketplace packaging.
 - Dependencies: `@privos_ai/app-server` 0.12, `@privos_ai/app-react` 0.8, `zod` 4,
   patched `body-parser`.
 - `SCOPES.md` maps every permission to its call sites and degraded behaviour.
+- **Open in Files** works: the iframe sandbox blocks `window.open`, so the button
+  asks the host (`OPEN_LINK`) to open the room's Files tab at the meeting folder
+  (`/group/<room>/files/<folderId>`; room type and name from `rooms.info`). The
+  chat summary links `summary.md` with the Hub's own `@Files:<roomId>/<path>`
+  syntax instead of an unresolved `privos://` link.
+- Live captions keep up: a push may carry ~4 s of audio (was 1 s), so the client
+  sends everything captured during the ~1.5 s relay round trip instead of
+  falling further behind on every push.
+- A recording with no recognisable speech says so ("No speech was recognised…")
+  instead of "No transcript content to summarize".
+- `npm run diagnose:local-stt` (`scripts/diagnose-local-stt.ts`): downloads a
+  meeting's audio as the bot and prints its level, VAD segments and what the
+  recognizer hears in each.

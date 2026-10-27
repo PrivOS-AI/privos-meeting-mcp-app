@@ -93,8 +93,8 @@ describe('meeting_audio_push', () => {
     await expect(audioPushTool.execute(args(), ctx(), {} as never)).rejects.toMatchObject({ code: 'INVALID_STATE' });
   });
 
-  it('refuses more than ~1 s of audio in one push and a non-16 kHz rate', async () => {
-    await expect(audioPushTool.execute(args({ pcm: Buffer.alloc(40_000).toString('base64') }), ctx(), {} as never)).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+  it('refuses more than ~4 s of audio in one push and a non-16 kHz rate', async () => {
+    await expect(audioPushTool.execute(args({ pcm: Buffer.alloc(140_000).toString('base64') }), ctx(), {} as never)).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     await expect(audioPushTool.execute(args({ sampleRate: 48000 }), ctx(), {} as never)).rejects.toMatchObject({ code: 'INVALID_INPUT' });
   });
 

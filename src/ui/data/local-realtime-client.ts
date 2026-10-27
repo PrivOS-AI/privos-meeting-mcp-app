@@ -14,8 +14,8 @@ import type { CaptionEvent, RealtimeConnection, RealtimeConnectionOptions } from
 
 const TARGET_RATE = 16_000;
 const PUSH_INTERVAL_MS = 500;
-/** At most ~1 s per push (the server's 32 KB cap). */
-const MAX_PUSH_SAMPLES = TARGET_RATE;
+/** At most ~4 s per push (the server's 128 KB cap): a push sends everything captured during the previous round trip. */
+const MAX_PUSH_SAMPLES = TARGET_RATE * 4;
 /** Unsent audio kept while pushes fail, ~20 s. */
 const MAX_BACKLOG_SAMPLES = TARGET_RATE * 20;
 const PROCESSOR_FRAMES = 4096;
