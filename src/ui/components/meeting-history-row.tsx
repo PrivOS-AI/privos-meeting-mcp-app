@@ -28,19 +28,22 @@ export interface MeetingHistoryRowProps {
 }
 
 export function MeetingHistoryRow({ meeting, speakers, actionItemCount, isOwner, isDeleting, onOpen, onRename, onExportSrt, onExportDocx, onDelete }: MeetingHistoryRowProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const shown = speakers.slice(0, MAX_AVATARS);
   const overflow = speakers.length - shown.length;
-  const date = meeting.startedAt ? new Date(meeting.startedAt).toLocaleDateString() : '—';
+  const date = meeting.startedAt ? new Date(meeting.startedAt).toLocaleString(language, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+  const title = meeting.title || t('screen.new.untitled');
 
   return (
     <tr className="ma-history-row">
-      <td className="ma-history-row__title" onClick={onOpen}>
-        <span className="ma-history-row__title-text">{meeting.title || t('screen.new.untitled')}</span>
-        <span className="ma-history-row__date">{date}</span>
+      <td className="ma-history-row__title">
+        <button type="button" className="ma-history-row__open" onClick={onOpen}>
+          <span className="ma-history-row__title-text">{title}</span>
+          <span className="ma-history-row__date">{date}</span>
+        </button>
       </td>
-      <td>
-        <div className="ma-history-row__avatars">
+      <td className="ma-history-row__speakers">
+        <div className="ma-history-row__avatars" title={speakers.map((s) => s.displayName).join(', ')}>
           {shown.map((speaker) => (
             <SpeakerAvatar key={speaker.speakerId} name={speaker.displayName} colorKey={speaker.colorKey} size={24} />
           ))}
@@ -48,9 +51,9 @@ export function MeetingHistoryRow({ meeting, speakers, actionItemCount, isOwner,
         </div>
       </td>
       <td className="ma-history-row__duration">{formatClock(meeting.durationSec ?? 0)}</td>
-      <td className="ma-history-row__actions-count">{actionItemCount}</td>
-      <td>
-        <StatusBadge status={meeting.status} />
+      <td className="ma-history-row__actions-count">{actionItemCount > 0 ? actionItemCount : '—'}</td>
+      <td className="ma-history-row__status">
+        <StatusBadge status={meeting.status} hasSummary={Boolean(meeting.summaryText)} />
       </td>
       <td className="ma-history-row__menu">
         <MeetingRowMenu canDelete={isOwner} isDeleting={isDeleting} onOpen={onOpen} onRename={onRename} onExportSrt={onExportSrt} onExportDocx={onExportDocx} onDelete={onDelete} />

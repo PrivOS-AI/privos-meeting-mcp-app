@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
+import { MarkdownText } from './markdown-text.js';
 import { fetchLiveSummary, type LiveSummaryResult, type LiveSummaryLine } from '../data/live-summary-api.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 import { asLanguageCode } from '../../shared/languages.js';
@@ -104,7 +105,7 @@ export function LiveSummaryPanel() {
       <section className="ma-live-summary__section">
         <h3 className="ma-side-panel__section-title">{t('recording.side.summary')}</h3>
         {result ? (
-          <p className="ma-live-summary__text">{result.summary}</p>
+          <MarkdownText source={result.summary} className="ma-live-summary__text" />
         ) : (
           <p className="ma-side-panel__empty">
             {status === 'loading'

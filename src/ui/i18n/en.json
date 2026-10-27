@@ -3,8 +3,6 @@
 
   "rail.new": "New meeting",
   "rail.history": "History",
-  "rail.bookmarks": "Bookmarks",
-  "rail.search": "Search",
   "rail.settings": "Settings",
   "rail.open": "Open menu",
   "rail.close": "Close menu",
@@ -230,7 +228,7 @@
 
   "processing.openDetail": "View details",
 
-  "history.searchPlaceholder": "Search meetings… (⌘K)",
+  "history.searchPlaceholder": "Search meetings… ({shortcut})",
   "history.stats.thisWeek": "Meetings this week",
   "history.stats.totalDuration": "Total recording time",
   "history.stats.openActionItems": "Open action items",
@@ -374,5 +372,20 @@
   "settings.captionDisplay.sizeMedium": "Medium",
   "settings.captionDisplay.sizeLarge": "Large",
   "settings.captionDisplay.showTranslation": "Show translation",
-  "settings.captionDisplay.showLiveSpeakerLabels": "Show live speaker labels"
+  "settings.captionDisplay.showLiveSpeakerLabels": "Show live speaker labels",
+
+  "status.interrupted": "Interrupted",
+  "status.transcriptOnly": "Transcript only",
+  "status.unknown": "Unknown",
+  "history.col.meeting": "Meeting",
+  "history.col.speakers": "Speakers",
+  "history.col.duration": "Duration",
+  "history.col.actionItems": "Action items",
+  "history.col.status": "Status",
+  "history.col.menu": "Actions",
+  "history.sortLabel": "Sort meetings",
+  "detail.audioUnavailable": "The recording can't be played here right now. The transcript and summary are unaffected.",
+  "screen.new.providerLocal": "built-in (on this workspace's server)",
+  "screen.new.localLanguageHint": "The built-in recognizer understands Vietnamese and English. For other languages, an admin can switch this room to Soniox or ElevenLabs in Settings › Speech recognition.",
+  "screen.new.acknowledgeFirst": "Tick “{label}” to start."
 }

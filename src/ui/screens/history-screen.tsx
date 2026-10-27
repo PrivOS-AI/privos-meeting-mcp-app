@@ -30,6 +30,7 @@ import {
 } from '../data/meeting-read-model.js';
 import { loadMeetingStats, type MeetingStats } from '../data/meeting-stats.js';
 import { formatDurationLong } from '../data/format-time.js';
+import { labelUnnamedSpeakers } from '../data/speaker-labels.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 
 export interface HistoryScreenProps {
@@ -40,6 +41,8 @@ export interface HistoryScreenProps {
 type FilterValue = 'all' | 'actionItems' | 'bookmarked' | 'mine';
 type SortValue = 'newest' | 'oldest' | 'longest';
 const PAGE_SIZE = 50;
+/** `SearchBox` answers both ⌘K and Ctrl+K; show the one this keyboard has. */
+const SEARCH_SHORTCUT = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘K' : 'Ctrl+K';
 const SORT_TO_ORDER_BY: Record<SortValue, MeetingOrderBy> = { newest: 'startedAt_desc', oldest: 'startedAt_asc', longest: 'durationSec_desc' };
 
 export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreenProps) {
@@ -159,7 +162,7 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
   return (
     <div className="ma-history-screen">
       <div className="ma-history-screen__header">
-        <SearchBox value={query} onChange={setQuery} placeholder={t('history.searchPlaceholder')} />
+        <SearchBox value={query} onChange={setQuery} placeholder={t('history.searchPlaceholder', { shortcut: SEARCH_SHORTCUT })} />
         <button type="button" className="ma-history-screen__start" onClick={onStartRecording}>
           <Icon name="record" size={16} /> {t('screen.new.start')}
         </button>
@@ -176,7 +179,7 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
 
       <div className="ma-history-screen__controls">
         <FilterChips options={filterOptions} value={filter} onChange={(next) => setFilter(next)} />
-        <select className="ma-history-screen__sort" value={sort} onChange={(e) => setSort(e.target.value as SortValue)}>
+        <select className="ma-history-screen__sort" aria-label={t('history.sortLabel')} value={sort} onChange={(e) => setSort(e.target.value as SortValue)}>
           <option value="newest">{t('history.sort.newest')}</option>
           <option value="oldest">{t('history.sort.oldest')}</option>
           <option value="longest">{t('history.sort.longest')}</option>
@@ -193,12 +196,22 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
         <EmptyState icon="history" title={t('screen.history.title')} subtitle={t('screen.history.subtitle')} />
       ) : (
         <table className="ma-history-screen__table">
+          <thead>
+            <tr>
+              <th scope="col">{t('history.col.meeting')}</th>
+              <th scope="col" className="ma-history-row__speakers">{t('history.col.speakers')}</th>
+              <th scope="col">{t('history.col.duration')}</th>
+              <th scope="col" className="ma-history-row__actions-count">{t('history.col.actionItems')}</th>
+              <th scope="col">{t('history.col.status')}</th>
+              <th scope="col"><span className="ma-visually-hidden">{t('history.col.menu')}</span></th>
+            </tr>
+          </thead>
           <tbody>
             {filtered.map((meeting) => (
               <MeetingHistoryRow
                 key={meeting._id}
                 meeting={meeting}
-                speakers={speakersByMeeting[meeting._id] ?? []}
+                speakers={labelUnnamedSpeakers(speakersByMeeting[meeting._id] ?? [], (n) => t('recording.speakerBadge.numbered', { n }))}
                 actionItemCount={actionCounts[meeting._id]?.total ?? 0}
                 isOwner={meeting.ownerUserId === userId}
                 isDeleting={deletingId === meeting._id}

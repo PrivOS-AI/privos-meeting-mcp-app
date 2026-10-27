@@ -14,6 +14,7 @@
   border-radius: var(--ma-radius-pill);
   font-weight: var(--weight-semibold);
   color: var(--ma-fg-inverse);
+  background: var(--privos-blue);
   flex-shrink: 0;
 }
 

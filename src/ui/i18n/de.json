@@ -3,8 +3,6 @@
 
   "rail.new": "Neue Besprechung",
   "rail.history": "Verlauf",
-  "rail.bookmarks": "Lesezeichen",
-  "rail.search": "Suche",
   "rail.settings": "Einstellungen",
   "rail.open": "Menü öffnen",
   "rail.close": "Menü schließen",
@@ -230,7 +228,7 @@
 
   "processing.openDetail": "Details anzeigen",
 
-  "history.searchPlaceholder": "Besprechungen suchen… (⌘K)",
+  "history.searchPlaceholder": "Besprechungen suchen… ({shortcut})",
   "history.stats.thisWeek": "Besprechungen diese Woche",
   "history.stats.totalDuration": "Gesamte Aufnahmezeit",
   "history.stats.openActionItems": "Offene Aufgaben",
@@ -374,5 +372,20 @@
   "settings.captionDisplay.sizeMedium": "Mittel",
   "settings.captionDisplay.sizeLarge": "Groß",
   "settings.captionDisplay.showTranslation": "Übersetzung anzeigen",
-  "settings.captionDisplay.showLiveSpeakerLabels": "Live-Sprecherbezeichnungen anzeigen"
+  "settings.captionDisplay.showLiveSpeakerLabels": "Live-Sprecherbezeichnungen anzeigen",
+
+  "status.interrupted": "Unterbrochen",
+  "status.transcriptOnly": "Nur Transkript",
+  "status.unknown": "Unbekannt",
+  "history.col.meeting": "Besprechung",
+  "history.col.speakers": "Sprecher",
+  "history.col.duration": "Dauer",
+  "history.col.actionItems": "Aufgaben",
+  "history.col.status": "Status",
+  "history.col.menu": "Aktionen",
+  "history.sortLabel": "Besprechungen sortieren",
+  "detail.audioUnavailable": "Die Aufnahme kann hier gerade nicht abgespielt werden. Transkript und Zusammenfassung sind nicht betroffen.",
+  "screen.new.providerLocal": "integriert (auf dem Server des Workspace)",
+  "screen.new.localLanguageHint": "Die integrierte Erkennung versteht Vietnamesisch und Englisch. Für andere Sprachen kann ein Admin diesen Raum unter Einstellungen › Spracherkennung auf Soniox oder ElevenLabs umstellen.",
+  "screen.new.acknowledgeFirst": "Setzen Sie das Häkchen bei „{label}“, um zu starten."
 }

@@ -3,8 +3,6 @@
 
   "rail.new": "新建会议",
   "rail.history": "历史记录",
-  "rail.bookmarks": "书签",
-  "rail.search": "搜索",
   "rail.settings": "设置",
   "rail.open": "打开菜单",
   "rail.close": "关闭菜单",
@@ -230,7 +228,7 @@
 
   "processing.openDetail": "查看详情",
 
-  "history.searchPlaceholder": "搜索会议…（⌘K）",
+  "history.searchPlaceholder": "搜索会议…（{shortcut}）",
   "history.stats.thisWeek": "本周会议数",
   "history.stats.totalDuration": "总录制时长",
   "history.stats.openActionItems": "未完成待办事项",
@@ -372,5 +370,20 @@
   "settings.captionDisplay.sizeMedium": "中",
   "settings.captionDisplay.sizeLarge": "大",
   "settings.captionDisplay.showTranslation": "显示翻译",
-  "settings.captionDisplay.showLiveSpeakerLabels": "显示实时发言人标签"
+  "settings.captionDisplay.showLiveSpeakerLabels": "显示实时发言人标签",
+
+  "status.interrupted": "已中断",
+  "status.transcriptOnly": "仅有转录",
+  "status.unknown": "未知",
+  "history.col.meeting": "会议",
+  "history.col.speakers": "发言人",
+  "history.col.duration": "时长",
+  "history.col.actionItems": "待办事项",
+  "history.col.status": "状态",
+  "history.col.menu": "操作",
+  "history.sortLabel": "会议排序",
+  "detail.audioUnavailable": "目前无法在此播放录音。转录和摘要不受影响。",
+  "screen.new.providerLocal": "内置（运行在工作区服务器上）",
+  "screen.new.localLanguageHint": "内置识别器支持越南语和英语。其他语言请由管理员在 设置 › 语音识别 中将本房间切换到 Soniox 或 ElevenLabs。",
+  "screen.new.acknowledgeFirst": "请勾选“{label}”后开始。"
 }

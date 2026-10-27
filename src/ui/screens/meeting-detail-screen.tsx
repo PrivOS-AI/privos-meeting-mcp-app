@@ -30,6 +30,7 @@ import { listActionItems, type ActionItemRecord } from '../data/action-item-read
 import { downloadMeetingDocx, downloadMeetingSrt } from '../data/meeting-export.js';
 import { getMeeting, listSpeakersForMeetings, renameMeeting, type MeetingReadModel, type MeetingSpeakerSummary } from '../data/meeting-read-model.js';
 import { resolveFileUrl } from '../data/file-download.js';
+import { labelUnnamedSpeakers } from '../data/speaker-labels.js';
 import { loadTranscript, resolveAudioUrl, type TranscriptDoc } from '../data/transcript-loader.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 
@@ -49,17 +50,19 @@ const SAVE_TO_FILES_ARTIFACTS: Array<{ labelKey: string; key: keyof MeetingReadM
 export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenProps) {
   const app = usePrivosApp();
   const { roomId } = usePrivosContext();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const playerRef = useRef<AudioPlayerHandle>(null);
 
   const [meeting, setMeeting] = useState<MeetingReadModel | null>(null);
   const [transcript, setTranscript] = useState<TranscriptDoc | null>(null);
-  const [speakers, setSpeakers] = useState<MeetingSpeakerSummary[]>([]);
+  const [rawSpeakers, setRawSpeakers] = useState<MeetingSpeakerSummary[]>([]);
+  const speakers = useMemo(() => labelUnnamedSpeakers(rawSpeakers, (n) => t('recording.speakerBadge.numbered', { n })), [rawSpeakers, t]);
   const [actionItems, setActionItems] = useState<ActionItemRecord[]>([]);
   const [bookmarks, setBookmarks] = useState<BookmarkRecord[]>([]);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioErrored, setAudioErrored] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [audioUnavailable, setAudioUnavailable] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
@@ -85,13 +88,21 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
         listActionItems(app, meetingId),
         listBookmarks(app, meetingId),
       ]);
-      setSpeakers(speakerMap[meetingId] ?? []);
+      setRawSpeakers(speakerMap[meetingId] ?? []);
       setActionItems(items);
       setBookmarks(bookmarkRows);
       if (record?.transcriptJsonFileId) setTranscript(await loadTranscript(app, record.transcriptJsonFileId));
       if (record?.audioFileId) {
         setAudioErrored(false);
-        setAudioUrl(await resolveAudioUrl(app, record.audioFileId));
+        setAudioUnavailable(false);
+        // The audio is optional on this screen: a URL the Hub cannot hand out must not hide the transcript
+        // behind a technical error. The detail goes to the console; the user gets a plain notice.
+        try {
+          setAudioUrl(await resolveAudioUrl(app, record.audioFileId));
+        } catch (audioError) {
+          console.warn('[meeting-detail] audio unavailable', audioError);
+          setAudioUnavailable(true);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -202,7 +213,7 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
           roomId={roomId}
           meetingId={meetingId}
           speakers={speakers}
-          onRelabeled={(speakerId, displayName) => setSpeakers((prev) => prev.map((s) => (s.speakerId === speakerId ? { ...s, displayName } : s)))}
+          onRelabeled={(speakerId, displayName) => setRawSpeakers((prev) => prev.map((s) => (s.speakerId === speakerId ? { ...s, displayName, named: true } : s)))}
         />
       ),
     },
@@ -255,9 +266,9 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
         </div>
 
         <div className="ma-detail__meta">
-          <span>{meeting.startedAt ? new Date(meeting.startedAt).toLocaleString() : '—'}</span>
+          <span>{meeting.startedAt ? new Date(meeting.startedAt).toLocaleString(language, { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</span>
           <span>{formatClock(meeting.durationSec ?? 0)}</span>
-          <StatusBadge status={meeting.status} />
+          <StatusBadge status={meeting.status} hasSummary={Boolean(meeting.summaryText)} />
           {meeting.transcriptJsonFileId ? <span className="ma-detail__badge">{t('detail.savedOnPrivos')}</span> : null}
         </div>
 
@@ -328,7 +339,9 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
               onError={() => void retryAudioUrl()}
             />
           </div>
-        ) : meeting.audioFileId ? null : (
+        ) : meeting.audioFileId ? (
+          audioUnavailable ? <p className="ma-detail__no-audio">{t('detail.audioUnavailable')}</p> : null
+        ) : (
           <p className="ma-detail__no-audio">{t('detail.audioDeleted')}</p>
         )}
       </div>

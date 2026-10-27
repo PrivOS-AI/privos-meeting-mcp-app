@@ -103,3 +103,20 @@ Marketplace packaging.
 - `npm run diagnose:local-stt` (`scripts/diagnose-local-stt.ts`): downloads a
   meeting's audio as the bot and prints its level, VAD segments and what the
   recognizer hears in each.
+- UI polish, checked screen by screen against a mock host:
+  - Summaries render their markdown (headings, lists, bold) instead of showing
+    `##` and `-`; rendered as React elements, never as HTML.
+  - Status badges: `interrupted` meetings are labelled (they showed "Private"),
+    and a finished meeting without a summary says "Transcript only".
+  - History table: column headers, titles reachable by keyboard, dates in the
+    app language, a labelled sort menu, `Ctrl+K` shown off macOS; on a phone
+    the status and row menu stay on screen (they were cut off).
+  - Speakers nobody named show as "Speaker N" instead of `speaker_2`; avatars
+    always have a background and use one initial when small.
+  - A recording the Hub cannot serve shows a plain notice instead of a raw
+    technical error, and no longer hides behind the page error.
+  - New meeting: the provider is named ("built-in"), a warning appears when
+    the built-in recognizer is paired with a language it does not support, and
+    a disabled Start button says what is missing.
+  - The rail no longer shows the permanently disabled Bookmarks and Search
+    entries (both live in History and the meeting view).

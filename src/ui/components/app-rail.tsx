@@ -18,7 +18,7 @@ import { Icon, type IconName } from './icon.js';
 import { UserMenu } from './user-menu.js';
 
 interface RailItem {
-  route: Route | null;
+  route: Route;
   icon: IconName;
   labelKey: string;
 }
@@ -26,8 +26,6 @@ interface RailItem {
 const RAIL_ITEMS: RailItem[] = [
   { route: 'new', icon: 'record', labelKey: 'rail.new' },
   { route: 'history', icon: 'history', labelKey: 'rail.history' },
-  { route: null, icon: 'bookmark', labelKey: 'rail.bookmarks' },
-  { route: null, icon: 'search', labelKey: 'rail.search' },
   { route: 'settings', icon: 'settings', labelKey: 'rail.settings' },
 ];
 
@@ -59,7 +57,7 @@ export function AppRail({ current, onNavigate, open, onClose }: AppRailProps) {
           </button>
           {RAIL_ITEMS.map((item) => {
             const label = t(item.labelKey);
-            const active = item.route !== null && item.route === current;
+            const active = item.route === current;
             const ripple = item.route === 'new' && meetingActive;
             return (
               <button
@@ -69,15 +67,10 @@ export function AppRail({ current, onNavigate, open, onClose }: AppRailProps) {
                 aria-label={label}
                 aria-current={active ? 'page' : undefined}
                 title={label}
-                disabled={item.route === null}
-                onClick={
-                  item.route
-                    ? () => {
-                        onNavigate(item.route as Route);
-                        onClose();
-                      }
-                    : undefined
-                }
+                onClick={() => {
+                  onNavigate(item.route);
+                  onClose();
+                }}
               >
                 <Icon name={item.icon} size={22} />
               </button>

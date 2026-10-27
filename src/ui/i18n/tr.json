@@ -3,8 +3,6 @@
 
   "rail.new": "Yeni toplantı",
   "rail.history": "Geçmiş",
-  "rail.bookmarks": "Yer imleri",
-  "rail.search": "Ara",
   "rail.settings": "Ayarlar",
   "rail.open": "Menüyü aç",
   "rail.close": "Menüyü kapat",
@@ -230,7 +228,7 @@
 
   "processing.openDetail": "Ayrıntıları görüntüle",
 
-  "history.searchPlaceholder": "Toplantılarda ara… (⌘K)",
+  "history.searchPlaceholder": "Toplantılarda ara… ({shortcut})",
   "history.stats.thisWeek": "Bu haftaki toplantılar",
   "history.stats.totalDuration": "Toplam kayıt süresi",
   "history.stats.openActionItems": "Açık eylem maddeleri",
@@ -374,5 +372,20 @@
   "settings.captionDisplay.sizeMedium": "Orta",
   "settings.captionDisplay.sizeLarge": "Büyük",
   "settings.captionDisplay.showTranslation": "Çeviriyi göster",
-  "settings.captionDisplay.showLiveSpeakerLabels": "Canlı konuşmacı etiketlerini göster"
+  "settings.captionDisplay.showLiveSpeakerLabels": "Canlı konuşmacı etiketlerini göster",
+
+  "status.interrupted": "Kesintiye uğradı",
+  "status.transcriptOnly": "Yalnızca döküm",
+  "status.unknown": "Bilinmiyor",
+  "history.col.meeting": "Toplantı",
+  "history.col.speakers": "Konuşmacılar",
+  "history.col.duration": "Süre",
+  "history.col.actionItems": "Görevler",
+  "history.col.status": "Durum",
+  "history.col.menu": "İşlemler",
+  "history.sortLabel": "Toplantıları sırala",
+  "detail.audioUnavailable": "Kayıt şu anda burada oynatılamıyor. Döküm ve özet etkilenmez.",
+  "screen.new.providerLocal": "yerleşik (çalışma alanının sunucusunda)",
+  "screen.new.localLanguageHint": "Yerleşik tanıyıcı Vietnamca ve İngilizceyi anlar. Diğer diller için bir yönetici bu odayı Ayarlar › Konuşma tanıma bölümünden Soniox veya ElevenLabs'e geçirebilir.",
+  "screen.new.acknowledgeFirst": "Başlamak için “{label}” kutusunu işaretleyin."
 }

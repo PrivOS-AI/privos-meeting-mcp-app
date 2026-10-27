@@ -3,8 +3,6 @@
 
   "rail.new": "Cuộc họp mới",
   "rail.history": "Lịch sử",
-  "rail.bookmarks": "Đánh dấu",
-  "rail.search": "Tìm kiếm",
   "rail.settings": "Cài đặt",
   "rail.open": "Mở menu",
   "rail.close": "Đóng menu",
@@ -230,7 +228,7 @@
 
   "processing.openDetail": "Xem chi tiết",
 
-  "history.searchPlaceholder": "Tìm kiếm cuộc họp… (⌘K)",
+  "history.searchPlaceholder": "Tìm kiếm cuộc họp… ({shortcut})",
   "history.stats.thisWeek": "Cuộc họp tuần này",
   "history.stats.totalDuration": "Tổng thời lượng ghi",
   "history.stats.openActionItems": "Việc cần làm chưa xong",
@@ -374,5 +372,20 @@
   "settings.captionDisplay.sizeMedium": "Vừa",
   "settings.captionDisplay.sizeLarge": "Lớn",
   "settings.captionDisplay.showTranslation": "Bật/tắt hiện bản dịch",
-  "settings.captionDisplay.showLiveSpeakerLabels": "Hiện nhãn người nói trực tiếp"
+  "settings.captionDisplay.showLiveSpeakerLabels": "Hiện nhãn người nói trực tiếp",
+
+  "status.interrupted": "Bị gián đoạn",
+  "status.transcriptOnly": "Chỉ có biên bản",
+  "status.unknown": "Không rõ",
+  "history.col.meeting": "Cuộc họp",
+  "history.col.speakers": "Người nói",
+  "history.col.duration": "Thời lượng",
+  "history.col.actionItems": "Việc cần làm",
+  "history.col.status": "Trạng thái",
+  "history.col.menu": "Thao tác",
+  "history.sortLabel": "Sắp xếp cuộc họp",
+  "detail.audioUnavailable": "Hiện không phát được bản ghi âm ở đây. Biên bản và tóm tắt vẫn đầy đủ.",
+  "screen.new.providerLocal": "tích hợp sẵn (chạy trên máy chủ của workspace)",
+  "screen.new.localLanguageHint": "Bộ nhận dạng tích hợp hiểu tiếng Việt và tiếng Anh. Với ngôn ngữ khác, quản trị viên có thể chuyển phòng này sang Soniox hoặc ElevenLabs trong Cài đặt › Nhận dạng giọng nói.",
+  "screen.new.acknowledgeFirst": "Đánh dấu “{label}” để bắt đầu."
 }

@@ -3,8 +3,6 @@
 
   "rail.new": "새 회의",
   "rail.history": "기록",
-  "rail.bookmarks": "북마크",
-  "rail.search": "검색",
   "rail.settings": "설정",
   "rail.open": "메뉴 열기",
   "rail.close": "메뉴 닫기",
@@ -230,7 +228,7 @@
 
   "processing.openDetail": "세부정보 보기",
 
-  "history.searchPlaceholder": "회의 검색… (⌘K)",
+  "history.searchPlaceholder": "회의 검색… ({shortcut})",
   "history.stats.thisWeek": "이번 주 회의 수",
   "history.stats.totalDuration": "총 녹음 시간",
   "history.stats.openActionItems": "미완료 실행 항목",
@@ -372,5 +370,20 @@
   "settings.captionDisplay.sizeMedium": "보통",
   "settings.captionDisplay.sizeLarge": "크게",
   "settings.captionDisplay.showTranslation": "번역 표시",
-  "settings.captionDisplay.showLiveSpeakerLabels": "실시간 화자 라벨 표시"
+  "settings.captionDisplay.showLiveSpeakerLabels": "실시간 화자 라벨 표시",
+
+  "status.interrupted": "중단됨",
+  "status.transcriptOnly": "녹취록만",
+  "status.unknown": "알 수 없음",
+  "history.col.meeting": "회의",
+  "history.col.speakers": "화자",
+  "history.col.duration": "길이",
+  "history.col.actionItems": "할 일",
+  "history.col.status": "상태",
+  "history.col.menu": "작업",
+  "history.sortLabel": "회의 정렬",
+  "detail.audioUnavailable": "지금은 여기서 녹음을 재생할 수 없습니다. 녹취록과 요약은 영향을 받지 않습니다.",
+  "screen.new.providerLocal": "내장 (워크스페이스 서버에서 실행)",
+  "screen.new.localLanguageHint": "내장 인식기는 베트남어와 영어를 지원합니다. 다른 언어는 관리자가 설정 › 음성 인식에서 이 방을 Soniox 또는 ElevenLabs로 전환할 수 있습니다.",
+  "screen.new.acknowledgeFirst": "시작하려면 “{label}”에 체크하세요."
 }

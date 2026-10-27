@@ -3,8 +3,6 @@
 
   "rail.new": "新しい会議",
   "rail.history": "履歴",
-  "rail.bookmarks": "ブックマーク",
-  "rail.search": "検索",
   "rail.settings": "設定",
   "rail.open": "メニューを開く",
   "rail.close": "メニューを閉じる",
@@ -230,7 +228,7 @@
 
   "processing.openDetail": "詳細を表示",
 
-  "history.searchPlaceholder": "会議を検索…（⌘K）",
+  "history.searchPlaceholder": "会議を検索…（{shortcut}）",
   "history.stats.thisWeek": "今週の会議数",
   "history.stats.totalDuration": "合計録音時間",
   "history.stats.openActionItems": "未完了のアクション項目",
@@ -372,5 +370,20 @@
   "settings.captionDisplay.sizeMedium": "中",
   "settings.captionDisplay.sizeLarge": "大",
   "settings.captionDisplay.showTranslation": "翻訳を表示",
-  "settings.captionDisplay.showLiveSpeakerLabels": "リアルタイム話者ラベルを表示"
+  "settings.captionDisplay.showLiveSpeakerLabels": "リアルタイム話者ラベルを表示",
+
+  "status.interrupted": "中断",
+  "status.transcriptOnly": "文字起こしのみ",
+  "status.unknown": "不明",
+  "history.col.meeting": "会議",
+  "history.col.speakers": "話者",
+  "history.col.duration": "長さ",
+  "history.col.actionItems": "アクション",
+  "history.col.status": "状態",
+  "history.col.menu": "操作",
+  "history.sortLabel": "会議の並べ替え",
+  "detail.audioUnavailable": "現在ここでは録音を再生できません。文字起こしと要約には影響ありません。",
+  "screen.new.providerLocal": "内蔵（ワークスペースのサーバーで実行）",
+  "screen.new.localLanguageHint": "内蔵の認識エンジンはベトナム語と英語に対応しています。その他の言語は、管理者が 設定 › 音声認識 でこのルームを Soniox または ElevenLabs に切り替えてください。",
+  "screen.new.acknowledgeFirst": "開始するには「{label}」にチェックを入れてください。"
 }

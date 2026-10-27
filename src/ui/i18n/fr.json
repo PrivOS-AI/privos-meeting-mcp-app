@@ -3,8 +3,6 @@
 
   "rail.new": "Nouvelle réunion",
   "rail.history": "Historique",
-  "rail.bookmarks": "Favoris",
-  "rail.search": "Rechercher",
   "rail.settings": "Paramètres",
   "rail.open": "Ouvrir le menu",
   "rail.close": "Fermer le menu",
@@ -230,7 +228,7 @@
 
   "processing.openDetail": "Voir les détails",
 
-  "history.searchPlaceholder": "Rechercher des réunions… (⌘K)",
+  "history.searchPlaceholder": "Rechercher des réunions… ({shortcut})",
   "history.stats.thisWeek": "Réunions cette semaine",
   "history.stats.totalDuration": "Durée totale d'enregistrement",
   "history.stats.openActionItems": "Actions ouvertes",
@@ -372,5 +370,20 @@
   "settings.captionDisplay.sizeMedium": "Moyenne",
   "settings.captionDisplay.sizeLarge": "Grande",
   "settings.captionDisplay.showTranslation": "Afficher la traduction",
-  "settings.captionDisplay.showLiveSpeakerLabels": "Afficher les étiquettes d'intervenants en direct"
+  "settings.captionDisplay.showLiveSpeakerLabels": "Afficher les étiquettes d'intervenants en direct",
+
+  "status.interrupted": "Interrompue",
+  "status.transcriptOnly": "Transcription seule",
+  "status.unknown": "Inconnu",
+  "history.col.meeting": "Réunion",
+  "history.col.speakers": "Intervenants",
+  "history.col.duration": "Durée",
+  "history.col.actionItems": "Actions",
+  "history.col.status": "Statut",
+  "history.col.menu": "Actions",
+  "history.sortLabel": "Trier les réunions",
+  "detail.audioUnavailable": "L’enregistrement ne peut pas être lu ici pour le moment. La transcription et le résumé ne sont pas affectés.",
+  "screen.new.providerLocal": "intégré (sur le serveur de l’espace de travail)",
+  "screen.new.localLanguageHint": "Le moteur intégré comprend le vietnamien et l’anglais. Pour d’autres langues, un administrateur peut passer cette salle à Soniox ou ElevenLabs dans Paramètres › Reconnaissance vocale.",
+  "screen.new.acknowledgeFirst": "Cochez « {label} » pour commencer."
 }

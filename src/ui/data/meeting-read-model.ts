@@ -151,7 +151,9 @@ export async function deleteMeeting(app: McpApp, meeting: MeetingReadModel): Pro
 
 export interface MeetingSpeakerSummary {
   speakerId: string;
+  /** The saved name, or the raw `speakerId` while `named` is false (screens show "Speaker N" then, see `labelUnnamedSpeakers`). */
   displayName: string;
+  named: boolean;
   colorKey: string;
 }
 
@@ -171,10 +173,11 @@ export async function listSpeakersForMeetings(app: McpApp, meetingIds: readonly 
   for (const record of records) {
     const meetingId = String(record.meeting ?? '');
     if (!meetingId) continue;
-    const displayName = typeof record.displayName === 'string' && record.displayName ? record.displayName : String(record.speakerId ?? '?');
+    const named = typeof record.displayName === 'string' && record.displayName.trim() !== '';
     (byMeeting[meetingId] ??= []).push({
       speakerId: String(record.speakerId ?? ''),
-      displayName,
+      displayName: named ? String(record.displayName) : String(record.speakerId ?? '?'),
+      named,
       colorKey: typeof record.colorKey === 'string' && record.colorKey ? record.colorKey : 'blue',
     });
   }
