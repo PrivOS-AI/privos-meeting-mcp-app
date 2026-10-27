@@ -16,6 +16,8 @@ dist-source/
 # dispatch-trust credential, never committed.
 /privos-standalone-identity.json
 /privos-standalone-identity.json.*
+# Container deploy: identity dir mounted into the container (a credential).
+/runtime/
 /.recyclebin/
 
 # Internal-only material — excluded from the public repo
