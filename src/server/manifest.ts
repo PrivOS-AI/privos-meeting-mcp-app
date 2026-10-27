@@ -9,11 +9,16 @@ import type { AppDescriptor, AppPermissionDescriptor } from '@privos_ai/app-serv
 import { getAppIconDataUri } from './app-icon.js';
 import publisherManifest from '../../privos-app.json';
 
-/** The exact field set the marketplace/Hub manifest contract recognizes. */
+/**
+ * The exact field set the marketplace/Hub manifest contract recognizes. Every
+ * field `privos-app.json` carries must be here: the served manifest's digest has
+ * to equal the reviewed file's (pinned at pairing / approval), or `/ready`
+ * reports MANIFEST_DRIFT.
+ */
 export const MARKETPLACE_MANIFEST_FIELDS = [
   'schemaVersion', 'kind', 'name', 'version', 'title', 'description', 'icon',
   'author', 'homepage', 'repository', 'permissions', 'dataPolicy', 'availabilityTier',
-  'capabilities', 'agentBot', 'tools', 'port', 'resources', 'volumes', 'stateless', 'license', 'env',
+  'capabilities', 'agentBot', 'tools', 'port', 'resources', 'volumes', 'stateless', 'license', 'ui', 'env',
   'resourceManifestTemplate',
 ] as const;
 

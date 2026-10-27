@@ -56,3 +56,12 @@ describe('marketplace contract', () => {
     }
   });
 });
+
+describe('served manifest digest', () => {
+  it('equals the reviewed privos-app.json digest (pinned at pairing), so /ready never reports MANIFEST_DRIFT', async () => {
+    delete process.env.FILES_ORIGIN;
+    const { lintManifest } = await import('@privos_ai/app-server/manifest-tools');
+    expect(lintManifest(createManifest() as never).canonicalManifestHash).toBe(lintManifest(manifest as never).canonicalManifestHash);
+    expect(Object.keys(manifest).filter((key) => !(key in createManifest()))).toEqual([]);
+  });
+});
