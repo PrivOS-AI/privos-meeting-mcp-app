@@ -55,6 +55,22 @@ function startManifestOnlySurface(reason: string): void {
   });
 }
 
+/**
+ * The SDK's default logger prints event names only. This one also prints which
+ * request arrived (method, tool, resource) so "the Hub never called us" and
+ * "we failed a resources/read" can be told apart from the container log. Never
+ * logs arguments, tokens or payloads.
+ */
+function logServeAppEvent(event: string, fields: Record<string, unknown>): void {
+  if (event.includes('error') || event.includes('fail') || event.includes('rejected')) {
+    console.error(`[serveApp] ✗ ${event}`, fields);
+    return;
+  }
+  if (event === 'relay.rpc.outbound') return;
+  const detail = [fields.method, fields.toolName].filter((v) => typeof v === 'string').join(' ');
+  console.log(`[serveApp] · ${event}${detail ? ` ${detail}` : ''}`);
+}
+
 /** Boot-time configuration + credential self-checks (non-fatal in dev). */
 async function runBootChecks(): Promise<void> {
   for (const problem of assertProviderKeysAtBoot()) {
@@ -116,6 +132,7 @@ async function start(): Promise<void> {
     port: Number(process.env.PORT || manifest.port || 3012),
     ...(transportOverride ? { transportOverride } : {}),
     resolveManifest: () => createManifest(),
+    logger: logServeAppEvent,
     configure: (app) => {
       app.use('/public', express.static(path.join(repoRoot, 'public')));
       app.get('/.well-known/mcp/manifest.json', (_req, res) => res.json(createManifest()));
