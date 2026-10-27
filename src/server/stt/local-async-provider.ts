@@ -16,8 +16,12 @@ import { ASR_MODEL_FILES, asrModelDir, missingAsrModels, recognizeUtterance, SAM
 import { env } from '../env.js';
 import type { AsyncSttProvider, ProviderStatus, SttResult, SttSegment, SttToken, TranscribeInput } from './stt-provider.js';
 
-/** Clustering cut for the speaker embeddings (sherpa-onnx diarization examples use 0.5 for 3D-Speaker models). */
-const CLUSTER_THRESHOLD = Number(process.env.SPEAKER_DIARIZATION_THRESHOLD) || 0.5;
+/**
+ * Clustering cut for the speaker embeddings; higher merges more. 0.5 (the sherpa-onnx
+ * example) split one 1.6 s sentence into two speakers on the smoke file; 0.7 kept five
+ * clips as five speakers. Tune on real meetings via SPEAKER_DIARIZATION_THRESHOLD.
+ */
+const CLUSTER_THRESHOLD = Number(process.env.SPEAKER_DIARIZATION_THRESHOLD) || 0.7;
 
 export interface SpeechBoundary {
   startSec: number;
