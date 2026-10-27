@@ -183,28 +183,28 @@ function keyForProvider(config: AppEnv, provider: SttVendor): string | undefined
 }
 
 /**
- * Fail-fast at boot IN PRODUCTION when the selected realtime/async provider has
- * no key, or when `VOICEPRINT_ENC_KEY` is missing. The message names the setting
- * that points at the provider so the operator knows which key to add. Returns a
- * list of warnings (non-fatal in dev) rather than throwing there.
+ * Boot-time configuration check. A missing `VOICEPRINT_ENC_KEY` is fatal outside
+ * development (voiceprints must never be sealed with the public default key).
+ * A missing speech-to-text key is only a warning: the app still boots and serves
+ * everything else, and live captions / processing fail with
+ * `PROVIDER_NOT_CONFIGURED` until an operator adds the key. Returns the warnings.
  */
 export function assertProviderKeysAtBoot(config: AppEnv = env): string[] {
-  const problems: string[] = [];
+  const warnings: string[] = [];
   if (!keyForProvider(config, config.realtimeProvider)) {
-    problems.push(
-      `STT_REALTIME_PROVIDER=${config.realtimeProvider} but missing ${config.realtimeProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'}.`,
+    warnings.push(
+      `STT_REALTIME_PROVIDER=${config.realtimeProvider} but missing ${config.realtimeProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'} — live captions are unavailable.`,
     );
   }
   if (!keyForProvider(config, config.asyncProvider)) {
-    problems.push(
-      `STT_ASYNC_PROVIDER=${config.asyncProvider} but missing ${config.asyncProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'}.`,
+    warnings.push(
+      `STT_ASYNC_PROVIDER=${config.asyncProvider} but missing ${config.asyncProvider === 'soniox' ? 'SONIOX_API_KEY' : 'ELEVENLABS_API_KEY'} — meeting processing is unavailable.`,
     );
   }
   if (!config.voiceprintEncKey) {
-    problems.push('missing VOICEPRINT_ENC_KEY (required outside development; voiceprints are encrypted with it).');
+    const problem = 'missing VOICEPRINT_ENC_KEY (required outside development; voiceprints are encrypted with it).';
+    if (!isDevelopmentRuntime()) throw new Error(`Invalid configuration at boot:\n- ${problem}`);
+    warnings.push(problem);
   }
-  if (problems.length && !isDevelopmentRuntime()) {
-    throw new Error(`Invalid configuration at boot:\n- ${problems.join('\n- ')}`);
-  }
-  return problems;
+  return warnings;
 }

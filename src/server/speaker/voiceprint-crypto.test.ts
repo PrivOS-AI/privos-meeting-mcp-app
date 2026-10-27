@@ -128,5 +128,11 @@ describe('voiceprint-crypto', () => {
     it('only warns in development', () => {
       expect(assertProviderKeysAtBoot(withProviderKeys(undefined))).toEqual([expect.stringContaining('VOICEPRINT_ENC_KEY')]);
     });
+
+    it('boots without a speech-to-text key outside development, with a warning per missing provider', () => {
+      runtime.mode = 'standalone-production';
+      const warnings = assertProviderKeysAtBoot({ ...withProviderKeys('configured'), sonioxApiKey: undefined, elevenLabsApiKey: undefined });
+      expect(warnings).toEqual([expect.stringContaining('live captions are unavailable'), expect.stringContaining('meeting processing is unavailable')]);
+    });
   });
 });
