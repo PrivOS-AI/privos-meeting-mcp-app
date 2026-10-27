@@ -36,6 +36,8 @@ function runStandaloneServer(): Promise<number> {
       cwd: repositoryRoot,
       stdio: 'inherit',
       env: { ...process.env, NODE_ENV: 'production' },
+      // On Windows npm/pnpm/yarn are .cmd shims that spawn only finds through a shell (else ENOENT).
+      shell: process.platform === 'win32',
     });
     child.on('error', reject);
     child.on('exit', (code, signal) => resolve(signal ? 1 : (code ?? 0)));
