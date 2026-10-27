@@ -4,7 +4,9 @@
  * the model name to the iframe so this only states where it is configured.
  * `summaryLength`/`summaryLanguage` are per-room `app_settings` writes (room
  * owners, moderators, workspace admins) read by the post-meeting summary;
- * language `auto` keeps the meeting's own language.
+ * language `auto` keeps the meeting's own language. `liveSummaryMinutes` sets the
+ * live panel's cadence while recording; `autoSendSummaryToChat` has the job post
+ * the summary to the room as soon as it exists.
  */
 import { useEffect, useState } from 'react';
 import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
@@ -12,7 +14,7 @@ import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 import { useI18n } from '../../i18n/i18n-provider.js';
 import { LANGUAGE_ENDONYMS, SUPPORTED_LANGUAGES } from '../../i18n/languages.js';
 import { loadWorkspaceSettings, saveWorkspaceSetting } from '../../data/settings-store.js';
-import type { WorkspaceAppSettings } from '../../../shared/app-settings.js';
+import { LIVE_SUMMARY_MINUTES, type WorkspaceAppSettings } from '../../../shared/app-settings.js';
 import { useCanManageRoomSettings } from './use-can-manage-room-settings.js';
 
 export function AiSummaryPanel() {
@@ -30,7 +32,7 @@ export function AiSummaryPanel() {
       .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
   }, [app, roomId]);
 
-  async function change<K extends 'summaryLength' | 'summaryLanguage'>(key: K, value: WorkspaceAppSettings[K]): Promise<void> {
+  async function change<K extends 'summaryLength' | 'summaryLanguage' | 'liveSummaryMinutes' | 'autoSendSummaryToChat'>(key: K, value: WorkspaceAppSettings[K]): Promise<void> {
     if (!settings) return;
     setSettings({ ...settings, [key]: value });
     try {
@@ -49,6 +51,25 @@ export function AiSummaryPanel() {
         <strong>Hub AI</strong>
       </div>
       <p className="ma-settings-panel__hint">{t('settings.aiSummary.modelHint')}</p>
+
+      <h4 className="ma-settings-panel__subtitle">{t('settings.aiSummary.duringMeeting')}</h4>
+      <label className="ma-settings-field">
+        <span>{t('settings.aiSummary.liveEvery')}</span>
+        <select
+          value={settings?.liveSummaryMinutes ?? 5}
+          disabled={!canManage || !settings}
+          onChange={(e) => void change('liveSummaryMinutes', Number(e.target.value))}
+        >
+          {LIVE_SUMMARY_MINUTES.map((minutes) => (
+            <option key={minutes} value={minutes}>
+              {minutes === 0 ? t('settings.aiSummary.liveManual') : t('settings.aiSummary.liveMinutes', { minutes })}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="ma-settings-panel__hint">{t('settings.aiSummary.liveHint')}</p>
+
+      <h4 className="ma-settings-panel__subtitle">{t('settings.aiSummary.afterMeeting')}</h4>
 
       <label className="ma-settings-field">
         <span>{t('settings.aiSummary.length')}</span>
@@ -78,6 +99,17 @@ export function AiSummaryPanel() {
           ))}
         </select>
       </label>
+
+      <label className="ma-settings-field ma-settings-field--checkbox">
+        <input
+          type="checkbox"
+          checked={settings?.autoSendSummaryToChat ?? false}
+          disabled={!canManage || !settings}
+          onChange={(e) => void change('autoSendSummaryToChat', e.target.checked)}
+        />
+        <span>{t('settings.aiSummary.autoSend')}</span>
+      </label>
+      <p className="ma-settings-panel__hint">{t('settings.aiSummary.autoSendHint')}</p>
 
       {!canManage ? <p className="ma-settings-panel__hint">{t('settings.adminOnlyNote')}</p> : null}
       {error ? (

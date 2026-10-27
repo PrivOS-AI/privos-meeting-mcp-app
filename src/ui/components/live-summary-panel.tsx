@@ -1,7 +1,7 @@
 /**
  * The live "Summary" panel (item #5): while a meeting is running it asks the
- * `meeting_live_summary` tool to summarize the transcript SO FAR, every ~10
- * minutes (plus a manual refresh), and renders the summary with the action
+ * `meeting_live_summary` tool to summarize the transcript SO FAR, every N
+ * minutes (the room's `liveSummaryMinutes`, 0 = on demand only; plus a manual refresh), and renders the summary with the action
  * items stacked directly beneath it. The authoritative, stored summary is
  * still produced once from the final transcript after the meeting ends.
  */
@@ -9,13 +9,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { MarkdownText } from './markdown-text.js';
+import { DEFAULT_WORKSPACE_SETTINGS } from '../../shared/app-settings.js';
+import { loadWorkspaceSettings } from '../data/settings-store.js';
 import { fetchLiveSummary, type LiveSummaryResult, type LiveSummaryLine } from '../data/live-summary-api.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 import { asLanguageCode } from '../../shared/languages.js';
 import { resolveLineSpeakerKey, useRecordingState, type RecordingState } from '../stores/recording-store.js';
 
-/** Auto-refresh cadence — the first summary lands ~10 min in, then every 10 min. */
-const REFRESH_INTERVAL_MS = 10 * 60_000;
 /** Below this many finalized lines there is nothing worth summarizing yet. */
 const MIN_LINES = 3;
 
@@ -43,6 +43,20 @@ export function LiveSummaryPanel() {
   const [result, setResult] = useState<LiveSummaryResult | null>(null);
   const [status, setStatus] = useState<Status>('idle');
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [intervalMin, setIntervalMin] = useState(DEFAULT_WORKSPACE_SETTINGS.liveSummaryMinutes);
+
+  useEffect(() => {
+    if (!roomId) return;
+    let cancelled = false;
+    loadWorkspaceSettings(app, roomId)
+      .then((settings) => {
+        if (!cancelled) setIntervalMin(settings.liveSummaryMinutes);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [app, roomId]);
 
   // The interval + refresh handler read the LATEST state without re-subscribing.
   const stateRef = useRef(state);
@@ -84,18 +98,20 @@ export function LiveSummaryPanel() {
     }
   }, [app, roomId, language, t]);
 
-  // Keep `run` in a ref so the 10-min interval is created ONCE per status change.
+  // Keep `run` in a ref so the interval is created ONCE per status/cadence change.
   // (The panel re-renders every second as the elapsed clock ticks; depending on
   // `run` here would clear+recreate the timer each render and it would never fire.)
   const runRef = useRef(run);
   runRef.current = run;
   useEffect(() => {
     if (state.status !== 'recording' && state.status !== 'paused') return;
-    const id = setInterval(() => void runRef.current(), REFRESH_INTERVAL_MS);
+    if (intervalMin <= 0) return;
+    const id = setInterval(() => void runRef.current(), intervalMin * 60_000);
     return () => clearInterval(id);
-  }, [state.status]);
+  }, [state.status, intervalMin]);
 
   const busy = status === 'loading';
+  const waitingText = intervalMin > 0 ? t('recording.liveSummary.waiting', { minutes: intervalMin }) : t('recording.liveSummary.waitingManual');
   const timeLabel = updatedAt
     ? new Date(updatedAt).toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' })
     : null;
@@ -112,7 +128,7 @@ export function LiveSummaryPanel() {
               ? t('recording.liveSummary.loading')
               : status === 'error'
                 ? t('recording.liveSummary.error')
-                : t('recording.liveSummary.waiting')}
+                : waitingText}
           </p>
         )}
       </section>
@@ -131,7 +147,7 @@ export function LiveSummaryPanel() {
             ))}
           </ul>
         ) : (
-          <p className="ma-side-panel__empty">{result ? t('recording.liveSummary.noActions') : t('recording.liveSummary.waiting')}</p>
+          <p className="ma-side-panel__empty">{result ? t('recording.liveSummary.noActions') : waitingText}</p>
         )}
       </section>
 

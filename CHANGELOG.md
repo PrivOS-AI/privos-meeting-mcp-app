@@ -120,3 +120,19 @@ Marketplace packaging.
     a disabled Start button says what is missing.
   - The rail no longer shows the permanently disabled Bookmarks and Search
     entries (both live in History and the meeting view).
+- Faster live captions with the built-in recognizer: the speech in progress shows
+  as a draft about once a second (one model, the language last heard) and the
+  final caption replaces it; a push waits up to 0.7 s for the decodes it
+  started, so a finished sentence arrives in the same answer instead of the
+  next one; the owner check of `meeting_audio_push` is cached for 30 s instead
+  of costing an App DB round trip per push; the client sends again as soon as
+  a push returns with audio waiting; long utterances are cut at 10 s (was 15).
+- New room settings under Settings › AI summary: the live summary cadence
+  (`liveSummaryMinutes`: on demand, 3, 5 (default), 10 or 15 minutes; it was
+  fixed at 10) and `autoSendSummaryToChat` (off by default), which posts the
+  summary to the room as the bot as soon as processing finishes, once per
+  meeting; a refusal leaves the "Send to chat" button.
+- Settings › Speech recognition: provider cards per role (live captions /
+  transcript after the meeting) with what each is good at and whether it is
+  ready, instead of two selects and a table of internal names; model details
+  sit under "Technical details".

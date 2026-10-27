@@ -50,6 +50,7 @@ function fakeEngine(recognized: string[] = []): LiveAsrEngine & { recognizeCalls
           speechStart = null;
           speech = [];
         },
+        isDetected: () => speechStart !== null,
       } as unknown as Awaited<ReturnType<LiveAsrEngine['createVad']>>;
     },
     async recognize(samples, atSec) {
@@ -143,5 +144,59 @@ describe('pcm16ToFloat32', () => {
     bytes.writeInt16LE(-32768, 2);
     bytes.writeInt16LE(0, 4);
     expect(Array.from(pcm16ToFloat32(bytes))).toEqual([0.5, -1, 0]);
+  });
+});
+
+describe('LiveAsrSession drafts', () => {
+  beforeEach(() => resetLiveSessionsForTests());
+
+  function draftEngine() {
+    const engine = fakeEngine(['Chốt thứ Sáu']);
+    const draftCalls: number[] = [];
+    return Object.assign(engine, {
+      draftCalls,
+      async recognizeDraft(samples: Float32Array) {
+        draftCalls.push(samples.length);
+        return `đang nói ${draftCalls.length}`;
+      },
+    });
+  }
+
+  it('shows the speech in progress as a draft, then replaces it with the final', async () => {
+    const engine = draftEngine();
+    const session = new LiveAsrSession('m1', engine);
+    // ~1.3 s of speech, nobody has stopped yet.
+    await session.push(0, 0, speech(40));
+    await session.settle(100);
+    const talking = session.captionsSince(0);
+    expect(talking.captions).toEqual([]);
+    expect(talking.draft).toMatchObject({ id: 'm1:local:draft', text: 'đang nói 1', atSec: 0 });
+
+    // The speaker stops: the draft goes and the final caption is in the same answer.
+    await session.push(1, 40 * WINDOW / RATE, silence(2));
+    await session.settle(100);
+    const done = session.captionsSince(0);
+    expect(done.draft).toBeNull();
+    expect(done.captions.map((c) => c.text)).toEqual(['Chốt thứ Sáu']);
+  });
+
+  it('decodes a draft at most about once a second', async () => {
+    const engine = draftEngine();
+    const session = new LiveAsrSession('m1', engine);
+    // Six pushes of ~0.32 s of continuous speech (~1.9 s in all).
+    for (let seq = 0; seq < 6; seq++) {
+      await session.push(seq, (seq * 10 * WINDOW) / RATE, speech(10));
+      await session.settle(50);
+    }
+    expect(engine.draftCalls.length).toBe(1);
+  });
+
+  it('emits no draft for a blip shorter than 0.6 s', async () => {
+    const engine = draftEngine();
+    const session = new LiveAsrSession('m1', engine);
+    await session.push(0, 0, speech(10));
+    await session.settle(50);
+    expect(session.captionsSince(0).draft).toBeNull();
+    expect(engine.draftCalls).toEqual([]);
   });
 });

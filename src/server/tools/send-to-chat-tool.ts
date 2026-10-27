@@ -64,6 +64,44 @@ function buildChatSummary(meeting: DbRow, fileLink: string | undefined): string 
   return `${header}${truncate(summary, bodyBudget)}${footer}`;
 }
 
+/**
+ * Posts a meeting's saved summary to its room as the bot, once: shared by the
+ * tool (the owner's click) and the job (the room's `autoSendSummaryToChat`).
+ * `meeting` is the current row; the send is idempotent on its `sentToChatAt`.
+ */
+export async function sendSummaryToChat(db: AppDbBotClient, roomId: string, meetingId: string, meeting: DbRow): Promise<{ sent: boolean; alreadySent?: boolean; sentAt: string }> {
+  if (typeof meeting.sentToChatAt === 'string' && meeting.sentToChatAt) {
+    return { sent: false, alreadySent: true, sentAt: meeting.sentToChatAt };
+  }
+  const pending = inFlight.get(meetingId);
+  if (pending) return { ...(await pending), sent: false, alreadySent: true };
+  if (!meeting.summaryText || typeof meeting.summaryText !== 'string') {
+    throw new AppError('Meeting has no summary to send yet.', 'INVALID_STATE');
+  }
+
+  // The Hub renders `@Files:<roomId>/<path>` as a link into the room's Files (its own chat syntax).
+  const fileLink =
+    typeof meeting.summaryFileId === 'string' && meeting.summaryFileId
+      ? `@Files:${roomId}/${folderName(String(meeting.title ?? ''), meetingId, startedAtDate(meeting.startedAt))}/summary.md`
+      : undefined;
+  const text = buildChatSummary(meeting, fileLink);
+
+  // Never swallowed: a Hub rejection (unknown tool, missing scope, bot not in room) surfaces verbatim so the UI
+  // can show the "Send to chat unavailable" tooltip instead of silently no-op'ing (plan.md: "no silent failure").
+  const send = (async () => {
+    await callAppPlatformTool(BOT_SEND_MESSAGE_TOOL, { roomId, text }, SEND_MESSAGE_SCOPE, roomId);
+    const sentAt = new Date().toISOString();
+    await upsertMeeting(db, meetingId, { sentToChatAt: sentAt });
+    return { sent: true, sentAt };
+  })();
+  inFlight.set(meetingId, send);
+  try {
+    return await send;
+  } finally {
+    inFlight.delete(meetingId);
+  }
+}
+
 export const sendToChatTool: AppTool = {
   name: 'meeting_send_to_chat',
   title: 'Send summary to chat',
@@ -77,35 +115,6 @@ export const sendToChatTool: AppTool = {
 
     const db = new AppDbBotClient(roomId);
     const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
-    if (typeof meeting.sentToChatAt === 'string' && meeting.sentToChatAt) {
-      return { sent: false, alreadySent: true, sentAt: meeting.sentToChatAt };
-    }
-    const pending = inFlight.get(meetingId);
-    if (pending) return { ...(await pending), sent: false, alreadySent: true };
-    if (!meeting.summaryText || typeof meeting.summaryText !== 'string') {
-      throw new AppError('Meeting has no summary to send yet.', 'INVALID_STATE');
-    }
-
-    // The Hub renders `@Files:<roomId>/<path>` as a link into the room's Files (its own chat syntax).
-    const fileLink =
-      typeof meeting.summaryFileId === 'string' && meeting.summaryFileId
-        ? `@Files:${roomId}/${folderName(String(meeting.title ?? ''), meetingId, startedAtDate(meeting.startedAt))}/summary.md`
-        : undefined;
-    const text = buildChatSummary(meeting, fileLink);
-
-    // Never swallowed: a Hub rejection (unknown tool, missing scope, bot not in room) surfaces verbatim so the UI
-    // can show the "Send to chat unavailable" tooltip instead of silently no-op'ing (plan.md: "no silent failure").
-    const send = (async () => {
-      await callAppPlatformTool(BOT_SEND_MESSAGE_TOOL, { roomId, text }, SEND_MESSAGE_SCOPE, roomId);
-      const sentAt = new Date().toISOString();
-      await upsertMeeting(db, meetingId, { sentToChatAt: sentAt });
-      return { sent: true, sentAt };
-    })();
-    inFlight.set(meetingId, send);
-    try {
-      return await send;
-    } finally {
-      inFlight.delete(meetingId);
-    }
+    return sendSummaryToChat(db, roomId, meetingId, meeting);
   },
 };

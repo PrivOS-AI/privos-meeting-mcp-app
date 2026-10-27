@@ -35,6 +35,10 @@ export interface WorkspaceAppSettings {
   interruptedPartsRetentionDays: number;
   /** Days after which a finished meeting is deleted entirely (Files, voice samples, records); `0` = keep. */
   autoDeleteMeetingsDays: number;
+  /** Minutes between live summaries while recording; `0` = only on demand. */
+  liveSummaryMinutes: number;
+  /** Post the summary to the room chat (as the bot) as soon as processing finishes. */
+  autoSendSummaryToChat: boolean;
 }
 
 /**
@@ -61,6 +65,8 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceAppSettings = {
   autoDeleteAudioDays: 90,
   interruptedPartsRetentionDays: 7,
   autoDeleteMeetingsDays: 0,
+  liveSummaryMinutes: 5,
+  autoSendSummaryToChat: false,
 };
 
 export const WORKSPACE_SETTING_KEYS = Object.keys(DEFAULT_WORKSPACE_SETTINGS) as ReadonlyArray<keyof WorkspaceAppSettings>;
@@ -94,6 +100,16 @@ function nonNegativeIntValidator(name: string): Validator {
   };
 }
 
+/** The live-summary cadences offered; `0` = only on demand. */
+export const LIVE_SUMMARY_MINUTES = [0, 3, 5, 10, 15] as const;
+
+function enumNumberValidator(name: string, allowed: readonly number[]): Validator {
+  return (value) => {
+    if (typeof value !== 'number' || !allowed.includes(value)) throw new AppError(`${name} must be one of: ${allowed.join(', ')}.`);
+    return value;
+  };
+}
+
 function booleanValidator(name: string): Validator {
   return (value) => {
     if (typeof value !== 'boolean') throw new AppError(`${name} must be true/false.`);
@@ -113,6 +129,8 @@ export const WORKSPACE_SETTING_VALIDATORS: Record<keyof WorkspaceAppSettings, Va
   interruptedPartsRetentionDays: nonNegativeIntValidator('interruptedPartsRetentionDays'),
   autoDeleteMeetingsDays: nonNegativeIntValidator('autoDeleteMeetingsDays'),
   keepOriginalAudio: booleanValidator('keepOriginalAudio'),
+  liveSummaryMinutes: enumNumberValidator('liveSummaryMinutes', LIVE_SUMMARY_MINUTES),
+  autoSendSummaryToChat: booleanValidator('autoSendSummaryToChat'),
 };
 
 export function isWorkspaceSettingKey(key: string): key is keyof WorkspaceAppSettings {

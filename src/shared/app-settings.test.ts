@@ -24,3 +24,17 @@ describe('speakerRecognition', () => {
     expect(() => WORKSPACE_SETTING_VALIDATORS.speakerRecognition('off')).toThrow(/speakerRecognition/);
   });
 });
+
+describe('meeting follow-up settings', () => {
+  it('summarizes live every 5 minutes by default and only at the offered cadences', () => {
+    expect(DEFAULT_WORKSPACE_SETTINGS.liveSummaryMinutes).toBe(5);
+    expect(WORKSPACE_SETTING_VALIDATORS.liveSummaryMinutes(0)).toBe(0);
+    expect(WORKSPACE_SETTING_VALIDATORS.liveSummaryMinutes(15)).toBe(15);
+    expect(() => WORKSPACE_SETTING_VALIDATORS.liveSummaryMinutes(1)).toThrow(/liveSummaryMinutes/);
+  });
+
+  it('does not post to chat unless the room turns it on', () => {
+    expect(DEFAULT_WORKSPACE_SETTINGS.autoSendSummaryToChat).toBe(false);
+    expect(() => WORKSPACE_SETTING_VALIDATORS.autoSendSummaryToChat('yes')).toThrow(/autoSendSummaryToChat/);
+  });
+});

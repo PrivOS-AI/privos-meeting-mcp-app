@@ -120,7 +120,8 @@ export async function createVad(): Promise<Vad> {
         minSilenceDuration: 0.4,
         minSpeechDuration: 0.25,
         windowSize: 512,
-        maxSpeechDuration: 15,
+        // A live caption is final only once its utterance ends; a monologue is cut at 10 s so it never waits longer.
+        maxSpeechDuration: 10,
       },
       sampleRate: SAMPLE_RATE,
       numThreads: 1,
@@ -194,6 +195,19 @@ export async function recognizeUtterance(samples: Float32Array, offsetSec = 0): 
     words,
     confidence: Number.isFinite(best.meanLogProb) ? Math.exp(best.meanLogProb) : 0,
   };
+}
+
+/**
+ * A draft of speech still in progress, for a live caption shown while the person is talking.
+ * Decoded with ONE model (the language the meeting last used) — half the cost of
+ * `recognizeUtterance`, which decides the language once the utterance is complete.
+ */
+export async function recognizeDraft(samples: Float32Array, lang: AsrLanguage): Promise<string> {
+  const decoded = await decodeWith(lang, samples);
+  return sentenceCase(tokensToWords(decoded.tokens, decoded.timestamps, 0, samples.length / SAMPLE_RATE), lang)
+    .map((word) => word.text)
+    .join('')
+    .trim();
 }
 
 /** Loads both recognizers ahead of the first utterance (boot warm-up). Never throws. */

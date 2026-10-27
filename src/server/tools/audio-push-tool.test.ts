@@ -46,7 +46,7 @@ vi.mock('../asr/asr-engine.js', async (importOriginal) => {
 let store: Store;
 let fakeHub: ReturnType<typeof installFakeHub>;
 
-const { audioPushTool } = await import('./audio-push-tool.js');
+const { audioPushTool, resetAudioPushOwnerChecksForTests } = await import('./audio-push-tool.js');
 const { resetLiveSessionsForTests, liveSessionFor } = await import('../asr/live-asr-session.js');
 const { resetRateLimits } = await import('./rate-limiter.js');
 const { env } = await import('../env.js');
@@ -69,6 +69,7 @@ describe('meeting_audio_push', () => {
   beforeEach(() => {
     resetLiveSessionsForTests();
     resetRateLimits();
+    resetAudioPushOwnerChecksForTests();
     store = { meetings: [{ _id: 'meeting-1', roomId: 'room-1', ownerUserId: 'owner-1', status: 'recording' }] };
     fakeHub = installFakeHub({ store });
   });

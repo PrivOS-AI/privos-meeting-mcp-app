@@ -318,6 +318,10 @@ function applyCaption(lines: CaptionLine[], event: CaptionEvent, speakerMap: Rec
     }
     return lines;
   }
+  // An empty draft withdraws the draft line of that id (speech that produced no final).
+  if (event.kind === 'draft' && !event.text.trim()) {
+    return lines.some((l) => l.id === event.id && !l.isFinal) ? lines.filter((l) => l.id !== event.id || l.isFinal) : lines;
+  }
   // Register a newly seen speaker BEFORE any early return below — otherwise a
   // line can render with a speaker the map does not know ("speaker 0").
   if (event.speakerKey && !speakerMap[event.speakerKey]) {

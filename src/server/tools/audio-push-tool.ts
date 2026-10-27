@@ -23,6 +23,15 @@ const MAX_PCM_BYTES = 131_072;
 const MAX_PCM_BASE64 = Math.ceil(MAX_PCM_BYTES / 3) * 4;
 /** Pushes per meeting per window: ~2/s expected, room for a burst of retries. */
 const PUSH_LIMIT = 12;
+/** How long a push waits for the decodes it started. */
+const SETTLE_MS = 700;
+/** A verified owner of a recording meeting is not re-checked for this long. */
+const OWNER_CHECK_TTL_MS = 30_000;
+const ownerChecks = new Map<string, number>();
+
+export function resetAudioPushOwnerChecksForTests(): void {
+  ownerChecks.clear();
+}
 const PUSH_WINDOW_MS = 2_000;
 
 export const audioPushTool: AppTool = {
@@ -55,9 +64,15 @@ export const audioPushTool: AppTool = {
     if (Number(args.sampleRate) !== SAMPLE_RATE) throw new AppError(`Audio must be ${SAMPLE_RATE} Hz mono PCM16.`, 'INVALID_INPUT');
     if (pcm.length > MAX_PCM_BASE64) throw new AppError('Audio chunk is too large (at most about 4 seconds per push).', 'INVALID_INPUT');
 
-    const db = new AppDbBotClient(roomId);
-    const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
-    if (meeting.status !== 'recording') throw new AppError('Meeting is not currently recording.', 'INVALID_STATE');
+    // Pushes arrive every ~1.5 s: the owner/recording check goes to App DB (a Hub round trip)
+    // once per OWNER_CHECK_TTL_MS, not on every push, so it stays off the caption path.
+    const checkKey = `${meetingId}:${actor.userId}`;
+    if ((ownerChecks.get(checkKey) ?? 0) < Date.now()) {
+      const db = new AppDbBotClient(roomId);
+      const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
+      if (meeting.status !== 'recording') throw new AppError('Meeting is not currently recording.', 'INVALID_STATE');
+      ownerChecks.set(checkKey, Date.now() + OWNER_CHECK_TTL_MS);
+    }
     if (!checkRateLimit('meeting_audio_push', meetingId, PUSH_LIMIT, PUSH_WINDOW_MS)) {
       throw new AppError('Too many audio pushes for this meeting — slow down.', 'RATE_LIMITED');
     }
@@ -73,6 +88,9 @@ export const audioPushTool: AppTool = {
     const bytes = Buffer.from(pcm, 'base64');
     if (bytes.length > MAX_PCM_BYTES || bytes.length % 2 !== 0) throw new AppError('Audio chunk must be whole PCM16 samples, at most 128 KB.', 'INVALID_INPUT');
     await session.push(seq, chunkStartSec, pcm16ToFloat32(bytes));
+    // An utterance that just ended is usually decoded within this wait, so its caption
+    // rides this answer instead of the next push ~1.5 s later.
+    await session.settle(SETTLE_MS);
     return { ...session.captionsSince(cursor), degraded: session.degraded };
   },
 };

@@ -18,6 +18,7 @@ import { AppError } from '../../shared/app-error.js';
 import { env } from '../env.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { getSetting } from '../hub/app-settings.js';
+import { sendSummaryToChat } from '../tools/send-to-chat-tool.js';
 import { uploadBotFile } from '../files/hub-file-upload.js';
 import { concatParts, deletePartFiles, type PartRef } from '../media/concat-parts.js';
 import { decodeToWav16k } from '../media/decode-audio.js';
@@ -493,6 +494,10 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       summaryError: summaryError ?? '',
     });
 
+    // 7b. the room may ask for the summary in chat as soon as it exists. Best-effort: a refusal
+    // (no `bot:message:send`, bot outside the room) leaves the manual "Send to chat" button.
+    if (summarized) await autoSendSummary(db, roomId, job.meetingId);
+
     // 8. cleanup — delete audio.webm ONLY when keepAudio===false AND summarize succeeded (plan.md: never delete the
     // only remaining source of truth when the AI step failed, even if the user opted out of keeping audio).
     await jobRepo.patch(job._id, { step: 'cleanup', progress: 0.98 });
@@ -523,5 +528,15 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
     // Runs on BOTH success and failure — the logs from a job that just failed matter most (plan.md § diagnostics).
     await uploadRoomCopy(agentBotHub, roomId, folderId, job.meetingId);
     await rm(scratch, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+async function autoSendSummary(db: AppDbBotClient, roomId: string, meetingId: string): Promise<void> {
+  try {
+    if ((await getSetting<boolean>(new AppDbBotClient(roomId), 'autoSendSummaryToChat')) !== true) return;
+    const meeting = await db.getById('meetings', 'room', meetingId);
+    if (meeting) await sendSummaryToChat(db, roomId, meetingId, meeting);
+  } catch (error) {
+    console.warn('[meeting-job] auto-send of the summary to chat failed (the button still works):', error instanceof Error ? error.message : error);
   }
 }

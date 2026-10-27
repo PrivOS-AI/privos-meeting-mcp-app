@@ -4,7 +4,8 @@
  * the meeting's `MediaStream` is tapped with WebAudio, downsampled to 16 kHz
  * mono, and sent every ~500 ms as PCM16 to `meeting_audio_push`, one push at a
  * time. Each answer carries the captions recognised since our cursor; they
- * arrive per utterance (final only — no drafts) on the meeting clock.
+ * arrive per utterance on the meeting clock, preceded by a `draft` of the
+ * speech still in progress that the final replaces.
  *
  * A failed push keeps its chunk and is retried with the next one (same `seq`,
  * so the server never feeds it twice); the backlog is capped, and audio
@@ -32,6 +33,8 @@ export interface AudioPushResponse {
   captions: Array<{ index: number; id: string; text: string; atSec: number; endSec: number; lang: string }>;
   cursor: number;
   degraded?: boolean;
+  /** The speech still in progress; `null` once it ended (its final is in `captions`) or nobody talks. */
+  draft?: { id: string; text: string; atSec: number; endSec: number; lang: string } | null;
 }
 
 /** Averages `input` (at `inputRate`) down to 16 kHz. Carries the fractional position across calls. */
@@ -116,6 +119,22 @@ export function createLocalConnection(opts: RealtimeConnectionOptions): Realtime
   mute.connect(context.destination);
   void context.resume();
 
+  /** Id of the draft line on screen, if any. */
+  let shownDraft: string | null = null;
+  const emitDraft = (response: AudioPushResponse) => {
+    const draft = response.draft ?? null;
+    if (draft) {
+      opts.onCaption({ kind: 'draft', id: draft.id, text: draft.text, atSec: draft.atSec, endSec: draft.endSec, lang: draft.lang });
+      shownDraft = draft.id;
+    } else if (shownDraft && response.captions.length === 0) {
+      // Speech that came to nothing (a cough, noise): clear the draft. A new final replaces it on its own.
+      opts.onCaption({ kind: 'draft', id: shownDraft, text: '', atSec: 0, endSec: 0 });
+      shownDraft = null;
+    } else {
+      shownDraft = null;
+    }
+  };
+
   const emit = (captions: AudioPushResponse['captions']) => {
     for (const caption of captions) {
       const event: CaptionEvent = { kind: 'final', id: caption.id, text: caption.text, atSec: caption.atSec, endSec: caption.endSec, lang: caption.lang };
@@ -135,6 +154,7 @@ export function createLocalConnection(opts: RealtimeConnectionOptions): Realtime
       seq++;
       cursor = response.cursor;
       emit(response.captions);
+      emitDraft(response);
       if (!live) {
         live = true;
         opts.onStatus('live', { sessionIndex: 0 });
@@ -146,6 +166,8 @@ export function createLocalConnection(opts: RealtimeConnectionOptions): Realtime
     } finally {
       inFlight = false;
     }
+    // A round trip takes longer than the tick: send what piled up meanwhile right away instead of idling until it.
+    if (!stopped && live && pending.length >= TARGET_RATE / 4) void pushOnce();
   };
 
   opts.onStatus('connecting', { sessionIndex: 0 });
