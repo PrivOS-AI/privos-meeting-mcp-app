@@ -14,7 +14,7 @@ before `meeting_bootstrap`.
 | `db:schema:read` | required | both | `src/server/hub/app-db-bot-client.ts` (`mcpapp.db.getSchema`, `mcpapp.db.listCollections`) | — |
 | `db:schema:write` | required | both | `src/server/hub/app-db-bot-client.ts` (register collections in `meeting_bootstrap`) | — |
 | `db:read` | required | both | `src/server/hub/app-db-bot-client.ts` (`mcpapp.db.query`, `mcpapp.db.get`); `src/ui/data/app-db-client.ts` (history, detail screens) | — |
-| `db:write` | required | both | `src/server/hub/app-db-bot-client.ts` (`mcpapp.db.create/update/delete`: meetings, jobs, encrypted voiceprints); `src/ui/data/app-db-client.ts` (drafts, bookmarks) | — |
+| `db:write` | required | both | `src/server/hub/app-db-bot-client.ts` (`mcpapp.db.create/update/delete`: meetings, jobs, encrypted voiceprints, action items, decisions); `src/ui/data/app-db-client.ts` (drafts, bookmarks, action item done/pushed; deleting a meeting deletes its rows) | — |
 | `sandbox:generate` | required | user | `src/server/hub/hub-ai-client.ts` (summary, live summary, translation) | — |
 | `sandbox:botkey:push` | optional | user | `src/ui/data/sandbox-bot-key.ts` (`agents.sandbox.botKeyStatus`, `agents.sandbox.pushBotKey`) | An admin pushes the bot key manually; Hub AI summary and translation stay unavailable until then |
 | `rooms:read` | optional | user | `src/ui/data/room-members.ts` (`groups.members` / `channels.members` for the speaker member picker); `src/ui/data/open-in-files.ts` (`rooms.info`, the room type and name for the **Open in Files** link) | The user types a speaker name instead of picking a member; **Open in Files** assumes a private group named as the host reports it |

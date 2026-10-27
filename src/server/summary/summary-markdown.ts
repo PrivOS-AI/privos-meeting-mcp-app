@@ -7,7 +7,7 @@
  * is rendered as-is, matching `transcript/markdown-writer.ts`'s convention of
  * not re-escaping segment text.
  */
-import type { SummaryPayload } from './summarizer.js';
+import type { SummaryActionItem, SummaryPayload } from './summarizer.js';
 import { escapeMarkdown, SUMMARY_MARKDOWN_LABELS, type SummaryLanguage } from './prompts.js';
 import { sanitizeDisplayName } from './sanitize.js';
 
@@ -53,25 +53,41 @@ export function renderSummaryMarkdown(input: RenderSummaryMarkdownInput): string
   lines.push(`## ${labels.decisions}`);
   lines.push('');
   if (input.payload.decisions.length > 0) {
-    for (const decision of input.payload.decisions) lines.push(`- ${decision}`);
-  } else {
-    lines.push('—');
-  }
-  lines.push('');
-
-  lines.push(`## ${labels.actionItems}`);
-  lines.push('');
-  if (input.payload.action_items.length > 0) {
-    lines.push(`| ${labels.task} | ${labels.owner} | ${labels.due} | ${labels.at} |`);
-    lines.push('| --- | --- | --- | --- |');
-    for (const item of input.payload.action_items) {
-      const at = typeof item.at === 'number' ? formatTimestamp(item.at) : '—';
-      lines.push(`| ${escapeCell(item.task)} | ${escapeCell(item.owner ?? '—')} | ${escapeCell(item.due ?? '—')} | ${at} |`);
+    for (const decision of input.payload.decisions) {
+      const meta = [decision.by ? `${labels.decidedBy}: ${escapeMarkdown(decision.by)}` : '', typeof decision.at === 'number' ? formatTimestamp(decision.at) : '']
+        .filter(Boolean)
+        .join(' · ');
+      lines.push(`- ${decision.text}${meta ? ` _(${meta})_` : ''}`);
     }
   } else {
     lines.push('—');
   }
   lines.push('');
+
+  // Tasks always get their section (an empty one says so); requests and open questions only when there are some.
+  const sections: Array<{ heading: string; items: SummaryActionItem[]; always: boolean }> = [
+    { heading: labels.actionItems, items: input.payload.action_items.filter((i) => i.type === 'task'), always: true },
+    { heading: labels.requests, items: input.payload.action_items.filter((i) => i.type === 'request'), always: false },
+    { heading: labels.questions, items: input.payload.action_items.filter((i) => i.type === 'question'), always: false },
+  ];
+  for (const section of sections) {
+    if (section.items.length === 0 && !section.always) continue;
+    lines.push(`## ${section.heading}`);
+    lines.push('');
+    if (section.items.length === 0) {
+      lines.push('—');
+    } else {
+      lines.push(`| ${labels.task} | ${labels.requester} | ${labels.owner} | ${labels.due} | ${labels.at} |`);
+      lines.push('| --- | --- | --- | --- | --- |');
+      for (const item of section.items) {
+        const at = typeof item.at === 'number' ? formatTimestamp(item.at) : '—';
+        const task = item.quote ? `${escapeCell(item.task)}<br>_“${escapeCell(item.quote)}”_` : escapeCell(item.task);
+        const due = [item.due, item.due_date && item.due_date !== item.due ? item.due_date : ''].filter(Boolean).join(' · ');
+        lines.push(`| ${task} | ${escapeCell(item.requester ?? '—')} | ${escapeCell(item.owner ?? '—')} | ${escapeCell(due || '—')} | ${at} |`);
+      }
+    }
+    lines.push('');
+  }
 
   lines.push(`## ${labels.keyTopics}`);
   lines.push('');

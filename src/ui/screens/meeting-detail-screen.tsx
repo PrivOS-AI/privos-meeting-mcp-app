@@ -26,7 +26,7 @@ import { TranscriptView } from '../components/transcript-view.js';
 import { addBookmarkAt, deleteBookmark, listBookmarks, type BookmarkRecord } from '../data/bookmark-read-model.js';
 import { formatClock } from '../data/format-time.js';
 import { searchTranscript, type Hit } from '../data/keyword-search.js';
-import { listActionItems, type ActionItemRecord } from '../data/action-item-read-model.js';
+import { listActionItems, listDecisions, type ActionItemRecord, type DecisionRecord } from '../data/action-item-read-model.js';
 import { downloadMeetingDocx, downloadMeetingSrt } from '../data/meeting-export.js';
 import { getMeeting, listSpeakersForMeetings, renameMeeting, type MeetingReadModel, type MeetingSpeakerSummary } from '../data/meeting-read-model.js';
 import { resolveFileUrl } from '../data/file-download.js';
@@ -58,6 +58,7 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
   const [rawSpeakers, setRawSpeakers] = useState<MeetingSpeakerSummary[]>([]);
   const speakers = useMemo(() => labelUnnamedSpeakers(rawSpeakers, (n) => t('recording.speakerBadge.numbered', { n })), [rawSpeakers, t]);
   const [actionItems, setActionItems] = useState<ActionItemRecord[]>([]);
+  const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
   const [bookmarks, setBookmarks] = useState<BookmarkRecord[]>([]);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioErrored, setAudioErrored] = useState(false);
@@ -83,11 +84,14 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
     try {
       const record = await getMeeting(app, meetingId);
       setMeeting(record);
-      const [speakerMap, items, bookmarkRows] = await Promise.all([
+      const [speakerMap, items, bookmarkRows, decisionRows] = await Promise.all([
         listSpeakersForMeetings(app, [meetingId]),
         listActionItems(app, meetingId),
         listBookmarks(app, meetingId),
+        // An install whose schema predates the collection answers with an error: no decisions, not a broken page.
+        listDecisions(app, meetingId).catch(() => []),
       ]);
+      setDecisions(decisionRows);
       setRawSpeakers(speakerMap[meetingId] ?? []);
       setActionItems(items);
       setBookmarks(bookmarkRows);
@@ -221,7 +225,7 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
       id: 'actions',
       icon: 'checkmark-circle',
       label: t('recording.side.actions'),
-      node: <ActionItemsCard roomId={roomId} meetingTitle={meeting.title ?? ''} items={actionItems} onSeek={seek} onChanged={() => void reload()} />,
+      node: <ActionItemsCard roomId={roomId} meetingTitle={meeting.title ?? ''} items={actionItems} decisions={decisions} onSeek={seek} onChanged={() => void reload()} />,
     },
     {
       id: 'bookmarks',

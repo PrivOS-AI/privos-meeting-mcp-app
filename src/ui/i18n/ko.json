@@ -421,5 +421,14 @@
   "settings.aiSummary.liveHint": "Hub AI가 지금까지의 내용과 할 일을 실시간 화면 옆 패널에 요약합니다.",
   "settings.aiSummary.autoSend": "요약이 준비되면 방 채팅에 게시",
   "settings.aiSummary.autoSendHint": "앱 봇이 회의마다 한 번, Files의 summary.md 링크와 함께 게시합니다. “메시지 보내기” 권한이 필요하며, 없으면 “채팅으로 보내기” 버튼을 사용합니다.",
-  "recording.liveSummary.waitingManual": "새로 고침을 눌러 지금까지의 내용을 요약하세요."
+  "recording.liveSummary.waitingManual": "새로 고침을 눌러 지금까지의 내용을 요약하세요.",
+
+  "actionItems.decisions": "결정 사항",
+  "actionItems.decidedBy": "{name} 결정",
+  "actionItems.filterByPerson": "사람별 필터",
+  "actionItems.everyone": "전체",
+  "actionItems.type.request": "요청",
+  "actionItems.type.question": "질문",
+  "actionItems.requester": "요청자",
+  "actionItems.owner": "담당자"
 }

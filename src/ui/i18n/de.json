@@ -423,5 +423,14 @@
   "settings.aiSummary.liveHint": "Hub AI fasst das bisher Gesagte samt Aufgaben im Seitenbereich des Live-Bildschirms zusammen.",
   "settings.aiSummary.autoSend": "Zusammenfassung automatisch im Raum-Chat posten, sobald sie fertig ist",
   "settings.aiSummary.autoSendHint": "Wird einmal pro Besprechung vom Bot der App gepostet, mit Link zu summary.md in Dateien. Erfordert die Berechtigung „Nachrichten senden“; sonst bleibt die Schaltfläche „An Chat senden“.",
-  "recording.liveSummary.waitingManual": "Tippen Sie auf Aktualisieren, um das bisher Gesagte zusammenzufassen."
+  "recording.liveSummary.waitingManual": "Tippen Sie auf Aktualisieren, um das bisher Gesagte zusammenzufassen.",
+
+  "actionItems.decisions": "Entscheidungen",
+  "actionItems.decidedBy": "von {name}",
+  "actionItems.filterByPerson": "Nach Person filtern",
+  "actionItems.everyone": "Alle",
+  "actionItems.type.request": "Anfrage",
+  "actionItems.type.question": "Frage",
+  "actionItems.requester": "Angefragt von",
+  "actionItems.owner": "Verantwortlich"
 }

@@ -17,7 +17,7 @@ import { setActionItemListItemId, type ActionItemRecord } from './action-item-re
 
 export const ACTION_LIST_NAME = 'Meeting action items';
 
-type FieldKey = 'task' | 'owner' | 'due' | 'meeting' | 'status';
+type FieldKey = 'task' | 'owner' | 'due' | 'meeting' | 'status' | 'requester' | 'type';
 
 interface FieldDef {
   key: FieldKey;
@@ -33,7 +33,12 @@ const FIELDS: readonly FieldDef[] = [
   { key: 'due', name: 'Due', type: 'DATE', order: 3 },
   { key: 'meeting', name: 'Meeting', type: 'TEXT', order: 4 },
   { key: 'status', name: 'Status', type: 'SELECT', order: 5, options: ['Open', 'Done'] },
+  // Added later: an existing list gets them on the next push (fields are matched by name).
+  { key: 'requester', name: 'Requested by', type: 'TEXT', order: 6 },
+  { key: 'type', name: 'Type', type: 'SELECT', order: 7, options: ['Task', 'Request', 'Question'] },
 ];
+
+const TYPE_OPTION: Record<ActionItemRecord['type'], string> = { task: 'Task', request: 'Request', question: 'Question' };
 
 interface HubFieldDefinition {
   _id: string;
@@ -141,9 +146,12 @@ export async function pushActionItems(
     const customFields = [
       { fieldId: fieldMap.task, value: item.task },
       ...(item.owner ? [{ fieldId: fieldMap.owner, value: item.owner }] : []),
-      ...(item.due ? [{ fieldId: fieldMap.due, value: item.due }] : []),
+      ...(item.requester ? [{ fieldId: fieldMap.requester, value: item.requester }] : []),
+      // `Due` is a DATE field: only a resolved date goes in; "Friday" stays in the app.
+      ...(item.dueDate ? [{ fieldId: fieldMap.due, value: item.dueDate }] : []),
       { fieldId: fieldMap.meeting, value: meetingTitle },
       { fieldId: fieldMap.status, value: item.done ? 'Done' : 'Open' },
+      { fieldId: fieldMap.type, value: TYPE_OPTION[item.type] },
     ];
     const created = await callRest<{ item: { _id: string } }>(app, 'POST', 'items.create', {
       body: { listId, stageId, name: item.task, customFields },

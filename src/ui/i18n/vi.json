@@ -423,5 +423,14 @@
   "settings.aiSummary.liveHint": "Hub AI tóm tắt những gì đã nói đến lúc đó, kèm việc cần làm, ở khung bên của màn hình đang họp.",
   "settings.aiSummary.autoSend": "Tự gửi tóm tắt vào chat của phòng khi xong",
   "settings.aiSummary.autoSendHint": "Bot của app gửi một lần cho mỗi cuộc họp, kèm link tới summary.md trong Files. Cần quyền “Gửi tin nhắn”; nếu thiếu, vẫn dùng nút “Gửi vào Chat”.",
-  "recording.liveSummary.waitingManual": "Bấm Làm mới để tóm tắt những gì đã nói đến lúc này."
+  "recording.liveSummary.waitingManual": "Bấm Làm mới để tóm tắt những gì đã nói đến lúc này.",
+
+  "actionItems.decisions": "Quyết định",
+  "actionItems.decidedBy": "do {name}",
+  "actionItems.filterByPerson": "Lọc theo người",
+  "actionItems.everyone": "Tất cả",
+  "actionItems.type.request": "Yêu cầu",
+  "actionItems.type.question": "Câu hỏi",
+  "actionItems.requester": "Người yêu cầu",
+  "actionItems.owner": "Người phụ trách"
 }

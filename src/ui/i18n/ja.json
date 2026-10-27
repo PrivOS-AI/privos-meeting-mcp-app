@@ -421,5 +421,14 @@
   "settings.aiSummary.liveHint": "Hub AI がそれまでの発言とアクションをライブ画面のサイドパネルに要約します。",
   "settings.aiSummary.autoSend": "要約ができたらルームのチャットに投稿する",
   "settings.aiSummary.autoSendHint": "アプリのボットが会議ごとに1回、Files の summary.md へのリンク付きで投稿します。「メッセージ送信」権限が必要です。ない場合は「チャットに送信」ボタンを使えます。",
-  "recording.liveSummary.waitingManual": "更新を押すと、それまでの発言を要約します。"
+  "recording.liveSummary.waitingManual": "更新を押すと、それまでの発言を要約します。",
+
+  "actionItems.decisions": "決定事項",
+  "actionItems.decidedBy": "{name} による",
+  "actionItems.filterByPerson": "人で絞り込む",
+  "actionItems.everyone": "全員",
+  "actionItems.type.request": "依頼",
+  "actionItems.type.question": "質問",
+  "actionItems.requester": "依頼者",
+  "actionItems.owner": "担当者"
 }

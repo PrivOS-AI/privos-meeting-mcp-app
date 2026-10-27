@@ -97,7 +97,7 @@
       "context": "room",
       "executionContext": "both",
       "feature": "meeting.db.write",
-      "reason": "Write meetings, speakers, encrypted voiceprint profiles, action items, and job status."
+      "reason": "Write meetings, speakers, encrypted voiceprint profiles, action items, decisions, and job status."
     },
     {
       "scope": "sandbox:generate",

@@ -12,7 +12,7 @@
  */
 import type { McpApp } from '@privos_ai/app-react';
 
-import { listActionItems } from './action-item-read-model.js';
+import { listActionItems, listDecisions } from './action-item-read-model.js';
 import { asLanguageCode } from '../../shared/languages.js';
 import { buildMeetingDocx, meetingDocxToBlob, type DocxSummary } from './docx-export.js';
 import { resolveFileUrl } from './file-download.js';
@@ -40,13 +40,17 @@ export async function downloadMeetingSrt(app: McpApp, meeting: MeetingReadModel)
 
 export async function downloadMeetingDocx(app: McpApp, meeting: MeetingReadModel): Promise<void> {
   if (!meeting.transcriptJsonFileId) throw new Error('This meeting has no transcript to export as DOCX.');
-  const [transcript, actionItems] = await Promise.all([loadTranscript(app, meeting.transcriptJsonFileId), listActionItems(app, meeting._id)]);
+  const [transcript, actionItems, decisions] = await Promise.all([
+    loadTranscript(app, meeting.transcriptJsonFileId),
+    listActionItems(app, meeting._id),
+    listDecisions(app, meeting._id).catch(() => []),
+  ]);
 
   const summary: DocxSummary | undefined = meeting.summaryText
     ? {
         summary: meeting.summaryText,
-        decisions: [],
-        action_items: actionItems.map((item) => ({ task: item.task, owner: item.owner, due: item.due })),
+        decisions: decisions.map((d) => (d.by ? `${d.text} (${d.by})` : d.text)),
+        action_items: actionItems.map((item) => ({ task: item.task, owner: item.owner, requester: item.requester, due: item.due })),
         key_topics: meeting.keyTopics ?? [],
       }
     : undefined;

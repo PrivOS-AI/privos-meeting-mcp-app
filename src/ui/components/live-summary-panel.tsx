@@ -140,8 +140,10 @@ export function LiveSummaryPanel() {
             {result.action_items.map((item, i) => (
               <li key={i} className="ma-live-summary__action">
                 <span className="ma-live-summary__action-task">{item.task}</span>
-                {item.owner || item.due ? (
-                  <span className="ma-live-summary__action-meta">{[item.owner, item.due].filter(Boolean).join(' · ')}</span>
+                {item.owner || item.requester || item.due ? (
+                  <span className="ma-live-summary__action-meta">
+                    {[item.requester && item.owner ? `${item.requester} → ${item.owner}` : (item.owner ?? item.requester), item.due].filter(Boolean).join(' · ')}
+                  </span>
                 ) : null}
               </li>
             ))}

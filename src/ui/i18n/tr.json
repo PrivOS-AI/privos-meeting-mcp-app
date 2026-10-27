@@ -423,5 +423,14 @@
   "settings.aiSummary.liveHint": "Hub AI, o ana kadar konuşulanları görevlerle birlikte canlı ekranın yan panelinde özetler.",
   "settings.aiSummary.autoSend": "Özet hazır olunca oda sohbetine gönder",
   "settings.aiSummary.autoSendHint": "Uygulamanın botu her toplantı için bir kez, Dosyalar'daki summary.md bağlantısıyla gönderir. “Mesaj gönder” izni gerekir; yoksa “Sohbete gönder” düğmesi kalır.",
-  "recording.liveSummary.waitingManual": "Şu ana kadar konuşulanları özetlemek için Yenile'ye basın."
+  "recording.liveSummary.waitingManual": "Şu ana kadar konuşulanları özetlemek için Yenile'ye basın.",
+
+  "actionItems.decisions": "Kararlar",
+  "actionItems.decidedBy": "{name} tarafından",
+  "actionItems.filterByPerson": "Kişiye göre filtrele",
+  "actionItems.everyone": "Herkes",
+  "actionItems.type.request": "Talep",
+  "actionItems.type.question": "Soru",
+  "actionItems.requester": "Talep eden",
+  "actionItems.owner": "Sorumlu"
 }

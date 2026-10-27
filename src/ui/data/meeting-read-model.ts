@@ -146,7 +146,13 @@ export async function deleteMeeting(app: McpApp, meeting: MeetingReadModel): Pro
     await Promise.all(trackedIds.map((id) => app.rest({ method: 'DELETE', path: `file-management.files/${id}` }).catch(() => undefined)));
   }
 
-  await new AppDbClient(app).delete('meetings', meeting._id);
+  // Its rows: no orphan action item left in the "open items" count, no parked speaker embedding.
+  const db = new AppDbClient(app);
+  for (const collection of ['action_items', 'decisions', 'bookmarks', 'meeting_speakers']) {
+    const result = await db.query({ collection, where: [{ field: 'meeting', op: '==', value: meeting._id }], limit: 1000 }).catch(() => null);
+    await Promise.all((result?.records ?? []).map((row) => db.delete(collection, row._id).catch(() => undefined)));
+  }
+  await db.delete('meetings', meeting._id);
 }
 
 export interface MeetingSpeakerSummary {

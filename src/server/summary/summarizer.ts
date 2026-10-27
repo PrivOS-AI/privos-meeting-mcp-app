@@ -21,30 +21,48 @@ import type { RoomBoundHubClient } from '@privos_ai/app-server';
 import { AppError } from '../../shared/app-error.js';
 import { generateAsyncWithHubAi } from '../hub/hub-ai-client.js';
 import type { TranscriptChunk } from './chunker.js';
-import { buildMapPrompt, buildReducePrompt, buildSchemaFixPrompt, SUMMARY_SYSTEM_CONTEXT, type SummaryLanguage, type SummaryLength } from './prompts.js';
+import { ACTION_ITEM_JSON, buildMapPrompt, buildReducePrompt, buildSchemaFixPrompt, DECISION_JSON, SUMMARY_SYSTEM_CONTEXT, type SummaryLanguage, type SummaryLength } from './prompts.js';
 import { sanitizeDisplayName } from './sanitize.js';
 
+export const ACTION_ITEM_TYPES = ['task', 'request', 'question'] as const;
+export type ActionItemType = (typeof ACTION_ITEM_TYPES)[number];
+
+const nullableString = z.string().nullable().default(null);
+
 const actionItemSchema = z.object({
+  // An unknown or missing type is a plain task rather than a failed summary.
+  type: z.enum(ACTION_ITEM_TYPES).catch('task').default('task'),
   task: z.string(),
-  owner: z.string().nullable().default(null),
-  due: z.string().nullable().default(null),
+  owner: nullableString,
+  requester: nullableString,
+  due: nullableString,
+  due_date: nullableString,
   at: z.number().nullable().default(null),
+  quote: nullableString,
 });
+
+/** A decision: older replies (and short models) give a bare string, which becomes `{ text }`. */
+const decisionSchema = z.union([
+  z.string().transform((text) => ({ text, by: null as string | null, at: null as number | null })),
+  z.object({ text: z.string(), by: nullableString, at: z.number().nullable().default(null) }),
+]);
 
 const chunkNotesSchema = z.object({
   notes: z.string(),
-  decisions: z.array(z.string()).default([]),
+  decisions: z.array(decisionSchema).default([]),
   action_items: z.array(actionItemSchema).default([]),
 });
 
 export const summaryPayloadSchema = z.object({
   summary: z.string(),
-  decisions: z.array(z.string()).default([]),
+  decisions: z.array(decisionSchema).default([]),
   action_items: z.array(actionItemSchema).default([]),
   key_topics: z.array(z.string()).default([]),
 });
 
 export type SummaryPayload = z.infer<typeof summaryPayloadSchema>;
+export type SummaryActionItem = SummaryPayload['action_items'][number];
+export type SummaryDecision = SummaryPayload['decisions'][number];
 type ChunkNotes = z.infer<typeof chunkNotesSchema>;
 
 export interface SummarizeTranscriptInput {
@@ -55,6 +73,8 @@ export interface SummarizeTranscriptInput {
   length?: SummaryLength;
   title: string;
   speakerNames: readonly string[];
+  /** YYYY-MM-DD the meeting took place, for turning "Friday" into a `due_date`. */
+  meetingDate?: string;
 }
 
 const MAX_NETWORK_RETRIES = 2;
@@ -122,9 +142,9 @@ function safeExtract(text: string): unknown {
   }
 }
 
-const ACTION_ITEM_SCHEMA_HINT = '{"task": string, "owner": string|null, "due": string|null, "at": number|null}';
-const NOTES_SCHEMA_HINT = `{"notes": string, "decisions": string[], "action_items": [${ACTION_ITEM_SCHEMA_HINT}]}`;
-const SUMMARY_SCHEMA_HINT = `{"summary": string, "decisions": string[], "action_items": [${ACTION_ITEM_SCHEMA_HINT}], "key_topics": string[]}`;
+const NOTES_SCHEMA_HINT = `{"notes": string, "decisions": [${DECISION_JSON}], "action_items": [${ACTION_ITEM_JSON}]}`;
+const SUMMARY_SCHEMA_HINT = `{"summary": string, "decisions": [${DECISION_JSON}], "action_items": [${ACTION_ITEM_JSON}], "key_topics": string[]}`;
+const MAX_QUOTE_CHARS = 200;
 
 /** Post-check: an `owner` must match a known speaker name OR be a free string ≤80 chars — otherwise it is unverifiable and dropped to `null` (plan.md § Requirements). */
 function sanitizeOwner(owner: string | null, speakerNames: ReadonlySet<string>): string | null {
@@ -134,6 +154,59 @@ function sanitizeOwner(owner: string | null, speakerNames: ReadonlySet<string>):
   if (speakerNames.has(trimmed)) return trimmed;
   if (trimmed.length <= 80) return trimmed;
   return null;
+}
+
+/** Lowercase, letters and digits only, single spaces — so a quote matches the transcript despite punctuation or spacing drift. */
+function normalizeForMatch(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFC')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+/** A quote is kept only when it really is in the transcript; the model may paraphrase or invent one. */
+export function verifiedQuote(quote: string | null, normalizedTranscript: string): string | null {
+  if (!quote) return null;
+  const trimmed = quote.trim().slice(0, MAX_QUOTE_CHARS);
+  const needle = normalizeForMatch(trimmed);
+  return needle.length >= 3 && normalizedTranscript.includes(needle) ? trimmed : null;
+}
+
+/** A timestamp must fall inside the meeting. */
+function verifiedAt(at: number | null, lastSec: number): number | null {
+  return typeof at === 'number' && Number.isFinite(at) && at >= 0 && at <= lastSec + 5 ? Math.round(at) : null;
+}
+
+/** `YYYY-MM-DD` and a real calendar date, else null. */
+export function verifiedDueDate(value: string | null): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value ? value : null;
+}
+
+/**
+ * The post-checks every summary goes through before anything is stored: names must be speakers
+ * (or short plain names), quotes must exist in the transcript, timestamps inside the meeting,
+ * dates real. What fails a check becomes null — the item itself is kept.
+ */
+export function verifySummary(payload: SummaryPayload, chunks: readonly TranscriptChunk[], speakerNames: readonly string[]): SummaryPayload {
+  const names = new Set(speakerNames.map((n) => sanitizeDisplayName(n)));
+  const transcript = normalizeForMatch(chunks.map((c) => c.text).join('\n'));
+  const lastSec = chunks.reduce((max, c) => Math.max(max, c.endSec), 0);
+  return {
+    ...payload,
+    decisions: payload.decisions.map((d) => ({ text: d.text, by: sanitizeOwner(d.by, names), at: verifiedAt(d.at, lastSec) })),
+    action_items: payload.action_items.map((item) => ({
+      ...item,
+      owner: sanitizeOwner(item.owner, names),
+      requester: sanitizeOwner(item.requester, names),
+      due: item.due?.trim() || null,
+      due_date: verifiedDueDate(item.due_date),
+      at: verifiedAt(item.at, lastSec),
+      quote: verifiedQuote(item.quote, transcript),
+    })),
+  };
 }
 
 /** Runs the map pass (sequential — see module header) then the reduce pass, returning the final validated + post-checked payload. */
@@ -168,6 +241,7 @@ export async function summarizeTranscript(
     speakerNames: input.speakerNames,
     language: input.language,
     length: input.length,
+    meetingDate: input.meetingDate,
     notesWithTimestamps: input.chunks.map((chunk, i) => ({
       startLabel: formatTimestamp(chunk.startSec),
       endLabel: formatTimestamp(chunk.endSec),
@@ -179,9 +253,5 @@ export async function summarizeTranscript(
 
   const reduced = await callAndValidate(hub, input.roomId, reducePrompt, summaryPayloadSchema, SUMMARY_SCHEMA_HINT, signal);
 
-  const speakerNameSet = new Set(input.speakerNames.map((n) => sanitizeDisplayName(n)));
-  return {
-    ...reduced,
-    action_items: reduced.action_items.map((item) => ({ ...item, owner: sanitizeOwner(item.owner, speakerNameSet) })),
-  };
+  return verifySummary(reduced, input.chunks, input.speakerNames);
 }

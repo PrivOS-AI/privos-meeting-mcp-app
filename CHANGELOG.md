@@ -146,3 +146,23 @@ Marketplace packaging.
   recognition off. New `liveSpeakers` capability (`meeting_live_speakers` now
   answers for any provider that has it). Ending a recording writes the last
   live speakers before the job reads them.
+- Action items know who asked and who does it. The summary now returns, per
+  item: `type` (task / request / open question), `owner`, `requester`, the
+  deadline as said (`due`) and as a date when it can be worked out from the
+  meeting date (`due_date`), the timestamp and the words that stated it
+  (`quote`); decisions carry who made them and when. Every field is checked on
+  the server before it is stored: names must be speakers (or short plain
+  names), a quote must really be in the transcript, a timestamp inside the
+  meeting, a date a real date — anything else is dropped, never guessed. A
+  name links to a PrivOS account only through a speaker whose voiceprint
+  profile is linked to one. New `decisions` collection; new `action_items`
+  fields. `summary.md` gets "Requested by", the quote, and separate Requests /
+  Open questions sections; the app shows decisions, "A → B", the deadline with
+  its date, the quote and a filter by person; DOCX and the Smart List carry the
+  requester (Smart List also gets a Type field).
+- Fixed: a deadline said as words ("Friday") was dropped before being stored
+  (it went through `new Date()`), and was pushed as text into the Smart List's
+  DATE field. Now the words are kept and only a real date goes into DATE.
+- Fixed: deleting a meeting (by hand or by auto-delete) left its action items,
+  bookmarks and speaker rows behind — orphan items still counted as "open".
+  All of a meeting's rows are deleted with it now.

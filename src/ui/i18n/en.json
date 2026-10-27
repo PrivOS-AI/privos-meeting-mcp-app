@@ -423,5 +423,14 @@
   "settings.aiSummary.liveHint": "Hub AI summarizes what has been said so far, with the action items, in the side panel of the live screen.",
   "settings.aiSummary.autoSend": "Post the summary to the room chat when it is ready",
   "settings.aiSummary.autoSendHint": "Posted once per meeting by the app’s bot, with a link to summary.md in Files. Needs the “Send messages” permission; without it the “Send to chat” button stays.",
-  "recording.liveSummary.waitingManual": "Press Refresh to summarize what has been said so far."
+  "recording.liveSummary.waitingManual": "Press Refresh to summarize what has been said so far.",
+
+  "actionItems.decisions": "Decisions",
+  "actionItems.decidedBy": "by {name}",
+  "actionItems.filterByPerson": "Filter by person",
+  "actionItems.everyone": "Everyone",
+  "actionItems.type.request": "Request",
+  "actionItems.type.question": "Question",
+  "actionItems.requester": "Requested by",
+  "actionItems.owner": "Owner"
 }

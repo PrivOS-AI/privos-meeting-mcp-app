@@ -421,5 +421,14 @@
   "settings.aiSummary.liveHint": "Hub AI 会在直播界面侧栏总结到目前为止的内容及待办事项。",
   "settings.aiSummary.autoSend": "摘要生成后自动发到房间聊天",
   "settings.aiSummary.autoSendHint": "由应用机器人每场会议发送一次，并附 Files 中 summary.md 的链接。需要“发送消息”权限；没有时仍可使用“发送到聊天”按钮。",
-  "recording.liveSummary.waitingManual": "点击刷新以总结到目前为止的内容。"
+  "recording.liveSummary.waitingManual": "点击刷新以总结到目前为止的内容。",
+
+  "actionItems.decisions": "决定",
+  "actionItems.decidedBy": "由 {name}",
+  "actionItems.filterByPerson": "按人筛选",
+  "actionItems.everyone": "全部",
+  "actionItems.type.request": "请求",
+  "actionItems.type.question": "问题",
+  "actionItems.requester": "提出人",
+  "actionItems.owner": "负责人"
 }

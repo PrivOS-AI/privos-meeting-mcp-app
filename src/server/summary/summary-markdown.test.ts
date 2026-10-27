@@ -5,10 +5,13 @@ import type { SummaryPayload } from './summarizer.js';
 
 const payload: SummaryPayload = {
   summary: 'Nhóm đã thống nhất kế hoạch ra mắt tính năng mới.',
-  decisions: ['Ra mắt vào thứ Sáu', 'Dùng bản dịch tự động cho phụ đề'],
+  decisions: [
+    { text: 'Ra mắt vào thứ Sáu', by: 'Nhân', at: 300 },
+    { text: 'Dùng bản dịch tự động cho phụ đề', by: null, at: null },
+  ],
   action_items: [
-    { task: 'Viết tài liệu hướng dẫn', owner: 'Thanh', due: '2026-09-25', at: 125 },
-    { task: 'Kiểm thử trên thiết bị thật', owner: null, due: null, at: null },
+    { type: 'task', task: 'Viết tài liệu hướng dẫn', owner: 'Thanh', requester: 'Nhân', due: '2026-09-25', due_date: '2026-09-25', at: 125, quote: null },
+    { type: 'task', task: 'Kiểm thử trên thiết bị thật', owner: null, requester: null, due: null, due_date: null, at: null, quote: null },
   ],
   key_topics: ['ra mắt', 'phụ đề song ngữ'],
 };
@@ -30,7 +33,13 @@ describe('renderSummaryMarkdown', () => {
     expect(md).toContain('## Quyết định');
     expect(md).toContain('- Ra mắt vào thứ Sáu');
     expect(md).toContain('## Việc cần làm');
-    expect(md).toContain('| Viết tài liệu hướng dẫn | Thanh | 2026\\-09\\-25 | 00:02:05 |');
+    expect(md).toContain('- Ra mắt vào thứ Sáu _(Người quyết: Nhân · 00:05:00)_');
+    expect(md).toContain('- Dùng bản dịch tự động cho phụ đề\n');
+    expect(md).toContain('| Việc | Người yêu cầu | Phụ trách | Hạn | Mốc thời gian |');
+    expect(md).toContain('| Viết tài liệu hướng dẫn | Nhân | Thanh | 2026\\-09\\-25 | 00:02:05 |');
+    // No requests or open questions in this meeting: no empty sections for them.
+    expect(md).not.toContain('## Yêu cầu');
+    expect(md).not.toContain('## Câu hỏi còn mở');
     expect(md).toContain('## Chủ đề chính');
     expect(md).toContain('ra mắt, phụ đề song ngữ');
     expect(md).toContain('Thanh, Nhân');
@@ -76,5 +85,27 @@ describe('renderSummaryMarkdown', () => {
     const sections = md.split('## ');
     expect(sections.find((s) => s.startsWith('Quyết định'))).toContain('—');
     expect(sections.find((s) => s.startsWith('Chủ đề chính'))).toContain('—');
+  });
+  it('puts requests and open questions in their own sections, with who asked and the quote', () => {
+    const md = renderSummaryMarkdown({
+      title: 'Họp',
+      startedAt: '2026-09-18T09:00:00.000Z',
+      durationSec: 600,
+      speakers: ['Thanh', 'Nhân'],
+      payload: {
+        ...payload,
+        action_items: [
+          { type: 'request', task: 'Gửi báo giá cho khách', owner: 'Thanh', requester: 'Nhân', due: 'thứ Năm', due_date: '2026-09-24', at: 61, quote: 'Thanh gửi báo giá giúp anh trước thứ Năm nhé' },
+          { type: 'question', task: 'Ai duyệt ngân sách quý 4?', owner: null, requester: 'Thanh', due: null, due_date: null, at: 90, quote: null },
+        ],
+      },
+      language: 'vi',
+    });
+    expect(md).toContain('## Yêu cầu');
+    expect(md).toContain('| Gửi báo giá cho khách<br>_“Thanh gửi báo giá giúp anh trước thứ Năm nhé”_ | Nhân | Thanh | thứ Năm · 2026\\-09\\-24 | 00:01:01 |');
+    expect(md).toContain('## Câu hỏi còn mở');
+    expect(md).toContain('| Ai duyệt ngân sách quý 4? | Thanh | — | — | 00:01:30 |');
+    // The task section still exists and says it is empty.
+    expect(md.split('## ').find((s) => s.startsWith('Việc cần làm'))).toContain('—');
   });
 });

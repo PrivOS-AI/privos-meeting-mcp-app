@@ -32,6 +32,7 @@ import {
   resolveSpeakersWithoutVoiceprints,
   type UserIdentity,
 } from '../speaker/resolve-speakers.js';
+import { getProfile } from '../speaker/profile-store.js';
 import { sessionRegistries } from '../speaker/session-speaker-registry.js';
 import { uploadRoomCopy } from '../speaker/speaker-diagnostics-log.js';
 import { chunkTranscript } from '../summary/chunker.js';
@@ -41,6 +42,7 @@ import { summarizeTranscript as runSummarizer, type SummaryPayload } from '../su
 import { translateSegmentsBatch } from '../summary/translator.js';
 import { asyncProviderFor } from '../stt/stt-provider-registry.js';
 import { alignByMaxOverlap } from '../transcript/caption-aligner.js';
+import { sanitizeDisplayName } from '../summary/sanitize.js';
 import { buildSegments, type Segment } from '../transcript/segment-builder.js';
 import { buildTranscriptMarkdown } from '../transcript/markdown-writer.js';
 import { buildTranscriptJson, serializeTranscriptJson } from '../transcript/transcript-json.js';
@@ -51,6 +53,7 @@ import {
   loadLiveIdentities,
   mergeLiveIntoAsyncSpeaker,
   replaceActionItems,
+  replaceDecisions,
   upsertMeeting,
   upsertMeetingSpeakers,
   type LiveIdentity,
@@ -187,10 +190,21 @@ async function applyLiveReconciliation(
 }
 
 /** Best-effort parse of the model's free-text `due` into an ISO date App DB's `date` field accepts; unparseable text is dropped rather than sent as an invalid date (the task text itself still carries any human phrasing like "this weekend"). */
-function parseDueDate(due: string | null): string | undefined {
-  if (!due) return undefined;
-  const parsed = new Date(due);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
+/** `YYYY-MM-DD` of the meeting's start, for resolving relative deadlines; undefined when the stamp is unusable. */
+function meetingDateOf(startedAt: string): string | undefined {
+  const date = new Date(startedAt);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString().slice(0, 10);
+}
+
+/** Speaker display name -> the PrivOS user its voiceprint profile is linked to. */
+async function privosUserIdsBySpeakerName(db: AppDbBotClient, speakers: readonly JobResultSpeaker[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (const speaker of speakers) {
+    if (!speaker.profileId || !speaker.displayName) continue;
+    const profile = await getProfile(db, speaker.profileId).catch(() => null);
+    if (profile?.privosUserId) out.set(sanitizeDisplayName(speaker.displayName), profile.privosUserId);
+  }
+  return out;
 }
 
 export interface SummarizeStepResult {
@@ -249,7 +263,7 @@ export async function summarizeTranscript(input: {
   const lengthSetting = await getSetting<SummaryLength>(settingsDb, 'summaryLength');
   const length: SummaryLength = lengthSetting === 'short' || lengthSetting === 'detailed' ? lengthSetting : 'normal';
   const chunks = chunkTranscript(translatedSegments, displayNameBySpeaker);
-  const payload = await runSummarizer(hub, { roomId, chunks, language: summaryLanguage, length, title, speakerNames }, signal);
+  const payload = await runSummarizer(hub, { roomId, chunks, language: summaryLanguage, length, title, speakerNames, meetingDate: meetingDateOf(startedAt) }, signal);
 
   const markdown = renderSummaryMarkdown({ title, startedAt, durationSec, speakers: speakerNames, payload, language: summaryLanguage });
   const summaryUpload = await uploadBotFile({
@@ -263,10 +277,30 @@ export async function summarizeTranscript(input: {
     signal,
   });
 
+  // A name in the summary links to a PrivOS account only through a speaker of this meeting whose
+  // voiceprint profile is linked to one — never by guessing from a name.
+  const userIdByName = await privosUserIdsBySpeakerName(db, speakers);
+  const userIdFor = (name: string | null) => (name ? userIdByName.get(sanitizeDisplayName(name)) : undefined);
   await replaceActionItems(
     db,
     meetingId,
-    payload.action_items.map((item) => ({ task: item.task, owner: item.owner, due: parseDueDate(item.due), atSec: item.at ?? undefined })),
+    payload.action_items.map((item) => ({
+      type: item.type,
+      task: item.task,
+      owner: item.owner,
+      ownerUserId: userIdFor(item.owner),
+      requester: item.requester,
+      requesterUserId: userIdFor(item.requester),
+      due: item.due,
+      dueDate: item.due_date,
+      atSec: item.at,
+      quote: item.quote,
+    })),
+  );
+  await replaceDecisions(
+    db,
+    meetingId,
+    payload.decisions.map((d) => ({ text: d.text, by: d.by, byUserId: userIdFor(d.by), atSec: d.at })),
   );
 
   return { payload, summaryFileId: summaryUpload.fileId, translatedSegments: [...translatedSegments] };

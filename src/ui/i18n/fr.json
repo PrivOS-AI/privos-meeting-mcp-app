@@ -421,5 +421,14 @@
   "settings.aiSummary.liveHint": "Hub AI résume ce qui a été dit jusqu’ici, avec les actions, dans le panneau latéral de l’écran en direct.",
   "settings.aiSummary.autoSend": "Publier le résumé dans le chat de la salle dès qu’il est prêt",
   "settings.aiSummary.autoSendHint": "Publié une fois par réunion par le bot de l’app, avec un lien vers summary.md dans Fichiers. Nécessite l’autorisation « Envoyer des messages » ; sinon le bouton « Envoyer au chat » reste disponible.",
-  "recording.liveSummary.waitingManual": "Appuyez sur Actualiser pour résumer ce qui a été dit jusqu’ici."
+  "recording.liveSummary.waitingManual": "Appuyez sur Actualiser pour résumer ce qui a été dit jusqu’ici.",
+
+  "actionItems.decisions": "Décisions",
+  "actionItems.decidedBy": "par {name}",
+  "actionItems.filterByPerson": "Filtrer par personne",
+  "actionItems.everyone": "Tout le monde",
+  "actionItems.type.request": "Demande",
+  "actionItems.type.question": "Question",
+  "actionItems.requester": "Demandé par",
+  "actionItems.owner": "Responsable"
 }

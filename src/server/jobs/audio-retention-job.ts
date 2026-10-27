@@ -36,6 +36,7 @@ import { getSetting } from '../hub/app-settings.js';
 import { deleteRoomFile, listRoomFolderFiles } from '../media/hub-file-download.js';
 import { forgetMeetingVoiceprints } from '../speaker/profile-store.js';
 import { sweepLocal } from '../speaker/speaker-diagnostics-log.js';
+import { deleteMeetingRecords } from './meeting-repository.js';
 import { readKnownRooms } from './known-rooms-store.js';
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
@@ -103,6 +104,7 @@ async function purgeExpiredMeetings(hub: RoomBoundHubClient, roomId: string, day
       if (folderId) {
         for (const file of await listRoomFolderFiles(hub, roomId, folderId)) await deleteRoomFile(hub, file._id);
       }
+      await deleteMeetingRecords(db, meeting._id);
       await db.delete('meetings', 'room', meeting._id);
       deleted++;
     } catch (error) {
