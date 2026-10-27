@@ -14,7 +14,7 @@ const SINGLE_USE_TOKEN_URL = 'https://api.elevenlabs.io/v1/single-use-token/real
 /** Docs describe the token as single-use, consumed at first connect, ~15 min TTL if unused. */
 const TOKEN_TTL_SECONDS = 15 * 60;
 
-const CAPABILITIES: RealtimeCapabilities = { speakerLabels: false, translation: false };
+const CAPABILITIES: RealtimeCapabilities = { speakerLabels: false, translation: false, liveSpeakers: false };
 
 export const elevenLabsRealtimeProvider: RealtimeTokenProvider = {
   vendor: 'elevenlabs',

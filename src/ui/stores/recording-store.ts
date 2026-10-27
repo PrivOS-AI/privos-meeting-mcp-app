@@ -186,7 +186,8 @@ export function resolveLineSpeakerKey(
   }
   const serverId = state.lineServerSpeaker[line.id];
   if (serverId) return resolveMergedSpeakerId(serverId, state.liveSpeakers);
-  return line.speakerKey;
+  // The built-in recognizer's captions carry a session speaker id directly, which a later merge may retire.
+  return line.speakerKey ? resolveMergedSpeakerId(line.speakerKey, state.liveSpeakers) : undefined;
 }
 
 /** A settled turn already newer than the previous poll's cursor plus the base label it was embedded under — the shape both `matchTurnsToLines` and `accumulateLabelSpeech`/`ownerForLabel` operate on. */
@@ -619,7 +620,9 @@ export class RecordingStore {
       });
     }
 
-    if (token.capabilities.speakerLabels) {
+    // Names, colours and merges of live session speakers — for a labelling provider and for the built-in
+    // recognizer, whose captions already carry the session speaker the server picked.
+    if (token.capabilities.liveSpeakers ?? token.capabilities.speakerLabels) {
       this.speakerPoll = new LiveSpeakerPoll(this.app, {
         roomId: this.ctx.roomId,
         meetingId,
@@ -762,7 +765,9 @@ export class RecordingStore {
     this.reconciling = true;
     try {
       for (const [speakerKey, choice] of [...this.pendingAssignments]) {
-        const session = ownerForLabel(speakerKey, this.state.liveSpeakers, this.labelSpeechMsBySpeaker);
+        // The built-in recognizer keys lines by the session speaker itself; a labelling provider by its realtime label.
+        const directId = resolveMergedSpeakerId(speakerKey, this.state.liveSpeakers);
+        const session = this.state.liveSpeakers.find((s) => s.sessionSpeakerId === directId) ?? ownerForLabel(speakerKey, this.state.liveSpeakers, this.labelSpeechMsBySpeaker);
         if (!session) continue; // no session speaker yet — keep it pending
         try {
           const [result] = await speakerResolve(this.app, this.ctx.roomId, this.state.meetingId, [

@@ -87,7 +87,7 @@ export const liveSpeakersTool: AppTool = {
     const meeting = await requireRoomMeeting(db, actor, roomId, meetingId);
 
     const vendor = await resolveRealtimeVendor(db);
-    if (!realtimeProviderFor(vendor).capabilities.speakerLabels) {
+    if (!realtimeProviderFor(vendor).capabilities.liveSpeakers) {
       return { sessionSpeakers: [], turns: [], labelsSupported: false, updatedAt: new Date().toISOString() };
     }
 

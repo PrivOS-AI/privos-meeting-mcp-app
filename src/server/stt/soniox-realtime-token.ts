@@ -17,7 +17,7 @@ export const SONIOX_WS_URL = 'wss://stt-rt.soniox.com/transcribe-websocket';
 /** Vendor hard cap is 300 min/session; this leaves headroom past our ~280 min proactive roll-over. */
 const MAX_SESSION_DURATION_SECONDS = 16_800;
 
-const CAPABILITIES: RealtimeCapabilities = { speakerLabels: true, translation: true };
+const CAPABILITIES: RealtimeCapabilities = { speakerLabels: true, translation: true, liveSpeakers: true };
 
 export const sonioxRealtimeProvider: RealtimeTokenProvider = {
   vendor: 'soniox',

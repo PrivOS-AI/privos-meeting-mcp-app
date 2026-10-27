@@ -33,7 +33,7 @@ describe('elevenLabsRealtimeProvider.mint', () => {
 
     expect(token.provider).toBe('elevenlabs');
     expect(token.token).toBe('temp-secret-token');
-    expect(token.capabilities).toEqual({ speakerLabels: false, translation: false });
+    expect(token.capabilities).toEqual({ speakerLabels: false, translation: false, liveSpeakers: false });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

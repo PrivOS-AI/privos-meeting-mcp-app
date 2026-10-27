@@ -63,8 +63,14 @@ export interface TranscribeInput {
 
 /** Capabilities a realtime provider advertises to the UI. */
 export interface RealtimeCapabilities {
+  /** The provider itself labels speakers in its live stream (Soniox); the client then reports turns via `meeting_chunk_ready`. */
   speakerLabels: boolean;
   translation: boolean;
+  /**
+   * Speakers are identified live on the server (`meeting_live_speakers` has data): through the
+   * chunk worker for a labelling provider, or per utterance for the built-in recognizer.
+   */
+  liveSpeakers: boolean;
 }
 
 /** Short-lived credential the iframe SDK connects with. */

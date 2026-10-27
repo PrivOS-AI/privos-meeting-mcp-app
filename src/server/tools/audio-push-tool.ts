@@ -7,6 +7,7 @@
  */
 import { AppError } from '../../shared/app-error.js';
 import { liveSessionFor, pcm16ToFloat32 } from '../asr/live-asr-session.js';
+import { createLocalSpeakerAttributor } from '../live-speakers/local-attribution.js';
 import { SAMPLE_RATE } from '../asr/asr-engine.js';
 import { env } from '../env.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
@@ -27,7 +28,7 @@ const PUSH_LIMIT = 12;
 const SETTLE_MS = 700;
 /** A verified owner of a recording meeting is not re-checked for this long. */
 const OWNER_CHECK_TTL_MS = 30_000;
-const ownerChecks = new Map<string, number>();
+const ownerChecks = new Map<string, { until: number; folderId: string }>();
 
 export function resetAudioPushOwnerChecksForTests(): void {
   ownerChecks.clear();
@@ -50,7 +51,7 @@ export const audioPushTool: AppTool = {
       cursor: { type: 'integer', minimum: 0, maximum: 10_000_000 },
     },
   },
-  async execute(args, context) {
+  async execute(args, context, runtime) {
     const actor = requireVerifiedActor(context);
     const roomId = typeof args.roomId === 'string' ? args.roomId.trim() : '';
     const meetingId = typeof args.meetingId === 'string' ? args.meetingId.trim() : '';
@@ -67,11 +68,13 @@ export const audioPushTool: AppTool = {
     // Pushes arrive every ~1.5 s: the owner/recording check goes to App DB (a Hub round trip)
     // once per OWNER_CHECK_TTL_MS, not on every push, so it stays off the caption path.
     const checkKey = `${meetingId}:${actor.userId}`;
-    if ((ownerChecks.get(checkKey) ?? 0) < Date.now()) {
-      const db = new AppDbBotClient(roomId);
+    const db = new AppDbBotClient(roomId);
+    let check = ownerChecks.get(checkKey);
+    if (!check || check.until < Date.now()) {
       const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
       if (meeting.status !== 'recording') throw new AppError('Meeting is not currently recording.', 'INVALID_STATE');
-      ownerChecks.set(checkKey, Date.now() + OWNER_CHECK_TTL_MS);
+      check = { until: Date.now() + OWNER_CHECK_TTL_MS, folderId: typeof meeting.folderId === 'string' ? meeting.folderId : '' };
+      ownerChecks.set(checkKey, check);
     }
     if (!checkRateLimit('meeting_audio_push', meetingId, PUSH_LIMIT, PUSH_WINDOW_MS)) {
       throw new AppError('Too many audio pushes for this meeting — slow down.', 'RATE_LIMITED');
@@ -83,6 +86,11 @@ export const audioPushTool: AppTool = {
         `The app is already captioning the maximum of ${env.liveMaxConcurrentRecordings} meetings, so live captions are temporarily unavailable — the recording keeps running.`,
         'CAPACITY_REACHED',
       );
+    }
+
+    // Live speakers: each finished utterance is attributed to a session speaker by voice.
+    if (!session.attributeSpeaker && check.folderId) {
+      session.attributeSpeaker = createLocalSpeakerAttributor({ db, hub: runtime.agentBotHub, roomId, folderId: check.folderId, meetingId });
     }
 
     const bytes = Buffer.from(pcm, 'base64');

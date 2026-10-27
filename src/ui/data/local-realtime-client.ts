@@ -30,7 +30,8 @@ export interface AudioPushRequest {
 }
 
 export interface AudioPushResponse {
-  captions: Array<{ index: number; id: string; text: string; atSec: number; endSec: number; lang: string }>;
+  /** `speakerKey` is the live session speaker the server attributed the utterance to, when it could tell. */
+  captions: Array<{ index: number; id: string; text: string; atSec: number; endSec: number; lang: string; speakerKey?: string }>;
   cursor: number;
   degraded?: boolean;
   /** The speech still in progress; `null` once it ended (its final is in `captions`) or nobody talks. */
@@ -137,7 +138,7 @@ export function createLocalConnection(opts: RealtimeConnectionOptions): Realtime
 
   const emit = (captions: AudioPushResponse['captions']) => {
     for (const caption of captions) {
-      const event: CaptionEvent = { kind: 'final', id: caption.id, text: caption.text, atSec: caption.atSec, endSec: caption.endSec, lang: caption.lang };
+      const event: CaptionEvent = { kind: 'final', id: caption.id, text: caption.text, atSec: caption.atSec, endSec: caption.endSec, lang: caption.lang, ...(caption.speakerKey ? { speakerKey: caption.speakerKey } : {}) };
       opts.onCaption(event);
     }
   };

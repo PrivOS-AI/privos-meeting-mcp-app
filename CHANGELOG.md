@@ -136,3 +136,13 @@ Marketplace packaging.
   transcript after the meeting) with what each is good at and whether it is
   ready, instead of two selects and a table of internal names; model details
   sit under "Technical details".
+- Live speakers with the built-in recognizer: every finished utterance is
+  embedded (the voiceprint model) and folded into the meeting's session
+  speaker registry, the same one the Soniox chunk path uses, so captions show
+  "Speaker N" while the meeting runs, known voices are named from voiceprints,
+  speakers can be renamed live, and the names carry into the post-meeting
+  transcript through `live-turns.json`. Utterances under 1 s stay with the
+  previous speaker when they follow closely. Off when the room turned speaker
+  recognition off. New `liveSpeakers` capability (`meeting_live_speakers` now
+  answers for any provider that has it). Ending a recording writes the last
+  live speakers before the job reads them.

@@ -8,6 +8,8 @@ export type SttVendor = 'local' | 'soniox' | 'elevenlabs';
 
 export interface RealtimeCapabilities {
   speakerLabels: boolean;
+  /** Speakers are identified live on the server — poll `meeting_live_speakers`. Absent from an older server: fall back to `speakerLabels`. */
+  liveSpeakers?: boolean;
   translation: boolean;
 }
 

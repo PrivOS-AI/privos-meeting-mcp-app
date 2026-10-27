@@ -51,6 +51,15 @@ export interface LiveCaption {
   atSec: number;
   endSec: number;
   lang: AsrLanguage;
+  /** The live session speaker who said it, when the session has an attributor and it could tell. */
+  speakerKey?: string;
+}
+
+/** Decides who said a finished utterance (`live-speakers/local-attribution.ts`); injected so this module stays free of speaker code. */
+export interface SpeakerAttributor {
+  (utterance: { index: number; samples: Float32Array; atSec: number; endSec: number }): Promise<string | undefined>;
+  /** Persists what the attributor still holds; awaited before the post-meeting job reads it. */
+  flush(): Promise<void>;
 }
 
 /** What a session needs from the engine — injectable so tests run without models. */
@@ -90,6 +99,8 @@ export class LiveAsrSession {
   private lastLang: AsrLanguage = 'vi';
   degraded = false;
   lastActivityMs = Date.now();
+  /** Set once by the push tool; without it captions carry no speaker. */
+  attributeSpeaker: SpeakerAttributor | null = null;
 
   constructor(
     readonly meetingId: string,
@@ -221,7 +232,9 @@ export class LiveAsrSession {
           this.lastLang = result.lang;
           if (!result.text) return;
           const index = this.nextIndex++;
-          this.captions.push({ index, id: `${this.meetingId}:local:${index}`, text: result.text, atSec, endSec, lang: result.lang });
+          // Speaker attribution never costs the caption: a failure just leaves it unattributed.
+          const speakerKey = this.attributeSpeaker ? await this.attributeSpeaker({ index, samples, atSec, endSec }).catch(() => undefined) : undefined;
+          this.captions.push({ index, id: `${this.meetingId}:local:${index}`, text: result.text, atSec, endSec, lang: result.lang, ...(speakerKey ? { speakerKey } : {}) });
           if (this.captions.length > MAX_CAPTIONS) this.captions.splice(0, this.captions.length - MAX_CAPTIONS);
         })
         .catch((error: unknown) => {
@@ -253,6 +266,23 @@ export function liveSessionFor(meetingId: string, maxSessions: number, engine?: 
   const session = new LiveAsrSession(meetingId, engine);
   sessions.set(meetingId, session);
   return session;
+}
+
+/**
+ * Recording is over: recognises what is still buffered, writes the live speakers the session
+ * attributed (the post-meeting job reads them next), then drops the session. Never throws.
+ */
+export async function finishLiveSession(meetingId: string): Promise<void> {
+  const session = sessions.get(meetingId);
+  if (!session) return;
+  try {
+    await session.finish();
+    await session.attributeSpeaker?.flush();
+  } catch (error) {
+    console.warn('[live-asr] finishing the live session failed:', meetingId, error instanceof Error ? error.message : error);
+  } finally {
+    closeLiveSession(meetingId);
+  }
 }
 
 /** Ends a meeting's live session (processing started). */

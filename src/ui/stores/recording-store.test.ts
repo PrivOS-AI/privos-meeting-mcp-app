@@ -42,6 +42,12 @@ describe('resolveLineSpeakerKey — resolution order', () => {
     expect(resolveLineSpeakerKey(state, line('l1', 's0:1', 0, 1))).toBe('s0:1');
   });
 
+  it('follows a merge for a line the built-in recognizer keyed by session speaker', () => {
+    const merged = { sessionSpeakerId: 'ss-2', sonioxLabels: ['local:4'], liveSpeechSec: 3, colorKey: 'gold', resolved: false, mergedInto: 'ss-1' };
+    const state = { lineSpeaker: {}, voiceAlias: {}, lineServerSpeaker: {}, liveSpeakers: [merged] };
+    expect(resolveLineSpeakerKey(state, line('l1', 'ss-2', 0, 1))).toBe('ss-1');
+  });
+
   it('follows a merged session speaker id to its winner instead of returning the stale loser id', () => {
     const speakers: LiveSpeaker[] = [
       { sessionSpeakerId: 'winner', sonioxLabels: ['s0:1'], colorKey: 'blue', resolved: true, liveSpeechSec: 10 },

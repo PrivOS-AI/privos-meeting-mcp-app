@@ -50,7 +50,7 @@ describe('sonioxRealtimeProvider.mint', () => {
       wsUrl: 'wss://stt-rt.soniox.com/transcribe-websocket',
       expiresAt: '2026-09-17T10:00:00.000Z',
       model: env.sonioxRtModel,
-      capabilities: { speakerLabels: true, translation: true },
+      capabilities: { speakerLabels: true, translation: true, liveSpeakers: true },
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 

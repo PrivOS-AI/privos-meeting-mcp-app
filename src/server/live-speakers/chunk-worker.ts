@@ -75,7 +75,8 @@ function sessionIndexFromLabel(label: string): number {
 export const invalidateProfileCache = profileStore.invalidateProfileCache;
 export const resetProfileCacheForTests = profileStore.resetProfileCacheForTests;
 
-async function matchPendingAgainstProfiles(db: AppDbBotClient, registry: MeetingSessionRegistry): Promise<void> {
+/** Names sticky, unnamed session speakers from `speaker_profiles` (never enrols). Shared with the built-in recognizer's per-utterance path. */
+export async function matchPendingAgainstProfiles(db: AppDbBotClient, registry: MeetingSessionRegistry): Promise<void> {
   const candidateIds = registry.candidatesForProfileMatch();
   if (candidateIds.length === 0) return;
   const [threshold, profiles] = await Promise.all([readMatchThreshold(db), profileStore.cachedProfiles(db)]);
@@ -101,7 +102,7 @@ async function matchPendingAgainstProfiles(db: AppDbBotClient, registry: Meeting
 }
 
 /** `ObserveFact`/`MergeFact` (registry-internal, opaque to diagnostics) -> the full timestamped `DiagnosticEvent` this chunk logs. */
-function toDiagnosticEvent(meetingId: string, seq: number, fact: SpeakerRegistryFact): DiagnosticEvent {
+export function toDiagnosticEvent(meetingId: string, seq: number, fact: SpeakerRegistryFact): DiagnosticEvent {
   const t = Date.now();
   if (fact.kind === 'observe') {
     return {

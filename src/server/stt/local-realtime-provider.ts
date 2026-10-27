@@ -2,15 +2,15 @@
  * `local` realtime provider. There is no vendor and no credential: the iframe
  * pushes audio to `meeting_audio_push` and the container recognises it
  * (`asr/live-asr-session.ts`). `mint` only tells the UI which client to use
- * and what it can expect — captions per utterance, no live speaker labels
- * (speakers come from the post-meeting diarization), translation through Hub
- * AI (`meeting_translate`).
+ * and what it can expect — captions per utterance, each attributed to a live
+ * session speaker on the server (`live-speakers/local-attribution.ts`; the
+ * provider itself has no labels), translation through Hub AI (`meeting_translate`).
  */
 import { missingAsrModels } from '../asr/asr-engine.js';
 import { activeLiveSessionCount } from '../asr/live-asr-session.js';
 import type { ProviderStatus, RealtimeCapabilities, RealtimeToken, RealtimeTokenProvider } from './stt-provider.js';
 
-const CAPABILITIES: RealtimeCapabilities = { speakerLabels: false, translation: false };
+const CAPABILITIES: RealtimeCapabilities = { speakerLabels: false, translation: false, liveSpeakers: true };
 const SESSION_HOURS = 6;
 
 export const localRealtimeProvider: RealtimeTokenProvider = {

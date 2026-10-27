@@ -10,7 +10,7 @@
 import { AppError } from '../../shared/app-error.js';
 import { meetingId8 } from '../../shared/meeting-slug.js';
 import { DEFAULT_WORKSPACE_SETTINGS } from '../../shared/app-settings.js';
-import { closeLiveSession } from '../asr/live-asr-session.js';
+import { finishLiveSession } from '../asr/live-asr-session.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { getSetting } from '../hub/app-settings.js';
 import { upsertMeeting } from '../jobs/meeting-repository.js';
@@ -98,8 +98,9 @@ export const processTool: AppTool = {
       keepAudio,
     });
 
-    // Recording is over: drop the live caption session (the transcript comes from the parts).
-    closeLiveSession(meetingId);
+    // Recording is over: write the live speakers it found, then drop the live caption session
+    // (the transcript itself comes from the parts).
+    await finishLiveSession(meetingId);
     void meetingQueue
       .enqueue(meetingId, (signal) => runMeetingJob({ job, roomId, folderId, parts, agentBotHub: runtime.agentBotHub, signal }), JOB_TIMEOUT_MS)
       .catch((error) => {

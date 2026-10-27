@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { closeLiveSession, liveSessionFor, LiveAsrSession, pcm16ToFloat32, resetLiveSessionsForTests, type LiveAsrEngine } from './live-asr-session.js';
+import { closeLiveSession, finishLiveSession, liveSessionFor, LiveAsrSession, pcm16ToFloat32, resetLiveSessionsForTests, type LiveAsrEngine } from './live-asr-session.js';
 
 const RATE = 16000;
 const WINDOW = 512;
@@ -198,5 +198,33 @@ describe('LiveAsrSession drafts', () => {
     await session.settle(50);
     expect(session.captionsSince(0).draft).toBeNull();
     expect(engine.draftCalls).toEqual([]);
+  });
+});
+
+describe('LiveAsrSession speakers', () => {
+  beforeEach(() => resetLiveSessionsForTests());
+
+  it('stamps each caption with the speaker the attributor picked, and flushes it when the recording ends', async () => {
+    const session = liveSessionFor('m-spk', 8, fakeEngine(['Xin chào']))!;
+    const flushed: string[] = [];
+    session.attributeSpeaker = Object.assign(async ({ index }: { index: number }) => `live_${index + 1}`, {
+      flush: async () => void flushed.push('m-spk'),
+    });
+    await session.push(0, 0, join(speech(4), silence(2)));
+    await session.settle(100);
+    expect(session.captionsSince(0).captions.map((c) => c.speakerKey)).toEqual(['live_1']);
+
+    await finishLiveSession('m-spk');
+    expect(flushed).toEqual(['m-spk']);
+    expect(liveSessionFor('m-spk', 0)).toBeNull();
+  });
+
+  it('keeps the caption when the attributor fails', async () => {
+    const session = new LiveAsrSession('m-fail', fakeEngine(['Hello']));
+    session.attributeSpeaker = Object.assign(async () => Promise.reject(new Error('no model')), { flush: async () => undefined });
+    await session.push(0, 0, join(speech(4), silence(2)));
+    await session.settle(100);
+    expect(session.captionsSince(0).captions).toMatchObject([{ text: 'Hello' }]);
+    expect(session.captionsSince(0).captions[0].speakerKey).toBeUndefined();
   });
 });
