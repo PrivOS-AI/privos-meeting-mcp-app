@@ -22,7 +22,7 @@ export const STALE_JOB_MS = HEARTBEAT_INTERVAL_MS * 8;
 /** A job interrupted by a restart is re-queued this many times before it is failed (guards a crash loop). */
 export const MAX_AUTO_RETRIES = 1;
 
-export type SttAsyncProviderName = 'soniox-async' | 'elevenlabs-batch';
+export type SttAsyncProviderName = 'local' | 'soniox-async' | 'elevenlabs-batch';
 export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
 export interface JobResultSpeaker {
@@ -113,7 +113,7 @@ function fromRow(row: DbRow): JobRecord {
     roomId: String(row.roomId ?? ''),
     partFileIds: toStringArray(row.partFileIds),
     audioFileId: optionalString(row.audioFileId),
-    sttProvider: row.sttProvider === 'elevenlabs-batch' ? 'elevenlabs-batch' : 'soniox-async',
+    sttProvider: row.sttProvider === 'elevenlabs-batch' || row.sttProvider === 'local' ? row.sttProvider : 'soniox-async',
     providerFileId: optionalString(row.providerFileId),
     providerTranscriptionId: optionalString(row.providerTranscriptionId),
     language: typeof row.language === 'string' && row.language ? row.language : 'vi',

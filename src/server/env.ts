@@ -9,7 +9,7 @@
  */
 import { resolveRuntimeMode } from '@privos_ai/app-server';
 
-type SttVendor = 'soniox' | 'elevenlabs';
+type SttVendor = 'local' | 'soniox' | 'elevenlabs';
 
 function str(key: string): string | undefined {
   const v = process.env[key];
@@ -24,7 +24,7 @@ function num(key: string, fallback: number): number {
 
 function vendor(key: string, fallback: SttVendor): SttVendor {
   const v = str(key)?.toLowerCase();
-  return v === 'soniox' || v === 'elevenlabs' ? v : fallback;
+  return v === 'local' || v === 'soniox' || v === 'elevenlabs' ? v : fallback;
 }
 
 export type SessionScoreMode = 'max' | 'centroid';
@@ -115,8 +115,8 @@ export function loadEnv(): AppEnv {
   const speakerMatchThreshold = num('SPEAKER_MATCH_THRESHOLD', 0.5);
   return {
     port: num('PORT', 3012),
-    realtimeProvider: vendor('STT_REALTIME_PROVIDER', 'soniox'),
-    asyncProvider: vendor('STT_ASYNC_PROVIDER', 'soniox'),
+    realtimeProvider: vendor('STT_REALTIME_PROVIDER', 'local'),
+    asyncProvider: vendor('STT_ASYNC_PROVIDER', 'local'),
     sonioxApiKey: str('SONIOX_API_KEY'),
     elevenLabsApiKey: str('ELEVENLABS_API_KEY'),
     sonioxRtModel: str('SONIOX_RT_MODEL') ?? 'stt-rt-v5',
@@ -178,7 +178,9 @@ export function isDevelopmentRuntime(): boolean {
   }
 }
 
+/** The key a vendor needs; `local` runs in this container and needs none. */
 function keyForProvider(config: AppEnv, provider: SttVendor): string | undefined {
+  if (provider === 'local') return 'local';
   return provider === 'soniox' ? config.sonioxApiKey : config.elevenLabsApiKey;
 }
 

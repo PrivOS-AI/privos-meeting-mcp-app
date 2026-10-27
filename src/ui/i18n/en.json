@@ -310,6 +310,7 @@
   "settings.speech.loading": "Loading status…",
   "settings.speech.noApiKeyNote": "There is no API key field here — keys are configured by an admin as server environment variables.",
   "settings.speech.realtimeProvider": "Realtime caption provider",
+  "settings.speech.localProvider": "Built-in (Vietnamese + English, audio stays in the workspace)",
   "settings.speech.asyncProvider": "Post-meeting processing provider",
   "settings.speech.hasSpeakerLabels": "has live speaker labels",
   "settings.speech.noSpeakerLabels": "no live labels",

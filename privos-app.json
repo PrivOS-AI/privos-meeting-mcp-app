@@ -40,7 +40,7 @@
       "Soniox (speech-to-text)",
       "ElevenLabs (speech-to-text)"
     ],
-    "retention": "Audio is streamed to the speech-to-text provider selected per room (Soniox or ElevenLabs) for live captions, and the merged recording is uploaded to that provider for the final transcript; the app deletes its Soniox upload after transcription, and each provider keeps data under its own terms. Recording parts are deleted once merged. The merged audio is deleted right after processing unless the room enables Keep original audio; audio kept on purpose, or left because the summary failed, is deleted after the room's auto-delete period (default 90 days, 0 disables). Parts of an interrupted recording are deleted after 7 days by default. Transcripts and summaries are produced with Hub AI inside the workspace and stored in the room's Files until the meeting is deleted, by its owner or after the room's meeting auto-delete period (off by default). Voiceprints (speaker embeddings, biometric data) can be turned off per room, in which case none are computed or stored; while on, the recorder must confirm before each recording that participants were told, and the confirmation time is kept on the meeting. Voiceprints are encrypted with AES-256-GCM, stored in the workspace App DB and never sent outside the workspace; deleting a meeting also removes the voice samples taken from it, and a profile stays until its creator or a workspace admin deletes it. Unconfirmed speaker embeddings are cleared 30 days after the meeting. Temporary files on the app volume are deleted after each job; operator diagnostics are kept for 90 days. Uninstalling the app does not delete data already stored in the room's Files or App DB."
+    "retention": "By default speech is recognised inside the app container (built-in Vietnamese/English models) and audio never leaves the workspace. Only if a room selects Soniox or ElevenLabs is audio streamed and uploaded to that provider, which keeps it under its own terms; the app deletes its Soniox upload after transcription. Recording parts are deleted once merged. The merged audio is deleted right after processing unless the room enables Keep original audio; audio kept on purpose, or left because the summary failed, is deleted after the room's auto-delete period (default 90 days, 0 disables). Parts of an interrupted recording are deleted after 7 days by default. Transcripts and summaries are produced with Hub AI inside the workspace and stored in the room's Files until the meeting is deleted, by its owner or after the room's meeting auto-delete period (off by default). Voiceprints (speaker embeddings, biometric data) can be turned off per room, in which case none are computed or stored; while on, the recorder must confirm before each recording that participants were told, and the confirmation time is kept on the meeting. Voiceprints are encrypted with AES-256-GCM, stored in the workspace App DB and never sent outside the workspace; deleting a meeting also removes the voice samples taken from it, and a profile stays until its creator or a workspace admin deletes it. Unconfirmed speaker embeddings are cleared 30 days after the meeting. Temporary files on the app volume are deleted after each job; operator diagnostics are kept for 90 days. Uninstalling the app does not delete data already stored in the room's Files or App DB."
   },
   "permissions": [
     {
@@ -850,6 +850,61 @@
           }
         }
       }
+    },
+    {
+      "name": "meeting_audio_push",
+      "title": "Push live audio",
+      "description": "Send a short chunk of the meeting's live audio to the app's own speech recognizer and receive the new captions — only the meeting owner, while recording.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "roomId",
+          "meetingId",
+          "seq",
+          "chunkStartSec",
+          "sampleRate",
+          "pcm"
+        ],
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "meetingId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "chunkStartSec": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 86400000,
+            "description": "Meeting-clock seconds of the first sample in this chunk."
+          },
+          "sampleRate": {
+            "type": "integer",
+            "enum": [
+              16000
+            ]
+          },
+          "pcm": {
+            "type": "string",
+            "maxLength": 43692,
+            "description": "Base64 little-endian PCM16 mono."
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000
+          }
+        }
+      }
     }
   ],
   "ui": {
@@ -858,29 +913,29 @@
   "env": [
     {
       "key": "SONIOX_API_KEY",
-      "description": "Soniox API key. Required if Soniox is the selected provider.",
+      "description": "Soniox API key — only when a room selects Soniox (optional).",
       "required": false,
       "secret": true
     },
     {
       "key": "ELEVENLABS_API_KEY",
-      "description": "ElevenLabs API key. Required if ElevenLabs is the selected provider.",
+      "description": "ElevenLabs API key — only when a room selects ElevenLabs (optional).",
       "required": false,
       "secret": true
     },
     {
       "key": "STT_REALTIME_PROVIDER",
-      "description": "Default realtime provider: soniox | elevenlabs.",
+      "description": "Default realtime caption provider: local (built in) | soniox | elevenlabs.",
       "required": false,
       "secret": false,
-      "default": "soniox"
+      "default": "local"
     },
     {
       "key": "STT_ASYNC_PROVIDER",
-      "description": "Default async provider: soniox | elevenlabs.",
+      "description": "Default post-meeting transcription provider: local (built in) | soniox | elevenlabs.",
       "required": false,
       "secret": false,
-      "default": "soniox"
+      "default": "local"
     },
     {
       "key": "SONIOX_RT_MODEL",

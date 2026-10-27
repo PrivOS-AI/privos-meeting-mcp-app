@@ -12,7 +12,7 @@
 import { AppError } from './app-error.js';
 import { SUPPORTED_LANGUAGES, type LanguageCode } from './languages.js';
 
-export type SttVendor = 'soniox' | 'elevenlabs';
+export type SttVendor = 'local' | 'soniox' | 'elevenlabs';
 export type SummaryLength = 'short' | 'normal' | 'detailed';
 /** `auto` = the meeting's own spoken language. */
 export type SettingsLanguage = LanguageCode | 'auto';
@@ -51,8 +51,8 @@ export interface WorkspaceAppSettings {
 export const SPEAKER_MATCH_THRESHOLD_FLOOR = 0.35;
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceAppSettings = {
-  sttRealtimeProvider: 'soniox',
-  sttAsyncProvider: 'soniox',
+  sttRealtimeProvider: 'local',
+  sttAsyncProvider: 'local',
   speakerRecognition: true,
   speakerMatchThreshold: 0.5,
   summaryLength: 'normal',
@@ -103,8 +103,8 @@ function booleanValidator(name: string): Validator {
 
 /** One validator per `WorkspaceAppSettings` key — the exact allowlist `meeting_settings_set` enforces. */
 export const WORKSPACE_SETTING_VALIDATORS: Record<keyof WorkspaceAppSettings, Validator> = {
-  sttRealtimeProvider: enumValidator('sttRealtimeProvider', ['soniox', 'elevenlabs']),
-  sttAsyncProvider: enumValidator('sttAsyncProvider', ['soniox', 'elevenlabs']),
+  sttRealtimeProvider: enumValidator('sttRealtimeProvider', ['local', 'soniox', 'elevenlabs']),
+  sttAsyncProvider: enumValidator('sttAsyncProvider', ['local', 'soniox', 'elevenlabs']),
   speakerRecognition: booleanValidator('speakerRecognition'),
   speakerMatchThreshold: unitFractionValidator('speakerMatchThreshold'),
   summaryLength: enumValidator('summaryLength', ['short', 'normal', 'detailed']),

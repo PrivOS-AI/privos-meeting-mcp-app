@@ -63,7 +63,7 @@ describe('meeting_stt_status', () => {
     expect(result.ok).toBe(true);
     expect(result.activeRealtimeProvider).toBe('soniox');
     expect(result.activeAsyncProvider).toBe('soniox');
-    expect(result.providers).toHaveLength(4);
+    expect(result.providers).toHaveLength(6);
     expect(result.providers.every((p) => p.configured === false)).toBe(true);
     expect(result.liveConcurrency.max).toBe(env.liveMaxConcurrentRecordings);
     // The detail message legitimately NAMES the missing env var (SONIOX_API_KEY) — that is not a secret.

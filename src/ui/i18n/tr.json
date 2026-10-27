@@ -310,6 +310,7 @@
   "settings.speech.loading": "Durum yükleniyor…",
   "settings.speech.noApiKeyNote": "Burada API anahtarı alanı yoktur — anahtarlar bir yönetici tarafından sunucu ortam değişkenleri olarak yapılandırılır.",
   "settings.speech.realtimeProvider": "Gerçek zamanlı altyazı sağlayıcısı",
+  "settings.speech.localProvider": "Yerleşik (Vietnamca + İngilizce, ses çalışma alanında kalır)",
   "settings.speech.asyncProvider": "Toplantı sonrası işleme sağlayıcısı",
   "settings.speech.hasSpeakerLabels": "canlı konuşmacı etiketleri var",
   "settings.speech.noSpeakerLabels": "canlı etiket yok",

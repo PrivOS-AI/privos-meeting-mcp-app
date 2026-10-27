@@ -308,6 +308,7 @@
   "settings.speech.loading": "ステータスを読み込み中…",
   "settings.speech.noApiKeyNote": "ここにはAPIキーの入力欄はありません — キーは管理者がサーバーの環境変数として設定します。",
   "settings.speech.realtimeProvider": "リアルタイム字幕プロバイダー",
+  "settings.speech.localProvider": "内蔵（ベトナム語＋英語、音声はワークスペース外に出ません）",
   "settings.speech.asyncProvider": "会議後処理プロバイダー",
   "settings.speech.hasSpeakerLabels": "リアルタイム話者ラベルあり",
   "settings.speech.noSpeakerLabels": "リアルタイムラベルなし",

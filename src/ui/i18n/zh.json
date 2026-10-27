@@ -308,6 +308,7 @@
   "settings.speech.loading": "正在加载状态…",
   "settings.speech.noApiKeyNote": "此处没有 API 密钥字段 — 密钥由管理员以服务器环境变量的形式配置。",
   "settings.speech.realtimeProvider": "实时字幕服务商",
+  "settings.speech.localProvider": "内置（越南语 + 英语，音频不离开工作区）",
   "settings.speech.asyncProvider": "会后处理服务商",
   "settings.speech.hasSpeakerLabels": "支持实时发言人标签",
   "settings.speech.noSpeakerLabels": "不支持实时标签",

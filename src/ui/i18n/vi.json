@@ -310,6 +310,7 @@
   "settings.speech.loading": "Đang tải trạng thái…",
   "settings.speech.noApiKeyNote": "Không có ô nhập khoá API ở đây — khoá do quản trị viên cấu hình trong biến môi trường trên máy chủ.",
   "settings.speech.realtimeProvider": "Nhà cung cấp phụ đề trực tiếp",
+  "settings.speech.localProvider": "Tích hợp sẵn (tiếng Việt + tiếng Anh, audio không rời workspace)",
   "settings.speech.asyncProvider": "Nhà cung cấp xử lý sau họp",
   "settings.speech.hasSpeakerLabels": "có nhãn người nói trực tiếp",
   "settings.speech.noSpeakerLabels": "không có nhãn trực tiếp",

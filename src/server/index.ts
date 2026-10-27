@@ -13,6 +13,7 @@ import path from 'node:path';
 import express from 'express';
 import { serveApp, resolveRuntimeMode, RuntimeModeError, type RoomBoundHubClient } from '@privos_ai/app-server';
 
+import { missingAsrModels, warmUpAsr } from './asr/asr-engine.js';
 import { assertProviderKeysAtBoot } from './env.js';
 import { startAudioRetention } from './jobs/audio-retention-job.js';
 import { meetingQueue } from './jobs/meeting-queue.js';
@@ -98,6 +99,9 @@ async function start(): Promise<void> {
     descriptor: buildRelayAppDescriptor(),
     createHandler: (ctx) => {
       void logAgentBotCredentialStatus(ctx.agentBotHub);
+      // Load the local speech models now, not on the first utterance (~5 s). Never throws.
+      if (missingAsrModels().length === 0) void warmUpAsr();
+      else console.warn(`[boot] Local speech models missing (${missingAsrModels().join(', ')}) — the local provider is unavailable.`);
       // Fire-and-forget: reloads queued jobs, fails stale processing jobs,
       // marks abandoned recordings interrupted, sweeps dead vendor garbage —
       // across every known room. Never blocks the handler from being ready.

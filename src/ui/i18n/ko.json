@@ -308,6 +308,7 @@
   "settings.speech.loading": "상태 불러오는 중…",
   "settings.speech.noApiKeyNote": "여기에는 API 키 입력란이 없습니다 — 키는 관리자가 서버 환경 변수로 설정합니다.",
   "settings.speech.realtimeProvider": "실시간 자막 제공업체",
+  "settings.speech.localProvider": "내장(베트남어 + 영어, 오디오가 워크스페이스 밖으로 나가지 않음)",
   "settings.speech.asyncProvider": "회의 후 처리 제공업체",
   "settings.speech.hasSpeakerLabels": "실시간 화자 라벨 있음",
   "settings.speech.noSpeakerLabels": "실시간 라벨 없음",

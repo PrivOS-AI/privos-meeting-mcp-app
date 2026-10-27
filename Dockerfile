@@ -6,18 +6,43 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build && npm prune --omit=dev --no-audit --no-fund
 
-# Speaker-embedding model, baked into the image (never committed). Without a URL
-# the image still builds and runs; voiceprint matching then reports
-# "model not found" while captions, transcripts and summaries keep working.
+# Speech models, baked into the image (never committed), from sherpa-onnx's
+# official GitHub releases, each pinned by sha256 (a changed file fails the build):
+#   models/asr/vi        Zipformer Vietnamese 30M int8 (offline transducer)
+#   models/asr/en        Zipformer small English int8
+#   models/asr/silero_vad.onnx                VAD
+#   models/asr/segmentation/model.onnx        pyannote segmentation 3.0 (diarization)
+#   models/3dspeaker_speaker-embedding_advanced.onnx   3D-Speaker CAM++ zh/en "advanced"
+#                                             (voiceprints + diarization embeddings)
 FROM node:22-bookworm-slim AS model
-ARG SPEAKER_MODEL_URL=""
-ARG SPEAKER_MODEL_SHA256=""
-RUN mkdir -p /models \
-    && if [ -n "$SPEAKER_MODEL_URL" ]; then \
-         apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
-         && curl -fsSL "$SPEAKER_MODEL_URL" -o /models/3dspeaker_speaker-embedding_advanced.onnx \
-         && { [ -z "$SPEAKER_MODEL_SHA256" ] || echo "$SPEAKER_MODEL_SHA256  /models/3dspeaker_speaker-embedding_advanced.onnx" | sha256sum -c -; }; \
-       else echo "WARN: SPEAKER_MODEL_URL not set — image ships without the speaker model"; fi
+ARG SHERPA=https://github.com/k2-fsa/sherpa-onnx/releases/download
+WORKDIR /dl
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl bzip2 \
+    && curl -fsSLO "$SHERPA/asr-models/sherpa-onnx-zipformer-vi-30M-int8-2026-02-09.tar.bz2" \
+    && curl -fsSLO "$SHERPA/asr-models/sherpa-onnx-zipformer-small-en-2023-06-26.tar.bz2" \
+    && curl -fsSLO "$SHERPA/asr-models/silero_vad.onnx" \
+    && curl -fsSLO "$SHERPA/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2" \
+    && curl -fsSLO "$SHERPA/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx" \
+    && printf '%s\n' \
+      "da8b637947091829d7ee9eda23da2a4ec7caa399233a3f4e34eb719fb2ea6b9b  sherpa-onnx-zipformer-vi-30M-int8-2026-02-09.tar.bz2" \
+      "c8bff1091c26c49731cddbcd60ef18061142ea11523df1b73bf1b14451b9c15e  sherpa-onnx-zipformer-small-en-2023-06-26.tar.bz2" \
+      "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6  silero_vad.onnx" \
+      "24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488  sherpa-onnx-pyannote-segmentation-3-0.tar.bz2" \
+      "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2  3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx" \
+      | sha256sum -c - \
+    && for f in *.tar.bz2; do tar -xjf "$f"; done \
+    && mkdir -p /models/asr/vi /models/asr/en /models/asr/segmentation \
+    && V=sherpa-onnx-zipformer-vi-30M-int8-2026-02-09 \
+    && cp "$V/encoder.int8.onnx" "$V/decoder.onnx" "$V/joiner.int8.onnx" "$V/tokens.txt" /models/asr/vi/ \
+    && E=sherpa-onnx-zipformer-small-en-2023-06-26 \
+    && cp "$E/encoder-epoch-99-avg-1.int8.onnx" /models/asr/en/encoder.int8.onnx \
+    && cp "$E/decoder-epoch-99-avg-1.int8.onnx" /models/asr/en/decoder.int8.onnx \
+    && cp "$E/joiner-epoch-99-avg-1.int8.onnx" /models/asr/en/joiner.int8.onnx \
+    && cp "$E/tokens.txt" /models/asr/en/tokens.txt \
+    && cp silero_vad.onnx /models/asr/ \
+    && cp sherpa-onnx-pyannote-segmentation-3-0/model.onnx /models/asr/segmentation/model.onnx \
+    && cp 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx /models/3dspeaker_speaker-embedding_advanced.onnx \
+    && du -sh /models
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production PORT=3012

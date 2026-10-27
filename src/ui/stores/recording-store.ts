@@ -633,6 +633,10 @@ export class RecordingStore {
         const raw = await this.app.callServerTool({ name: 'meeting_realtime_token', arguments: { roomId: this.ctx.roomId, meetingId } });
         return parseToolResultOrThrow(raw) as unknown as RealtimeToken;
       },
+      pushAudio: async (request) => {
+        const raw = await this.app.callServerTool({ name: 'meeting_audio_push', arguments: { roomId: this.ctx.roomId, meetingId, ...request } });
+        return parseToolResultOrThrow(raw) as unknown as import('../data/local-realtime-client.js').AudioPushResponse;
+      },
       onStarted: (sessionIndex) => {
         this.clock?.registerSessionStart(sessionIndex);
         this.setState({ sessionIndex });

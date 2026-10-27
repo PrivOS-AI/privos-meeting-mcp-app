@@ -15,7 +15,7 @@ import { saveWorkspaceSetting } from '../../data/settings-store.js';
 import type { WorkspaceAppSettings } from '../../../shared/app-settings.js';
 
 interface ProviderStatusDto {
-  provider: 'soniox' | 'elevenlabs';
+  provider: 'local' | 'soniox' | 'elevenlabs';
   kind: 'realtime' | 'async';
   configured: boolean;
   ok: boolean;
@@ -27,8 +27,8 @@ interface ProviderStatusDto {
 
 interface SttStatusAdmin {
   ok: true;
-  activeRealtimeProvider: 'soniox' | 'elevenlabs';
-  activeAsyncProvider: 'soniox' | 'elevenlabs';
+  activeRealtimeProvider: 'local' | 'soniox' | 'elevenlabs';
+  activeAsyncProvider: 'local' | 'soniox' | 'elevenlabs';
   providers: ProviderStatusDto[];
   liveConcurrency: { active?: number; max: number };
   checkedAt: string;
@@ -106,6 +106,7 @@ export function SpeechRecognitionPanel() {
           disabled={saving === 'sttRealtimeProvider'}
           onChange={(e) => void changeProvider('sttRealtimeProvider', e.target.value as WorkspaceAppSettings['sttRealtimeProvider'])}
         >
+          <option value="local">{t('settings.speech.localProvider')}</option>
           <option value="soniox">Soniox — {t('settings.speech.hasSpeakerLabels')}</option>
           <option value="elevenlabs">ElevenLabs — {t('settings.speech.noSpeakerLabels')}</option>
         </select>
@@ -119,6 +120,7 @@ export function SpeechRecognitionPanel() {
           disabled={saving === 'sttAsyncProvider'}
           onChange={(e) => void changeProvider('sttAsyncProvider', e.target.value as WorkspaceAppSettings['sttAsyncProvider'])}
         >
+          <option value="local">{t('settings.speech.localProvider')}</option>
           <option value="soniox">Soniox</option>
           <option value="elevenlabs">ElevenLabs</option>
         </select>

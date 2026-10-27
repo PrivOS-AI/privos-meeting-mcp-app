@@ -10,6 +10,7 @@
 import { AppError } from '../../shared/app-error.js';
 import { meetingId8 } from '../../shared/meeting-slug.js';
 import { DEFAULT_WORKSPACE_SETTINGS } from '../../shared/app-settings.js';
+import { closeLiveSession } from '../asr/live-asr-session.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { getSetting } from '../hub/app-settings.js';
 import { upsertMeeting } from '../jobs/meeting-repository.js';
@@ -82,7 +83,7 @@ export const processTool: AppTool = {
     if (parts.length === 0) throw new AppError('Meeting has no recording parts to process.', 'INVALID_STATE');
 
     const asyncVendor = await resolveAsyncVendor(db);
-    const sttProvider = asyncVendor === 'elevenlabs' ? ('elevenlabs-batch' as const) : ('soniox-async' as const);
+    const sttProvider = asyncVendor === 'local' ? ('local' as const) : asyncVendor === 'elevenlabs' ? ('elevenlabs-batch' as const) : ('soniox-async' as const);
     // The room's setting decides, read here on the server: the `keepAudio` the iframe wrote on the meeting row is ignored.
     const keepAudio = (await getSetting<boolean>(db, 'keepOriginalAudio')) ?? DEFAULT_WORKSPACE_SETTINGS.keepOriginalAudio;
     await upsertMeeting(db, meetingId, { keepAudio });
@@ -97,6 +98,8 @@ export const processTool: AppTool = {
       keepAudio,
     });
 
+    // Recording is over: drop the live caption session (the transcript comes from the parts).
+    closeLiveSession(meetingId);
     void meetingQueue
       .enqueue(meetingId, (signal) => runMeetingJob({ job, roomId, folderId, parts, agentBotHub: runtime.agentBotHub, signal }), JOB_TIMEOUT_MS)
       .catch((error) => {

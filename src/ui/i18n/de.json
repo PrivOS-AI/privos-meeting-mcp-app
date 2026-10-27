@@ -310,6 +310,7 @@
   "settings.speech.loading": "Status wird geladen…",
   "settings.speech.noApiKeyNote": "Hier gibt es kein Feld für API-Schlüssel — Schlüssel werden von einem Administrator als Server-Umgebungsvariablen konfiguriert.",
   "settings.speech.realtimeProvider": "Anbieter für Echtzeit-Untertitel",
+  "settings.speech.localProvider": "Integriert (Vietnamesisch + Englisch, Audio bleibt im Workspace)",
   "settings.speech.asyncProvider": "Anbieter für Nachbearbeitung",
   "settings.speech.hasSpeakerLabels": "mit Live-Sprecherbezeichnungen",
   "settings.speech.noSpeakerLabels": "ohne Live-Bezeichnungen",

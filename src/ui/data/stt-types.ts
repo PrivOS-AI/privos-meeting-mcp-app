@@ -3,7 +3,8 @@
  * Kept as a separate small module (not imported from `src/server`) because the
  * iframe bundle must never pull in server-only code.
  */
-export type SttVendor = 'soniox' | 'elevenlabs';
+/** `local` = the app's own recognizer (no vendor); `soniox` / `elevenlabs` = optional vendors. */
+export type SttVendor = 'local' | 'soniox' | 'elevenlabs';
 
 export interface RealtimeCapabilities {
   speakerLabels: boolean;

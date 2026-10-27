@@ -319,11 +319,13 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
     const wavPath = path.join(scratch, 'audio-16k.wav');
     const decoded = await decodeToWav16k(webmPath, wavPath, signal);
 
-    // 3. transcribe via the job's pinned provider ('elevenlabs-batch' wants the wav, 'soniox-async' the raw webm).
+    // 3. transcribe via the job's pinned provider ('local' and 'elevenlabs-batch' want the wav, 'soniox-async' the raw webm).
     await jobRepo.patch(job._id, { step: 'transcribe', progress: 0.35 });
-    const providerVendor = job.sttProvider === 'elevenlabs-batch' ? 'elevenlabs' : 'soniox';
+    const providerVendor = job.sttProvider === 'local' ? 'local' : job.sttProvider === 'elevenlabs-batch' ? 'elevenlabs' : 'soniox';
     const provider = asyncProviderFor(providerVendor);
-    const audioPath = job.sttProvider === 'elevenlabs-batch' ? wavPath : webmPath;
+    const audioPath = providerVendor === 'soniox' ? webmPath : wavPath;
+    // soniox-async and local tokens carry their own spacing; elevenlabs-batch tokens are bare words.
+    const tokensCarrySpacing = providerVendor !== 'elevenlabs';
     const sttResult = await provider.transcribeFile({
       audioPath,
       languageHints: job.language ? [job.language] : undefined,
@@ -337,9 +339,7 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
 
     // 4. segments — ONE builder for both providers, they already share `SttToken`.
     await jobRepo.patch(job._id, { step: 'segment', progress: 0.6 });
-    // soniox-async tokens carry their own spacing (concatenate); elevenlabs-batch
-    // tokens are bare words (join with a space) — see segment-builder options.
-    const segments = buildSegments(sttResult.tokens, { pauseSplitSec: 1.5, tokensCarrySpacing: providerVendor === 'soniox' });
+    const segments = buildSegments(sttResult.tokens, { pauseSplitSec: 1.5, tokensCarrySpacing });
 
     // 5. P4 embed + match/enrol against `speaker_profiles`; P5 reconciles against live-turns.json.
     // Mapping-before-resolve (plan.md § Requirements): the async<->live map and
@@ -463,7 +463,7 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
       segments: finalSegments,
       displayNameBySpeaker,
     });
-    const srt = buildSrt(finalSegments, sttResult.tokens, providerVendor === 'soniox');
+    const srt = buildSrt(finalSegments, sttResult.tokens, tokensCarrySpacing);
 
     const [jsonUpload, mdUpload, srtUpload] = await Promise.all([
       uploadBotFile({

@@ -76,6 +76,15 @@ Marketplace packaging.
   audio, `speaker_resolve`/`meeting_relabel_speaker` save names only. On: the
   new-meeting screen tells the recorder voices may be matched and requires them
   to confirm they told participants; the time is stored as `voiceprintNoticeAt`.
+- **Built-in speech recognition (`local`, now the default).** Vietnamese and
+  English Zipformer models (sherpa-onnx, CPU) baked into the image with Silero
+  VAD, pyannote segmentation and the 3D-Speaker embedding, all sha256-pinned.
+  Each utterance is decoded by both models and the better fit (mean token
+  log-prob) wins, so mixed Vietnamese/English meetings need no language ID.
+  Live captions: the iframe pushes 16 kHz PCM every ~500 ms
+  (`meeting_audio_push`) and gets the new captions back. Post-meeting: VAD +
+  diarization run in a worker thread, every word gets its speaker. No vendor
+  key is needed; Soniox and ElevenLabs stay selectable per room.
 - Data policy rewritten to match actual behaviour, including what is not
   deleted automatically (transcripts, summaries, data left after uninstall).
 - Dependencies: `@privos_ai/app-server` 0.12, `@privos_ai/app-react` 0.8, `zod` 4,

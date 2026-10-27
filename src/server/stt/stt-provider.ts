@@ -9,7 +9,8 @@
  * P2 (realtime) and P3 (async).
  */
 
-export type SttVendor = 'soniox' | 'elevenlabs';
+/** `local` = recognised in this container (sherpa-onnx); `soniox` / `elevenlabs` = optional vendors. */
+export type SttVendor = 'local' | 'soniox' | 'elevenlabs';
 
 /** One recognized token, normalized across vendors. Timestamps are ms from the recorder epoch. */
 export interface SttToken {

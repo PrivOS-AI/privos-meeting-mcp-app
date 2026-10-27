@@ -7,7 +7,7 @@
 import type { Segment } from './segment-builder.js';
 import type { SttToken } from '../stt/stt-provider.js';
 
-export type SttAsyncProviderName = 'soniox-async' | 'elevenlabs-batch';
+export type SttAsyncProviderName = 'local' | 'soniox-async' | 'elevenlabs-batch';
 
 export interface TranscriptSpeaker {
   speakerId: string;

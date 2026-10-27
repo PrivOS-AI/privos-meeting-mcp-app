@@ -308,6 +308,7 @@
   "settings.speech.loading": "Chargement du statut…",
   "settings.speech.noApiKeyNote": "Il n'y a pas de champ de clé API ici — les clés sont configurées par un administrateur en tant que variables d'environnement serveur.",
   "settings.speech.realtimeProvider": "Fournisseur de sous-titres en temps réel",
+  "settings.speech.localProvider": "Intégré (vietnamien + anglais, l'audio reste dans l'espace)",
   "settings.speech.asyncProvider": "Fournisseur de traitement post-réunion",
   "settings.speech.hasSpeakerLabels": "avec étiquettes d'intervenants en direct",
   "settings.speech.noSpeakerLabels": "sans étiquettes en direct",
