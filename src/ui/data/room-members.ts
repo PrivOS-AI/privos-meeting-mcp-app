@@ -77,3 +77,17 @@ export async function searchRoomMembers(app: McpApp, roomId: string, filter: str
   }
   throw new Error('room members lookup failed');
 }
+
+/** Everyone in the room (up to `count`), for showing people's avatars and names. Same routes, same degradation (throws without `rooms:read`). */
+export async function listRoomMembers(app: McpApp, roomId: string, count = 500): Promise<RoomMember[]> {
+  const query = { roomId, count };
+  const cached = routeByRoom.get(roomId);
+  for (const path of cached ? [cached] : MEMBER_ROUTES) {
+    const members = await fetchVia(app, path, query);
+    if (members) {
+      routeByRoom.set(roomId, path);
+      return members;
+    }
+  }
+  throw new Error('room members lookup failed');
+}

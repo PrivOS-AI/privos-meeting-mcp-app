@@ -187,3 +187,19 @@ Marketplace packaging.
 - Side-panel tabs wrap onto a second row instead of overlapping.
 - Manifest: three new tools; data policy says where questions, saved answers
   and notes go. An admin Refresh is needed after deploying.
+- More accurate recognition when the capture is quiet or noisy (measured with
+  the new `scripts/eval-asr.ts`):
+  - The Vietnamese model is now the int8 Zipformer trained on ~70k hours
+    (was 30M / ~6k hours). At SNR 5 dB, and when quiet and noisy, it keeps
+    ~92 % of words where the old model lost 25–42 %. It is ~1.4× slower.
+  - Every utterance is brought to ~-20 dBFS before recognition (an English
+    clip at -40 dB went from 96 % to 2 % word errors).
+  - Decoding uses `modified_beam_search` (4 paths).
+  - The microphone is captured with `autoGainControl`.
+  - An ffmpeg denoise chain was measured and left out (worse at SNR 0).
+- People's PrivOS avatars instead of initials: in the rail, transcripts,
+  speaker lists, history rows and the member picker. Avatars are public at
+  `<hub>/avatar/<username>`; `meeting_bootstrap` now returns the Hub origin.
+  A person is matched by user id, else by a name exactly one room member has.
+  Initials stay when nobody matches, without `rooms:read`, or when the image
+  fails.

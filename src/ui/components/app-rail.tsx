@@ -15,6 +15,7 @@ import type { Route } from '../app.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 import { useRecordingState } from '../stores/recording-store.js';
 import { Icon, type IconName } from './icon.js';
+import { SpeakerAvatar } from './speaker-avatar.js';
 import { UserMenu } from './user-menu.js';
 
 interface RailItem {
@@ -88,7 +89,7 @@ export function AppRail({ current, onNavigate, open, onClose }: AppRailProps) {
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen((v) => !v)}
           >
-            {initial}
+            <SpeakerAvatar name={username || initial} username={username || null} size={36} />
           </button>
           {menuOpen ? <UserMenu username={username} onClose={() => setMenuOpen(false)} /> : null}
         </div>

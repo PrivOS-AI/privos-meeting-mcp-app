@@ -164,6 +164,8 @@ export interface MeetingSpeakerSummary {
   displayName: string;
   named: boolean;
   colorKey: string;
+  /** The PrivOS user this speaker was identified as (member picker or a linked voiceprint), when known. */
+  privosUserId?: string;
 }
 
 /**
@@ -188,6 +190,7 @@ export async function listSpeakersForMeetings(app: McpApp, meetingIds: readonly 
       displayName: named ? String(record.displayName) : String(record.speakerId ?? '?'),
       named,
       colorKey: typeof record.colorKey === 'string' && record.colorKey ? record.colorKey : 'blue',
+      ...(typeof record.privosUserId === 'string' && record.privosUserId ? { privosUserId: record.privosUserId } : {}),
     });
   }
   return byMeeting;

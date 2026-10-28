@@ -17,6 +17,7 @@ export interface MeetingSpeakerRow {
   speakerId: string;
   displayName: string;
   colorKey: string;
+  privosUserId?: string;
 }
 
 export interface MeetingSpeakersPanelProps {
@@ -42,7 +43,7 @@ export function MeetingSpeakersPanel({ roomId, meetingId, speakers, onRelabeled 
     <ul className="ma-meeting-speakers__list">
       {speakers.map((speaker) => (
         <li key={speaker.speakerId} className="ma-meeting-speakers__row">
-          <SpeakerAvatar name={speaker.displayName} colorKey={speaker.colorKey} size={28} />
+          <SpeakerAvatar name={speaker.displayName} colorKey={speaker.colorKey} userId={speaker.privosUserId} size={28} />
           <span className="ma-meeting-speakers__name">{speaker.displayName}</span>
           {editingId === speaker.speakerId ? (
             <SpeakerLabelEditor
