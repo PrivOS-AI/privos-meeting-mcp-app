@@ -1,12 +1,22 @@
 /**
- * Initials avatar colored by `colorKey` (assigned by `profile-store.ts`'s
- * `pickColorKey` on the backend — 6-color palette, see
- * `theme/speaker-identity.css`).
+ * A person's avatar: their PrivOS photo when the app can tell who they are
+ * (`data/people.tsx` — by user id, username, or a name only one room member
+ * has), otherwise initials colored by `colorKey` (assigned by
+ * `profile-store.ts`'s `pickColorKey` on the backend — 6-color palette, see
+ * `theme/speaker-identity.css`). A photo that fails to load falls back to the
+ * initials.
  */
+import { useEffect, useState } from 'react';
+
+import { usePeople } from '../data/people.js';
+
 export interface SpeakerAvatarProps {
   name: string;
   colorKey?: string;
   size?: number;
+  /** The PrivOS user behind this speaker, when known. */
+  userId?: string | null;
+  username?: string | null;
 }
 
 function initialsOf(name: string): string {
@@ -16,14 +26,26 @@ function initialsOf(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function SpeakerAvatar({ name, colorKey = 'blue', size = 32 }: SpeakerAvatarProps) {
+export function SpeakerAvatar({ name, colorKey = 'blue', size = 32, userId, username }: SpeakerAvatarProps) {
+  const people = usePeople();
+  const src = people.avatarUrl({ userId, username, name });
+  const [failed, setFailed] = useState<string | null>(null);
+  useEffect(() => setFailed(null), [src]);
+  const showPhoto = src !== null && failed !== src;
+
   return (
     <span
-      className={`ma-speaker-avatar ma-speaker-avatar--${colorKey}`}
+      className={`ma-speaker-avatar ma-speaker-avatar--${colorKey}${showPhoto ? ' ma-speaker-avatar--photo' : ''}`}
       style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
       aria-hidden="true"
     >
-      {size < 28 ? initialsOf(name).charAt(0) : initialsOf(name)}
+      {showPhoto ? (
+        <img src={src} alt="" width={size} height={size} loading="lazy" decoding="async" onError={() => setFailed(src)} />
+      ) : size < 28 ? (
+        initialsOf(name).charAt(0)
+      ) : (
+        initialsOf(name)
+      )}
     </span>
   );
 }

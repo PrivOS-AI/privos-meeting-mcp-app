@@ -14,6 +14,7 @@
  */
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, ensureAppDbSchema } from '../hub/app-db-bot-client.js';
+import { resolveHubOrigin } from '../hub/resolve-hub-origin.js';
 import { purgeExpiredAudio } from '../jobs/audio-retention-job.js';
 import { addKnownRoom } from '../jobs/known-rooms-store.js';
 import { sweepRoom } from '../jobs/startup-sweep.js';
@@ -49,6 +50,9 @@ export const bootstrapTool: AppTool = {
       console.warn('[meeting_bootstrap] retention failed (not blocking bootstrap):', error instanceof Error ? error.message : error);
     });
 
-    return { ok: true, roomId, knownRoomCount: knownRooms.length };
+    // The Hub's own address, for loading people's avatars (`<hub>/avatar/<username>`, public): the iframe
+    // runs in an opaque origin and the host context does not carry it.
+    const hubOrigin = await resolveHubOrigin().catch(() => undefined);
+    return { ok: true, roomId, knownRoomCount: knownRooms.length, ...(hubOrigin ? { hubOrigin } : {}) };
   },
 };

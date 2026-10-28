@@ -416,7 +416,8 @@ export class RecordingStore {
    * DOMException whose `name` the start screen maps to a user-facing message.
    */
   private async acquireMicStream(): Promise<MediaStream> {
-    const host = await startHostMicStream(this.app, { sampleRate: 16000, echoCancellation: true, noiseSuppression: true });
+    // Auto gain: a far or quiet microphone otherwise records barely above silence, which the recognizer misses.
+    const host = await startHostMicStream(this.app, { sampleRate: 16000, echoCancellation: true, noiseSuppression: true, autoGainControl: true });
     if (host.kind === 'stream') {
       this.micStop = host.stop;
       return host.stream;
@@ -443,7 +444,7 @@ export class RecordingStore {
     }
     const { preferredMicDeviceId } = loadLocalPreferences();
     const stream = await navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1, ...(preferredMicDeviceId ? { deviceId: { ideal: preferredMicDeviceId } } : {}) },
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, ...(preferredMicDeviceId ? { deviceId: { ideal: preferredMicDeviceId } } : {}) },
     });
     this.micStop = () => {
       for (const track of stream.getTracks()) track.stop();

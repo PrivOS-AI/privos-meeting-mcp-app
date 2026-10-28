@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { pickLanguage, sentenceCase, tokensToWords } from './asr-engine.js';
+import { normalizeLevel, pickLanguage, sentenceCase, tokensToWords } from './asr-engine.js';
 
 describe('tokensToWords', () => {
   it('joins BPE pieces into words and offsets times onto the caller clock', () => {
@@ -41,5 +41,27 @@ describe('pickLanguage', () => {
 
   it('keeps a close call Vietnamese', () => {
     expect(pickLanguage({ meanLogProb: -0.2 }, { meanLogProb: -0.17 })).toBe('vi');
+  });
+});
+
+describe('normalizeLevel', () => {
+  const rms = (s: Float32Array) => Math.sqrt(s.reduce((a, x) => a + x * x, 0) / s.length);
+  const tone = (amplitude: number) => Float32Array.from({ length: 1600 }, (_, i) => amplitude * Math.sin(i / 3));
+
+  it('brings quiet speech up to a steady level', () => {
+    expect(rms(normalizeLevel(tone(0.01)))).toBeCloseTo(0.1, 2);
+  });
+
+  it('boosts by at most +30 dB and keeps peaks under 0.95', () => {
+    expect(rms(normalizeLevel(tone(0.0001)))).toBeLessThan(0.0001 * 32);
+    const loud = normalizeLevel(Float32Array.from({ length: 1600 }, (_, i) => (i === 10 ? 0.5 : 0.001)));
+    expect(Math.max(...loud.map(Math.abs))).toBeLessThanOrEqual(0.95 + 1e-6);
+  });
+
+  it('leaves silence and already-even speech untouched', () => {
+    const silence = new Float32Array(1600);
+    expect(normalizeLevel(silence)).toBe(silence);
+    const even = tone(0.1414);
+    expect(normalizeLevel(even)).toBe(even);
   });
 });

@@ -129,6 +129,7 @@
   color: var(--ma-fg-inverse);
   background: var(--ma-brand-blue);
   border-radius: 50%;
+  overflow: hidden;
 }
 
 /* ---------- Top bar ---------- */

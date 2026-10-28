@@ -11,6 +11,7 @@ import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { searchRoomMembers, type RoomMember } from '../data/room-members.js';
 import { useI18n } from '../i18n/i18n-provider.js';
+import { SpeakerAvatar } from './speaker-avatar.js';
 
 export interface MemberPickerProps {
   onSelect(member: RoomMember): void;
@@ -90,9 +91,13 @@ export function MemberPicker({ onSelect, selectedLabel }: MemberPickerProps) {
                   setQuery('');
                   setResults([]);
                 }}
+                className="ma-member-picker__option"
               >
-                {m.name}
-                {m.username ? ` (@${m.username})` : ''}
+                <SpeakerAvatar name={m.name} userId={m.id} username={m.username || null} size={24} />
+                <span>
+                  {m.name}
+                  {m.username ? ` (@${m.username})` : ''}
+                </span>
               </button>
             </li>
           ))}

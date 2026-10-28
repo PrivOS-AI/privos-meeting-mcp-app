@@ -8,7 +8,9 @@ RUN npm run build && npm prune --omit=dev --no-audit --no-fund
 
 # Speech models, baked into the image (never committed), from sherpa-onnx's
 # official GitHub releases, each pinned by sha256 (a changed file fails the build):
-#   models/asr/vi        Zipformer Vietnamese 30M int8 (offline transducer)
+#   models/asr/vi        Zipformer Vietnamese int8, trained on ~70k hours (offline transducer;
+#                        chosen over the 30M/6k-hour model by scripts/eval-asr.ts: far more robust to
+#                        quiet and noisy capture)
 #   models/asr/en        Zipformer small English int8
 #   models/asr/silero_vad.onnx                VAD
 #   models/asr/segmentation/model.onnx        pyannote segmentation 3.0 (diarization)
@@ -18,13 +20,13 @@ FROM node:22-bookworm-slim AS model
 ARG SHERPA=https://github.com/k2-fsa/sherpa-onnx/releases/download
 WORKDIR /dl
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl bzip2 \
-    && curl -fsSLO "$SHERPA/asr-models/sherpa-onnx-zipformer-vi-30M-int8-2026-02-09.tar.bz2" \
+    && curl -fsSLO "$SHERPA/asr-models/sherpa-onnx-zipformer-vi-int8-2025-04-20.tar.bz2" \
     && curl -fsSLO "$SHERPA/asr-models/sherpa-onnx-zipformer-small-en-2023-06-26.tar.bz2" \
     && curl -fsSLO "$SHERPA/asr-models/silero_vad.onnx" \
     && curl -fsSLO "$SHERPA/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2" \
     && curl -fsSLO "$SHERPA/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx" \
     && printf '%s\n' \
-      "da8b637947091829d7ee9eda23da2a4ec7caa399233a3f4e34eb719fb2ea6b9b  sherpa-onnx-zipformer-vi-30M-int8-2026-02-09.tar.bz2" \
+      "48d0fdc9b3515eb9b00c4dfec2883207ee5ebe5c95b1959e7afce87fc3391938  sherpa-onnx-zipformer-vi-int8-2025-04-20.tar.bz2" \
       "c8bff1091c26c49731cddbcd60ef18061142ea11523df1b73bf1b14451b9c15e  sherpa-onnx-zipformer-small-en-2023-06-26.tar.bz2" \
       "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6  silero_vad.onnx" \
       "24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488  sherpa-onnx-pyannote-segmentation-3-0.tar.bz2" \
@@ -32,8 +34,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
       | sha256sum -c - \
     && for f in *.tar.bz2; do tar -xjf "$f"; done \
     && mkdir -p /models/asr/vi /models/asr/en /models/asr/segmentation \
-    && V=sherpa-onnx-zipformer-vi-30M-int8-2026-02-09 \
-    && cp "$V/encoder.int8.onnx" "$V/decoder.onnx" "$V/joiner.int8.onnx" "$V/tokens.txt" /models/asr/vi/ \
+    && V=sherpa-onnx-zipformer-vi-int8-2025-04-20 \
+    && cp "$V/encoder-epoch-12-avg-8.int8.onnx" /models/asr/vi/encoder.int8.onnx \
+    && cp "$V/decoder-epoch-12-avg-8.onnx" /models/asr/vi/decoder.onnx \
+    && cp "$V/joiner-epoch-12-avg-8.int8.onnx" /models/asr/vi/joiner.int8.onnx \
+    && cp "$V/tokens.txt" /models/asr/vi/tokens.txt \
     && E=sherpa-onnx-zipformer-small-en-2023-06-26 \
     && cp "$E/encoder-epoch-99-avg-1.int8.onnx" /models/asr/en/encoder.int8.onnx \
     && cp "$E/decoder-epoch-99-avg-1.int8.onnx" /models/asr/en/decoder.int8.onnx \

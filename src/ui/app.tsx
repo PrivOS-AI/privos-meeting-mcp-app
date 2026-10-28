@@ -24,12 +24,14 @@ import { useI18n } from './i18n/i18n-provider.js';
 import { RecordingStoreProvider, useRecordingState } from './stores/recording-store.js';
 import { ensureSandboxBotKey } from './data/sandbox-bot-key.js';
 import { parseToolResultOrThrow, ToolCallError } from './data/tool-error.js';
+import { usePeople } from './data/people.js';
 
 export type Route = 'new' | 'live' | 'processing' | 'detail' | 'history' | 'settings';
 
 export function App() {
   const app = usePrivosApp();
   const context = usePrivosContext();
+  const people = usePeople();
   const [route, setRoute] = useState<Route>('new');
   // Mobile-only: the rail is an off-canvas drawer toggled by the hamburger below.
   const [railOpen, setRailOpen] = useState(false);
@@ -52,7 +54,8 @@ export function App() {
 
   async function runBootstrap(): Promise<void> {
     try {
-      parseToolResultOrThrow(await app.callServerTool({ name: 'meeting_bootstrap', arguments: { roomId: context.roomId } }));
+      const result = parseToolResultOrThrow(await app.callServerTool({ name: 'meeting_bootstrap', arguments: { roomId: context.roomId } }));
+      if (typeof result.hubOrigin === 'string') people.setHubOrigin(result.hubOrigin);
       setMissingAssistant(null);
     } catch (error) {
       if (error instanceof ToolCallError && error.code === 'ASSISTANT_NOT_IN_ROOM') {

@@ -45,7 +45,7 @@ export function MeetingHistoryRow({ meeting, speakers, actionItemCount, isOwner,
       <td className="ma-history-row__speakers">
         <div className="ma-history-row__avatars" title={speakers.map((s) => s.displayName).join(', ')}>
           {shown.map((speaker) => (
-            <SpeakerAvatar key={speaker.speakerId} name={speaker.displayName} colorKey={speaker.colorKey} size={24} />
+            <SpeakerAvatar key={speaker.speakerId} name={speaker.displayName} colorKey={speaker.colorKey} userId={speaker.privosUserId} size={24} />
           ))}
           {overflow > 0 ? <span className="ma-history-row__avatar-overflow">+{overflow}</span> : null}
         </div>
