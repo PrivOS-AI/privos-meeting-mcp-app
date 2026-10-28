@@ -1,8 +1,9 @@
 # Changelog
 
-## [1.0.1]
+## [1.1.0] — 2026-10-28
 
-Marketplace packaging.
+Marketplace packaging, built-in speech recognition and meeting intelligence.
+1.0.1 was never released; everything below ships as 1.1.0.
 
 - Dockerfile (Debian slim, non-root, patched OS packages) with the speaker model
   baked in from the `SPEAKER_MODEL_URL` build argument, `.dockerignore`, and
@@ -203,3 +204,8 @@ Marketplace packaging.
   A person is matched by user id, else by a name exactly one room member has.
   Initials stay when nobody matches, without `rooms:read`, or when the image
   fails.
+- Fixed "App assets unavailable" after deploys that changed only the UI: the
+  version never moved, so the Hub kept serving the asset set it read for the
+  old one. Version 1.1.0; `ui-bundle.lock.json` records the UI bundle digest
+  per version and `npm run check:ui-version` fails when the UI changes without
+  a version bump. The container now logs every UI read (`[ui] resources/read …`).

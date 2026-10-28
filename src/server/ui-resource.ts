@@ -55,11 +55,33 @@ export function renderUiHtml(): string {
   return devPublicUrl ? devHtml(devPublicUrl) : getBuiltUi().renderHtml();
 }
 
+/**
+ * One line per UI read, so "App assets unavailable" can be traced from the container log: whether the
+ * Hub asked for the shell, the asset list or a file, and whether that file exists in this build. A Hub
+ * that never asks for the assets named by the shell is serving a stale asset set (version not bumped).
+ */
+function logUiRead(kind: 'shell' | 'assets-manifest' | 'asset', detail = ''): void {
+  console.log(`[ui] resources/read ${kind}${detail ? ` ${detail}` : ''}`);
+}
+
 export const uiResourceProvider: UiResourceProvider = {
   uri: UI_RESOURCE_URI,
   mimeType: MCP_UI_MIME,
-  renderHtml: () => renderUiHtml(),
-  readAsset: (uri) => (devPublicUrl ? null : getBuiltUi().readAsset(uri)),
-  readAssetsManifest: () => (devPublicUrl ? { files: [] } : getBuiltUi().readAssetsManifest()),
+  renderHtml: () => {
+    logUiRead('shell');
+    return renderUiHtml();
+  },
+  readAsset: (uri) => {
+    if (devPublicUrl) return null;
+    const asset = getBuiltUi().readAsset(uri);
+    logUiRead('asset', `${uri.slice(uri.lastIndexOf('/') + 1)} ${asset ? 'found' : 'MISSING'}`);
+    return asset;
+  },
+  readAssetsManifest: () => {
+    if (devPublicUrl) return { files: [] };
+    const assets = getBuiltUi().readAssetsManifest();
+    logUiRead('assets-manifest', `${assets.files.length} files`);
+    return assets;
+  },
   assetUriPrefix: `ui://${APP_ID}/assets/`,
 };

@@ -2,42 +2,51 @@
 
 This file provides guidance to PrivOS (privos.ai) when working with the project in this repository.
 
-Meeting Agent is a PrivOS MCP app (`ai.privos.meeting-agent`) for offline meeting
-capture: browser-mic recording, bilingual live captions with speaker labels,
-cross-session speaker identity via encrypted voiceprints, Hub-AI summaries, and
-transcript/summary storage in PrivOS Files. Boot goes through the SDK's unified
-`serveApp` (`src/server/index.ts`); runtime mode is auto-detected, never set by env.
+Meeting Agent is a PrivOS MCP app (`ai.privos.meeting-agent`) for meeting
+capture: browser-mic recording, bilingual live captions with live speaker
+labels, cross-session speaker identity via encrypted voiceprints, Hub-AI
+summaries, questions and notes, and transcript/summary storage in PrivOS Files.
+Speech recognition runs inside the container by default (sherpa-onnx models
+baked into the image). Boot goes through the SDK's unified `serveApp`
+(`src/server/index.ts`); runtime mode is auto-detected, never set by env.
 
-## Deployment — runs on the hodao node (not locally)
+## Deployment — one Docker container, always from `main`
 
-This app runs in **production on the hodao node**, managed by pm2 (systemd boot).
-`CLAUDE.md`/`AGENTS.md`/`GEMINI.md` are symlinks to this file, so every agent reads it.
+The dev install runs as a single container (`privos-meeting`) built from the
+repo's `Dockerfile`, **always from the latest `origin/main`**: branch work
+reaches it only after a PR is merged. `CLAUDE.md`/`AGENTS.md`/`GEMINI.md` are
+symlinks to this file, so every agent reads it. Connection details, the run
+command and secrets stay out of the repo.
 
-**Workflow: edit code locally here → rsync to the node → restart there.**
-Do NOT run the app locally and on the node at the same time — duplicate pairing
-identity conflicts on the relay.
+- Build from `git archive origin/main`; tag the image `privos-meeting:main-<sha>`;
+  run it `--read-only` with tmpfs `/tmp`, the `privos-meeting-data` volume at
+  `/app/data`, the identity **directory** mounted and `.env` (0600) as env-file.
+- Secrets live only in `.env` + the identity file. `VOICEPRINT_ENC_KEY` **must
+  be backed up** — losing it loses every voiceprint.
+- Verify: the log shows `relay.connected`; `/ready` is 200. `MANIFEST_DRIFT`
+  means the manifest changed: an admin clicks Refresh (Admin → Apps → app →
+  Settings).
 
-- Node: `ssh -i ~/.ssh/<key> -p <port> root@<node-host>` (connection details kept out of the repo)
-- Remote path: `/opt/privos/apps/meeting-agent`
-- pm2 process: `meeting-agent` · port `3012`
-- No system ffmpeg, no GPU, Node v22, python3 without torch → audio decode +
-  speaker embedding are pure-Node (`@ffmpeg-installer/ffmpeg`, `sherpa-onnx-node`).
-- Secrets live only in `.env` (0600) + `privos-standalone-identity.json`.
-  `VOICEPRINT_ENC_KEY` **must be backed up** — losing it loses every voiceprint.
+### A UI change needs a new version
 
-Redeploy after a local edit (see `scripts/deploy-hodao.sh`):
+A Hub reads a version's UI once (install, upgrade, or the Refresh after a
+manifest change) and keeps serving that asset set. Deploying a changed UI under
+the same version leaves the Hub with the old assets while the live shell names
+new ones, and the tab shows **"App assets unavailable"**. So, whenever the UI
+changes:
 
-```bash
-bash scripts/deploy-hodao.sh
-```
+1. bump `version` in `privos-app.json` **and** `package.json` (and the lockfile);
+2. `npm run build && npm run ui:lock` (records the bundle digest for that version);
+3. after deploying, an admin clicks Refresh.
 
-Notes:
-- The deploy script `chown -R root:root` + `chmod 600` the identity/.env after rsync
-  (rsync preserves the local uid; pm2 runs as root and refuses the identity otherwise).
-- `npm install` only when deps changed; ONNX model + `.env` are provisioned on the node.
-- Verify: `pm2 logs meeting-agent` should show `relay.connected`; also check
-  `curl localhost:3012/health` and `/ready` (both 200) — the deploy script prints these.
-- STT provider (Soniox/ElevenLabs, realtime + async) is switched from Settings
+`npm run check:ui-version` (part of `verify:fast-pr`) fails when the built UI
+differs from the one locked for the current version. The container log has one
+`[ui] resources/read …` line per UI read: a Hub that reads only `shell` and
+never the assets it names is serving a stale asset set.
+
+## Settings
+
+- STT provider (built-in by default; Soniox/ElevenLabs, realtime + async) is switched from Settings
   in the app, PER ROOM (keys `room:<roomId>:<key>` in `app_settings`). Only the
   room's owners and moderators, or a workspace admin, may change it — read from
   the Hub-signed `room_roles` / `workspace_roles` claims, which need the
@@ -47,5 +56,5 @@ Notes:
   Never requires a redeploy or manifest republish; CSP already declares both
   vendor WS origins. After adding `rooms:roles:read`, an admin must approve it
   (Admin → Apps → this app) before roles reach the app.
-- Full runbook (backup/rotate `VOICEPRINT_ENC_KEY`, rollback, pm2 ecosystem
-  entry, first-deploy steps): `docs/deployment-guide.md`.
+- Backup/rotation of `VOICEPRINT_ENC_KEY` and first-deploy steps:
+  `docs/deployment-guide.md` (its pm2 sections predate the container).
