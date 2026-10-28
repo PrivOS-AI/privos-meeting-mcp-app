@@ -166,3 +166,24 @@ Marketplace packaging.
 - Fixed: deleting a meeting (by hand or by auto-delete) left its action items,
   bookmarks and speaker rows behind — orphan items still counted as "open".
   All of a meeting's rows are deleted with it now.
+- Ask about a meeting (`meeting_ask`, new "Ask" tab while recording and after):
+  the answer comes only from the transcript (the captions so far during the
+  meeting), with the lines it rests on — click one to jump there. The model
+  returns line ids from the prompt and only those survive, so a citation always
+  points at something said. A long meeting is narrowed to the lines that share
+  words with the question (diacritics ignored). Nothing is stored; "Save to
+  Files" (`meeting_save_answer`) appends that exact answer to the meeting's
+  `qa.md`, accepted only with the short-lived token the server issued for this
+  person, meeting and answer; saving twice adds it once.
+- Meeting notes (`meeting_notes_save`, new "Notes" tab): the owner's notes save
+  automatically to the meeting and to `notes.md` in Files, with a revision that
+  only goes up so a slow save never overwrites a newer one; "Insert time"
+  stamps the meeting clock while recording; the summary gives the recorder's
+  points weight (facts and owners still come from the transcript).
+- The room's AI Chat knows which meeting is open (`host/chatContext.set`): the
+  one being recorded, or the one being read, with its summary.
+- Finished meetings drop their live working files (`live-turns.json`,
+  `captions-<id8>.json`); the folder keeps what people read.
+- Side-panel tabs wrap onto a second row instead of overlapping.
+- Manifest: three new tools; data policy says where questions, saved answers
+  and notes go. An admin Refresh is needed after deploying.

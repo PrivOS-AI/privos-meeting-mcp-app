@@ -13,7 +13,11 @@ import { EmptyState } from '../components/empty-state.js';
 import { Icon } from '../components/icon.js';
 import { KeepAwakeNotice } from '../components/keep-awake-notice.js';
 import { UploadStatusNotice } from '../components/upload-status-notice.js';
-import { LiveSummaryPanel } from '../components/live-summary-panel.js';
+import { useAiChatContext } from '../data/chat-context.js';
+import { getMeeting } from '../data/meeting-read-model.js';
+import { AskPanel } from '../components/ask-panel.js';
+import { liveCaptionLines, LiveSummaryPanel } from '../components/live-summary-panel.js';
+import { NotesPanel } from '../components/notes-panel.js';
 import { VoiceWaveform } from '../components/voice-waveform.js';
 import { RecIndicator } from '../components/rec-indicator.js';
 import { RecordingFooter } from '../components/recording-footer.js';
@@ -33,6 +37,13 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
   const { roomId } = usePrivosContext();
   const store = useRecordingStore();
   const state = useRecordingState();
+  // The room's AI Chat knows which meeting is being recorded (no per-second detail: it would resend every tick).
+  const speakerCount = Object.keys(state.speakerMap).length;
+  useAiChatContext(
+    state.meetingId
+      ? `PrivOS Meeting App — recording the meeting "${state.title || t('screen.new.untitled')}" now${speakerCount ? `, ${speakerCount} speakers so far` : ''}. Live captions, a running summary and questions about the meeting are in the app.`
+      : null,
+  );
   const [view, setView] = useState<ViewMode>('transcript');
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -209,7 +220,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
   );
 }
 
-type SideTab = 'summary' | 'bookmarks';
+type SideTab = 'summary' | 'ask' | 'notes' | 'bookmarks';
 
 interface LiveSidePanelProps {
   meetingId: string | null;
@@ -233,10 +244,26 @@ function LiveSidePanel({ meetingId, bookmarkRev }: LiveSidePanelProps) {
   // Summary + action items share ONE tab (action items render under the summary),
   // matching the design; both are written by the post-meeting job, so they show
   // the "available after the meeting ends" note during a live session.
-  const TABS: Array<{ id: SideTab; icon: 'sparkle' | 'bookmark'; labelKey: string }> = [
+  const TABS: Array<{ id: SideTab; icon: 'sparkle' | 'bookmark' | 'chat' | 'edit'; labelKey: string }> = [
     { id: 'summary', icon: 'sparkle', labelKey: 'recording.side.summary' },
+    { id: 'ask', icon: 'chat', labelKey: 'ask.tab' },
+    { id: 'notes', icon: 'edit', labelKey: 'notes.tab' },
     { id: 'bookmarks', icon: 'bookmark', labelKey: 'recording.side.bookmarks' },
   ];
+  const { roomId } = usePrivosContext();
+  const state = useRecordingState();
+  // Read at click time, not render time: the lines and the clock move every second.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  // The notes outlive the Notes tab (switching tabs unmounts it); seeded once from the meeting, so a
+  // reload mid-meeting shows what was already saved instead of an empty box that would overwrite it.
+  const [notes, setNotes] = useState<string | null>(null);
+  useEffect(() => {
+    if (!meetingId || notes !== null || tab !== 'notes') return;
+    getMeeting(app, meetingId)
+      .then((m) => setNotes((current) => current ?? m?.notesText ?? ''))
+      .catch(() => setNotes((current) => current ?? ''));
+  }, [app, meetingId, notes, tab]);
 
   useEffect(() => {
     if (!meetingId || tab !== 'bookmarks') return;
@@ -272,11 +299,16 @@ function LiveSidePanel({ meetingId, bookmarkRev }: LiveSidePanelProps) {
         ))}
       </div>
       <div className="ma-side-panel__body">
-        {tab === 'bookmarks' ? (
-          <BookmarksPanel bookmarks={bookmarks} onDelete={(id) => void removeBookmark(id)} />
-        ) : (
-          <LiveSummaryPanel />
-        )}
+        {tab === 'bookmarks' ? <BookmarksPanel bookmarks={bookmarks} onDelete={(id) => void removeBookmark(id)} /> : null}
+        {tab === 'summary' ? <LiveSummaryPanel /> : null}
+        {tab === 'ask' && meetingId ? <AskPanel roomId={roomId} meetingId={meetingId} getLiveLines={() => liveCaptionLines(stateRef.current, t)} /> : null}
+        {tab === 'notes' && meetingId ? (
+          notes === null ? (
+            <p className="ma-side-panel__empty">{t('history.loading')}</p>
+          ) : (
+            <NotesPanel roomId={roomId} meetingId={meetingId} initialText={notes} editable currentSec={() => stateRef.current.elapsedSec} onTextChange={setNotes} />
+          )
+        ) : null}
       </div>
     </div>
   );

@@ -75,6 +75,8 @@ export interface SummarizeTranscriptInput {
   speakerNames: readonly string[];
   /** YYYY-MM-DD the meeting took place, for turning "Friday" into a `due_date`. */
   meetingDate?: string;
+  /** The recorder's notes, if any. */
+  notes?: string;
 }
 
 const MAX_NETWORK_RETRIES = 2;
@@ -242,6 +244,7 @@ export async function summarizeTranscript(
     language: input.language,
     length: input.length,
     meetingDate: input.meetingDate,
+    notes: input.notes,
     notesWithTimestamps: input.chunks.map((chunk, i) => ({
       startLabel: formatTimestamp(chunk.startSec),
       endLabel: formatTimestamp(chunk.endSec),

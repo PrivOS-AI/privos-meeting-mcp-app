@@ -11,6 +11,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { ActionItemsCard } from '../components/action-items-card.js';
+import { AskPanel } from '../components/ask-panel.js';
+import { NotesPanel } from '../components/notes-panel.js';
 import { AudioPlayer, type AudioPlayerHandle } from '../components/audio-player.js';
 import { BookmarksPanel } from '../components/bookmarks-panel.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -29,6 +31,7 @@ import { searchTranscript, type Hit } from '../data/keyword-search.js';
 import { listActionItems, listDecisions, type ActionItemRecord, type DecisionRecord } from '../data/action-item-read-model.js';
 import { downloadMeetingDocx, downloadMeetingSrt } from '../data/meeting-export.js';
 import { getMeeting, listSpeakersForMeetings, renameMeeting, type MeetingReadModel, type MeetingSpeakerSummary } from '../data/meeting-read-model.js';
+import { useAiChatContext } from '../data/chat-context.js';
 import { resolveFileUrl } from '../data/file-download.js';
 import { labelUnnamedSpeakers } from '../data/speaker-labels.js';
 import { loadTranscript, resolveAudioUrl, type TranscriptDoc } from '../data/transcript-loader.js';
@@ -49,7 +52,7 @@ const SAVE_TO_FILES_ARTIFACTS: Array<{ labelKey: string; key: keyof MeetingReadM
 
 export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenProps) {
   const app = usePrivosApp();
-  const { roomId } = usePrivosContext();
+  const { roomId, userId } = usePrivosContext();
   const { t, language } = useI18n();
   const playerRef = useRef<AudioPlayerHandle>(null);
 
@@ -57,8 +60,21 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
   const [transcript, setTranscript] = useState<TranscriptDoc | null>(null);
   const [rawSpeakers, setRawSpeakers] = useState<MeetingSpeakerSummary[]>([]);
   const speakers = useMemo(() => labelUnnamedSpeakers(rawSpeakers, (n) => t('recording.speakerBadge.numbered', { n })), [rawSpeakers, t]);
+  // The room's AI Chat knows which meeting is open, with its summary, so the Hub's assistant can be asked about it.
+  useAiChatContext(
+    meeting
+      ? [
+          `PrivOS Meeting App — the user is looking at the meeting "${meeting.title || t('screen.new.untitled')}"${meeting.startedAt ? ` of ${meeting.startedAt.slice(0, 10)}` : ''}, ${Math.round((meeting.durationSec ?? 0) / 60)} min, ${speakers.length} speakers (${speakers.map((s) => s.displayName).join(', ')}).`,
+          meeting.summaryText ? `Summary: ${meeting.summaryText}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : null,
+  );
   const [actionItems, setActionItems] = useState<ActionItemRecord[]>([]);
   const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
+  /** Notes typed in this visit — the tab remounts on every switch, and the loaded meeting row would be stale. */
+  const [notesDraft, setNotesDraft] = useState<string | null>(null);
   const [bookmarks, setBookmarks] = useState<BookmarkRecord[]>([]);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioErrored, setAudioErrored] = useState(false);
@@ -226,6 +242,18 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
       icon: 'checkmark-circle',
       label: t('recording.side.actions'),
       node: <ActionItemsCard roomId={roomId} meetingTitle={meeting.title ?? ''} items={actionItems} decisions={decisions} onSeek={seek} onChanged={() => void reload()} />,
+    },
+    {
+      id: 'ask',
+      icon: 'chat',
+      label: t('ask.tab'),
+      node: meeting.transcriptJsonFileId ? <AskPanel roomId={roomId} meetingId={meetingId} onSeek={seek} /> : <p className="ma-side-panel__empty">{t('ask.noTranscript')}</p>,
+    },
+    {
+      id: 'notes',
+      icon: 'edit',
+      label: t('notes.tab'),
+      node: <NotesPanel roomId={roomId} meetingId={meetingId} initialText={notesDraft ?? meeting.notesText ?? ''} editable={meeting.ownerUserId === userId} onTextChange={setNotesDraft} />,
     },
     {
       id: 'bookmarks',

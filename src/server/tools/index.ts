@@ -5,6 +5,8 @@
  * The UI-bearing `meeting_agent` tool is declared in the manifest and answered
  * directly by the MCP handler.
  */
+import { askTool, saveAnswerTool } from './ask-tool.js';
+import { notesTool } from './notes-tool.js';
 import { audioPushTool } from './audio-push-tool.js';
 import { botCredentialCheckTool } from './bot-credential-check-tool.js';
 import { bootstrapTool } from './bootstrap-tool.js';
@@ -46,4 +48,7 @@ export function registerAllTools(): void {
   registerTool(relabelSpeakerTool);
   registerTool(forgetVoiceprintsTool);
   registerTool(audioPushTool);
+  registerTool(askTool);
+  registerTool(saveAnswerTool);
+  registerTool(notesTool);
 }

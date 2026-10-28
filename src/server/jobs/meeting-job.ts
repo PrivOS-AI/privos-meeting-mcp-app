@@ -22,7 +22,8 @@ import { sendSummaryToChat } from '../tools/send-to-chat-tool.js';
 import { uploadBotFile } from '../files/hub-file-upload.js';
 import { concatParts, deletePartFiles, type PartRef } from '../media/concat-parts.js';
 import { decodeToWav16k } from '../media/decode-audio.js';
-import { deleteRoomFile } from '../media/hub-file-download.js';
+import { deleteRoomFile, listRoomFolderFiles } from '../media/hub-file-download.js';
+import { meetingId8 } from '../../shared/meeting-slug.js';
 import { readLiveTurns, type LiveTurnSpan } from '../media/live-turns-store.js';
 import { dataDir } from '../paths.js';
 import { abortMeetingQueue } from '../live-speakers/chunk-worker.js';
@@ -263,7 +264,9 @@ export async function summarizeTranscript(input: {
   const lengthSetting = await getSetting<SummaryLength>(settingsDb, 'summaryLength');
   const length: SummaryLength = lengthSetting === 'short' || lengthSetting === 'detailed' ? lengthSetting : 'normal';
   const chunks = chunkTranscript(translatedSegments, displayNameBySpeaker);
-  const payload = await runSummarizer(hub, { roomId, chunks, language: summaryLanguage, length, title, speakerNames, meetingDate: meetingDateOf(startedAt) }, signal);
+  const meetingRow = await db.getById('meetings', 'room', meetingId).catch(() => null);
+  const notes = typeof meetingRow?.notesText === 'string' ? meetingRow.notesText : undefined;
+  const payload = await runSummarizer(hub, { roomId, chunks, language: summaryLanguage, length, title, speakerNames, meetingDate: meetingDateOf(startedAt), notes }, signal);
 
   const markdown = renderSummaryMarkdown({ title, startedAt, durationSec, speakers: speakerNames, payload, language: summaryLanguage });
   const summaryUpload = await uploadBotFile({
@@ -543,6 +546,10 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
         });
     }
 
+    // The live working files have served their purpose once the transcript exists: the folder keeps
+    // only what people read. Best-effort — a leftover file costs nothing but clutter.
+    await deleteLiveWorkingFiles(agentBotHub, roomId, folderId, job.meetingId, signal);
+
     await jobRepo.finish(job._id, {
       durationSec,
       languageCode,
@@ -572,5 +579,21 @@ async function autoSendSummary(db: AppDbBotClient, roomId: string, meetingId: st
     if (meeting) await sendSummaryToChat(db, roomId, meetingId, meeting);
   } catch (error) {
     console.warn('[meeting-job] auto-send of the summary to chat failed (the button still works):', error instanceof Error ? error.message : error);
+  }
+}
+
+/**
+ * `live-turns.json` (live speaker spans, read by this job) and `captions-<id8>.json` (crash insurance for
+ * the on-screen captions before processing). Only this meeting's captions file goes — a shared folder
+ * may hold another meeting's.
+ */
+async function deleteLiveWorkingFiles(hub: RoomBoundHubClient, roomId: string, folderId: string, meetingId: string, signal?: AbortSignal): Promise<void> {
+  const names = new Set(['live-turns.json', `captions-${meetingId8(meetingId)}.json`]);
+  try {
+    for (const file of await listRoomFolderFiles(hub, roomId, folderId, signal)) {
+      if (names.has(file.name)) await deleteRoomFile(hub, file._id, signal);
+    }
+  } catch (error) {
+    console.warn('[meeting-job] could not delete the live working files (does not block job completion):', error instanceof Error ? error.message : error);
   }
 }

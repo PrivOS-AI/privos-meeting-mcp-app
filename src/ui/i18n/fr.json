@@ -430,5 +430,27 @@
   "actionItems.type.request": "Demande",
   "actionItems.type.question": "Question",
   "actionItems.requester": "Demandé par",
-  "actionItems.owner": "Responsable"
+  "actionItems.owner": "Responsable",
+
+  "ask.tab": "Questions",
+  "ask.label": "Question sur cette réunion",
+  "ask.placeholder": "Posez une question sur cette réunion…",
+  "ask.submit": "Demander",
+  "ask.asking": "Réponse en cours…",
+  "ask.hint": "Les réponses viennent uniquement de ce qui a été dit, avec les passages cités. Rien n’est enregistré sauf si vous l’enregistrez.",
+  "ask.empty": "Par exemple : qui envoie le devis ? Quelle date de sortie a été retenue ?",
+  "ask.nothingYet": "Aucun sous-titre pour répondre pour l’instant.",
+  "ask.save": "Enregistrer dans Fichiers",
+  "ask.saving": "Enregistrement…",
+  "ask.saved": "Enregistré dans qa.md",
+  "ask.alreadySaved": "Déjà dans qa.md",
+  "ask.noTranscript": "Les questions sont disponibles une fois la réunion traitée.",
+  "notes.tab": "Notes",
+  "notes.label": "Vos notes pour cette réunion",
+  "notes.placeholder": "Notez ce qui compte…",
+  "notes.insertTime": "Insérer l’heure",
+  "notes.saving": "Enregistrement…",
+  "notes.saved": "Enregistré",
+  "notes.empty": "Aucune note.",
+  "notes.hint": "Enregistrées automatiquement dans notes.md (Fichiers) et prises en compte par le résumé."
 }
