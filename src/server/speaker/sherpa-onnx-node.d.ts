@@ -53,6 +53,8 @@ declare module 'sherpa-onnx-node' {
       debug?: boolean | number;
     };
     decodingMethod?: string;
+    /** Paths kept by `modified_beam_search`. */
+    maxActivePaths?: number;
   }
 
   export interface OfflineRecognizerResult {
