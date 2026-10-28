@@ -1,6 +1,6 @@
 {
   "name": "ai.privos.meeting-agent",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -18,6 +18,8 @@
     "start": "tsx src/server/index.ts",
     "start:standalone": "NODE_ENV=production npm start",
     "pair": "tsx scripts/pair.ts",
+    "check:ui-version": "tsx scripts/check-ui-version.ts",
+    "ui:lock": "tsx scripts/check-ui-version.ts --write",
     "diagnose:local-stt": "tsx scripts/diagnose-local-stt.ts",
     "diagnose:scopes": "tsx scripts/diagnose-scopes.ts",
     "build": "vite build && tsx scripts/generate-manifest.ts && npm run manifest:lint",
@@ -31,7 +33,7 @@
     "calibrate:extract": "tsx scripts/extract-calibration-slices.ts",
     "calibrate:replay": "tsx scripts/replay-meeting-speakers.ts",
     "package": "bash scripts/package-source.sh",
-    "verify:fast-pr": "npm run typecheck && npm run test && npm run build && npm run preflight"
+    "verify:fast-pr": "npm run typecheck && npm run test && npm run build && npm run check:ui-version && npm run preflight"
   },
   "dependencies": {
     "@elevenlabs/client": "^1.25.0",
