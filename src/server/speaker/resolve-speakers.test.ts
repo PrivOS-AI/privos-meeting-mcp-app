@@ -13,6 +13,9 @@ const VOICE_DIRECTIONS: Record<number, readonly number[]> = {
   0.9: [1, 0, 0, 0],
   [-0.9]: [0, 1, 0, 0],
   0.1: [0, 0, 1, 0],
+  // Two short ranges of ONE voice near [1,0,0,0]: cos 0.45 to each other (what 2-3 s turns of one person score), mean = that voice.
+  0.8: [0.85, 0.527, 0, 0],
+  0.7: [0.85, -0.527, 0, 0],
 };
 
 vi.mock('../media/decode-audio.js', () => ({
@@ -196,6 +199,20 @@ describe('resolveSpeakers', () => {
 
     const reloaded = await profileStore.getProfile(db(), profile.id);
     expect(reloaded?.embeddings).toHaveLength(1); // no contamination from the incoherent cluster
+  });
+
+  it('names a speaker whose short ranges agree only loosely (cos 0.45 — one person, short turns): coherence has its own, lower bar than naming', async () => {
+    const profile = await profileStore.createProfile(db(), { displayName: 'An', createdByUserId: 'user-1' });
+    await profileStore.enrolEmbedding(db(), profile.id, { vector: new Float32Array([1, 0, 0, 0]), meetingId: 'm0', durationSec: 10, source: 'auto-post', speakerKey: 'seed' });
+
+    const segments = [seg('spkShort', 0, 3), seg('spkShort', 5, 8)];
+    rangeMarkers.set('0:3', 0.8);
+    rangeMarkers.set('5:8', 0.7);
+
+    const [result] = await resolveSpeakers(db(), '/fake/wav.wav', segments, 'meeting-1');
+    expect(result.resolved).toBe(true);
+    expect(result.profileId).toBe(profile.id);
+    expect(result.pendingEmbeddingJson).toBeUndefined();
   });
 
   it('a user-identified speaker skips matching entirely and enrols into the USER\'s profile, not a different one it would otherwise match', async () => {

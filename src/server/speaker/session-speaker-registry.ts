@@ -39,6 +39,14 @@ const RETAINED_TURNS_CAP = 5000;
  * re-checked against every profile named since.
  */
 export const PROFILE_MATCH_RETRY_SPEECH_SEC = 15;
+/**
+ * The FIRST attempt needs only this much update-quality speech (on top of
+ * being sticky): a centroid of ~6 s already separates people cleanly (same
+ * person >= 0.5 against their profile, strangers <= ~0.2 on the eval set), so
+ * a returning person is named within their first few sentences instead of
+ * after 15 s of talking. Retries still wait for {@link PROFILE_MATCH_RETRY_SPEECH_SEC}.
+ */
+export const PROFILE_MATCH_FIRST_SPEECH_SEC = 6;
 
 export type NameSource = 'user' | 'async' | 'live';
 
@@ -747,14 +755,20 @@ export class MeetingSessionRegistry {
 
   /**
    * `sessionSpeakerId`s eligible to try `speaker_profiles` matching this
-   * pass: sticky, unresolved, not merged away, and has gained
-   * `PROFILE_MATCH_RETRY_SPEECH_SEC` of update-quality speech since its last
-   * attempt (or never attempted at all) — replaces the old hard "stop after 5
+   * pass: sticky, unresolved, not merged away, and has either never been
+   * tried (with `PROFILE_MATCH_FIRST_SPEECH_SEC` of update-quality speech) or
+   * gained `PROFILE_MATCH_RETRY_SPEECH_SEC` of it since its last attempt — replaces the old hard "stop after 5
    * attempts" cap with backoff-by-new-speech and NO cap (plan.md).
    */
   candidatesForProfileMatch(): string[] {
     return [...this.byId.values()]
-      .filter((s) => s.sticky && !s.profileId && !s.mergedInto && s.qualitySpeechSec - s.qualitySpeechSecAtLastAttempt >= PROFILE_MATCH_RETRY_SPEECH_SEC)
+      .filter(
+        (s) =>
+          s.sticky &&
+          !s.profileId &&
+          !s.mergedInto &&
+          (s.profileAttempts === 0 ? s.qualitySpeechSec >= PROFILE_MATCH_FIRST_SPEECH_SEC : s.qualitySpeechSec - s.qualitySpeechSecAtLastAttempt >= PROFILE_MATCH_RETRY_SPEECH_SEC),
+      )
       .map((s) => s.sessionSpeakerId);
   }
 

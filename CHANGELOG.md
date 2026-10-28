@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+- Voice memory recognises people who only take short turns. The post-meeting
+  coherence check has its own bar (`SPEAKER_COHERENCE_THRESHOLD`, default 0.3)
+  instead of the 0.5 naming threshold. Two 2–3 s ranges of one person score
+  about 0.35–0.6 against each other, while a cluster mixing two voices scores
+  0.1 or less. Before, such speakers were parked unnamed and never enrolled.
+- Live: a returning person is matched against saved voiceprints once they are
+  sticky with 6 s of clean speech, instead of after 15 s. Retries still need
+  another 15 s.
+- `scripts/eval-voice-memory.ts` runs the cross-meeting path end to end with the
+  real code: enrol in meeting 1 (sealed vectors), recognise in meeting 2 (live
+  registry and `resolveSpeakers`), with a stranger who must stay unnamed.
+  `scripts/eval-speakers.ts` measures voiceprint separation by segment length
+  and noise.
+
 ## [1.1.0] — 2026-10-28
 
 Marketplace packaging, built-in speech recognition and meeting intelligence.
