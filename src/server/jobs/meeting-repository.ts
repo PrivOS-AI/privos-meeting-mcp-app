@@ -21,6 +21,9 @@ export interface MeetingPatch {
   durationSec?: number;
   /** Backend-owned: stamped by `meeting_process` from the room's `keepOriginalAudio` setting, never trusted from the iframe. */
   keepAudio?: boolean;
+  /** The owner's notes (`meeting_notes_save`); the summary reads them. */
+  notesText?: string;
+  notesRevision?: number;
 }
 
 /** Backend-owned `meetings` fields only — see plan.md's field-ownership table for what the iframe writes instead. */

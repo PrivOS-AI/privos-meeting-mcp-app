@@ -444,15 +444,15 @@
 
 .ma-side-panel__tabs {
   display: flex;
-  overflow-x: auto;
-  scrollbar-width: none;
+  /* More tabs than fit wrap onto a second row — every tab stays visible, none hides off to the side. */
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--ma-border-1);
 }
 
 .ma-side-panel__tab {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 0 var(--space-1);
+  /* Never narrower than its label: tabs that do not fit move to the next row instead of overlapping. */
+  flex: 1 0 auto;
+  padding: 0 var(--space-2);
   white-space: nowrap;
   display: flex;
   align-items: center;

@@ -432,5 +432,27 @@
   "actionItems.type.request": "Anfrage",
   "actionItems.type.question": "Frage",
   "actionItems.requester": "Angefragt von",
-  "actionItems.owner": "Verantwortlich"
+  "actionItems.owner": "Verantwortlich",
+
+  "ask.tab": "Fragen",
+  "ask.label": "Frage zu dieser Besprechung",
+  "ask.placeholder": "Frage zu dieser Besprechung…",
+  "ask.submit": "Fragen",
+  "ask.asking": "Antwort wird erstellt…",
+  "ask.hint": "Antworten stammen nur aus dem Gesagten, mit den zugrunde liegenden Zeilen. Gespeichert wird nur, was Sie speichern.",
+  "ask.empty": "Zum Beispiel: Wer schickt das Angebot? Welcher Termin wurde beschlossen?",
+  "ask.nothingYet": "Noch keine Untertitel, aus denen geantwortet werden kann.",
+  "ask.save": "In Dateien speichern",
+  "ask.saving": "Wird gespeichert…",
+  "ask.saved": "In qa.md gespeichert",
+  "ask.alreadySaved": "Bereits in qa.md",
+  "ask.noTranscript": "Fragen sind möglich, sobald die Besprechung verarbeitet wurde.",
+  "notes.tab": "Notizen",
+  "notes.label": "Ihre Notizen zu dieser Besprechung",
+  "notes.placeholder": "Notieren Sie das Wichtige…",
+  "notes.insertTime": "Zeit einfügen",
+  "notes.saving": "Wird gespeichert…",
+  "notes.saved": "Gespeichert",
+  "notes.empty": "Keine Notizen.",
+  "notes.hint": "Automatisch in notes.md (Dateien) gespeichert und von der Zusammenfassung berücksichtigt."
 }

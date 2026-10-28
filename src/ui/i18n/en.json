@@ -432,5 +432,27 @@
   "actionItems.type.request": "Request",
   "actionItems.type.question": "Question",
   "actionItems.requester": "Requested by",
-  "actionItems.owner": "Owner"
+  "actionItems.owner": "Owner",
+
+  "ask.tab": "Ask",
+  "ask.label": "Question about this meeting",
+  "ask.placeholder": "Ask about this meeting…",
+  "ask.submit": "Ask",
+  "ask.asking": "Answering…",
+  "ask.hint": "Answers come only from what was said in the meeting, with the lines they rest on. Nothing is stored unless you save it.",
+  "ask.empty": "For example: Who is sending the quote? Which release date was agreed?",
+  "ask.nothingYet": "There are no captions to answer from yet.",
+  "ask.save": "Save to Files",
+  "ask.saving": "Saving…",
+  "ask.saved": "Saved to qa.md",
+  "ask.alreadySaved": "Already in qa.md",
+  "ask.noTranscript": "Questions are available once the meeting has been processed.",
+  "notes.tab": "Notes",
+  "notes.label": "Your notes for this meeting",
+  "notes.placeholder": "Write down what matters…",
+  "notes.insertTime": "Insert time",
+  "notes.saving": "Saving…",
+  "notes.saved": "Saved",
+  "notes.empty": "No notes.",
+  "notes.hint": "Saved automatically to notes.md in Files, and taken into account by the summary."
 }

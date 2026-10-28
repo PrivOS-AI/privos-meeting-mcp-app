@@ -430,5 +430,27 @@
   "actionItems.type.request": "请求",
   "actionItems.type.question": "问题",
   "actionItems.requester": "提出人",
-  "actionItems.owner": "负责人"
+  "actionItems.owner": "负责人",
+
+  "ask.tab": "提问",
+  "ask.label": "关于本次会议的问题",
+  "ask.placeholder": "询问本次会议…",
+  "ask.submit": "提问",
+  "ask.asking": "正在回答…",
+  "ask.hint": "回答仅基于会议内容，并附原话。除非你保存，否则不会存储。",
+  "ask.empty": "例如：谁负责发报价？定了哪天发布？",
+  "ask.nothingYet": "还没有可用于回答的字幕。",
+  "ask.save": "保存到文件",
+  "ask.saving": "正在保存…",
+  "ask.saved": "已保存到 qa.md",
+  "ask.alreadySaved": "已在 qa.md 中",
+  "ask.noTranscript": "会议处理完成后即可提问。",
+  "notes.tab": "笔记",
+  "notes.label": "你对本次会议的笔记",
+  "notes.placeholder": "记下重点…",
+  "notes.insertTime": "插入时间",
+  "notes.saving": "正在保存…",
+  "notes.saved": "已保存",
+  "notes.empty": "暂无笔记。",
+  "notes.hint": "自动保存到文件中的 notes.md，并在生成摘要时参考。"
 }

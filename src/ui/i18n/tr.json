@@ -432,5 +432,27 @@
   "actionItems.type.request": "Talep",
   "actionItems.type.question": "Soru",
   "actionItems.requester": "Talep eden",
-  "actionItems.owner": "Sorumlu"
+  "actionItems.owner": "Sorumlu",
+
+  "ask.tab": "Sor",
+  "ask.label": "Bu toplantı hakkında soru",
+  "ask.placeholder": "Bu toplantı hakkında sorun…",
+  "ask.submit": "Sor",
+  "ask.asking": "Yanıtlanıyor…",
+  "ask.hint": "Yanıtlar yalnızca toplantıda söylenenlere dayanır ve ilgili satırları gösterir. Kaydetmediğiniz sürece hiçbir şey saklanmaz.",
+  "ask.empty": "Örneğin: Teklifi kim gönderecek? Hangi çıkış tarihinde anlaşıldı?",
+  "ask.nothingYet": "Henüz yanıt verilecek altyazı yok.",
+  "ask.save": "Dosyalara kaydet",
+  "ask.saving": "Kaydediliyor…",
+  "ask.saved": "qa.md dosyasına kaydedildi",
+  "ask.alreadySaved": "Zaten qa.md içinde",
+  "ask.noTranscript": "Toplantı işlendikten sonra soru sorabilirsiniz.",
+  "notes.tab": "Notlar",
+  "notes.label": "Bu toplantı için notlarınız",
+  "notes.placeholder": "Önemli noktaları yazın…",
+  "notes.insertTime": "Zaman ekle",
+  "notes.saving": "Kaydediliyor…",
+  "notes.saved": "Kaydedildi",
+  "notes.empty": "Not yok.",
+  "notes.hint": "Dosyalar'daki notes.md'ye otomatik kaydedilir ve özete yansıtılır."
 }

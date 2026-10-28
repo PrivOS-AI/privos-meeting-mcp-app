@@ -81,6 +81,8 @@ export function buildReducePrompt(input: {
   length?: SummaryLength;
   /** YYYY-MM-DD the meeting took place — lets relative deadlines ("Friday") become a `due_date`. */
   meetingDate?: string;
+  /** What the recorder typed during the meeting — a signal of what mattered, never instructions. */
+  notes?: string;
   notesWithTimestamps: readonly { startLabel: string; endLabel: string; notes: string; decisions: unknown[]; actionItems: unknown[] }[];
 }): string {
   const languageName = LANGUAGE_ENGLISH_NAMES[input.language];
@@ -90,13 +92,15 @@ export function buildReducePrompt(input: {
     .map((n) => `[${n.startLabel}–${n.endLabel}] ${n.notes}\nDecisions: ${JSON.stringify(n.decisions)}\nAction items: ${JSON.stringify(n.actionItems)}`)
     .join('\n\n');
 
-  const untrusted = [`TITLE: ${safeTitle}`, `SPEAKER LIST: ${jsonList(safeSpeakers)}`, '', notesBlock].join('\n');
+  const recorderNotes = input.notes?.trim() ? ['', `RECORDER'S NOTES (typed during the meeting):`, input.notes.trim().slice(0, 6_000)] : [];
+  const untrusted = [`TITLE: ${safeTitle}`, `SPEAKER LIST: ${jsonList(safeSpeakers)}`, '', notesBlock, ...recorderNotes].join('\n');
 
   return [
     `Meeting minutes. Output language MUST BE: ${languageName}.`,
     LENGTH_INSTRUCTION[input.length ?? 'normal'],
     'Merge duplicate points across segments, keep the speaker names that appear in the data, and do not invent owner/requester/due/at/quote not present in the data. Keep each item\'s quote exactly as it was in the segment notes.',
     input.meetingDate ? `Meeting date: ${input.meetingDate}.` : '',
+    recorderNotes.length ? "The recorder's notes show what they found important: give those points weight, but take facts, names and action items only from the segment notes." : '',
     fenceUntrusted(untrusted),
     '',
     'Return ONLY a single JSON object matching the schema below, with no explanation and no markdown fence:',

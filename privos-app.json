@@ -34,13 +34,13 @@
     "tmpSizeMb": 1024
   },
   "dataPolicy": {
-    "version": "2026-10-26",
+    "version": "2026-10-28",
     "externalProcessing": true,
     "externalDestinations": [
       "Soniox (speech-to-text)",
       "ElevenLabs (speech-to-text)"
     ],
-    "retention": "By default speech is recognised inside the app container (built-in Vietnamese/English models) and audio never leaves the workspace. Only if a room selects Soniox or ElevenLabs is audio streamed and uploaded to that provider, which keeps it under its own terms; the app deletes its Soniox upload after transcription. Recording parts are deleted once merged. The merged audio is deleted right after processing unless the room enables Keep original audio; audio kept on purpose, or left because the summary failed, is deleted after the room's auto-delete period (default 90 days, 0 disables). Parts of an interrupted recording are deleted after 7 days by default. Transcripts and summaries are produced with Hub AI inside the workspace and stored in the room's Files until the meeting is deleted, by its owner or after the room's meeting auto-delete period (off by default). Voiceprints (speaker embeddings, biometric data) can be turned off per room, in which case none are computed or stored; while on, the recorder must confirm before each recording that participants were told, and the confirmation time is kept on the meeting. Voiceprints are encrypted with AES-256-GCM, stored in the workspace App DB and never sent outside the workspace; deleting a meeting also removes the voice samples taken from it, and a profile stays until its creator or a workspace admin deletes it. Unconfirmed speaker embeddings are cleared 30 days after the meeting. Temporary files on the app volume are deleted after each job; operator diagnostics are kept for 90 days. Uninstalling the app does not delete data already stored in the room's Files or App DB."
+    "retention": "By default speech is recognised inside the app container (built-in Vietnamese/English models) and audio never leaves the workspace. Only if a room selects Soniox or ElevenLabs is audio streamed and uploaded to that provider, which keeps it under its own terms; the app deletes its Soniox upload after transcription. Recording parts are deleted once merged. The merged audio is deleted right after processing unless the room enables Keep original audio; audio kept on purpose, or left because the summary failed, is deleted after the room's auto-delete period (default 90 days, 0 disables). Parts of an interrupted recording are deleted after 7 days by default. Transcripts and summaries are produced with Hub AI inside the workspace and stored in the room's Files until the meeting is deleted, by its owner or after the room's meeting auto-delete period (off by default). Asking a question about a meeting sends the relevant transcript lines to Hub AI inside the workspace; the question and answer are not stored unless the person saves the answer, which appends it to the meeting's qa.md in the room's Files. The meeting owner's notes are stored on the meeting and in notes.md in the room's Files, and are used for the summary. Both follow the meeting's lifecycle. Voiceprints (speaker embeddings, biometric data) can be turned off per room, in which case none are computed or stored; while on, the recorder must confirm before each recording that participants were told, and the confirmation time is kept on the meeting. Voiceprints are encrypted with AES-256-GCM, stored in the workspace App DB and never sent outside the workspace; deleting a meeting also removes the voice samples taken from it, and a profile stays until its creator or a workspace admin deletes it. Unconfirmed speaker embeddings are cleared 30 days after the meeting. Temporary files on the app volume are deleted after each job; operator diagnostics are kept for 90 days. Uninstalling the app does not delete data already stored in the room's Files or App DB."
   },
   "permissions": [
     {
@@ -902,6 +902,199 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 10000000
+          }
+        }
+      }
+    },
+    {
+      "name": "meeting_ask",
+      "title": "Ask about a meeting",
+      "description": "Answer a question about one meeting from its transcript (or, while it runs, the captions so far), citing the lines that support the answer. Nothing is stored.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "roomId",
+          "meetingId",
+          "question"
+        ],
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "meetingId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "vi",
+              "en",
+              "fr",
+              "zh",
+              "ko",
+              "ja",
+              "de",
+              "tr"
+            ]
+          },
+          "segments": {
+            "type": "array",
+            "maxItems": 8000,
+            "description": "While the meeting is running: the caption lines so far. Omit afterwards — the saved transcript is used.",
+            "items": {
+              "type": "object",
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "speakerId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "speakerName": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "startSec": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 2000
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "meeting_save_answer",
+      "title": "Save an answer to Files",
+      "description": "Append an answer from meeting_ask (unchanged, with its saveToken) to the meeting's qa.md in the room's Files, readable by everyone in the room. Saving the same answer twice adds it once.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "roomId",
+          "meetingId",
+          "question",
+          "answer",
+          "saveToken"
+        ],
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "meetingId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "answer": {
+            "type": "object",
+            "required": [
+              "answer",
+              "citations"
+            ],
+            "properties": {
+              "answer": {
+                "type": "string",
+                "maxLength": 4000
+              },
+              "insufficient": {
+                "type": "boolean"
+              },
+              "citations": {
+                "type": "array",
+                "maxItems": 5,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "lineId",
+                    "atSec",
+                    "speaker",
+                    "quote"
+                  ],
+                  "properties": {
+                    "lineId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "atSec": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "speaker": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "quote": {
+                      "type": "string",
+                      "maxLength": 400
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "saveToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        }
+      }
+    },
+    {
+      "name": "meeting_notes_save",
+      "title": "Save meeting notes",
+      "description": "Save the meeting owner's notes (whole text) to the meeting and to notes.md in its Files folder; the summary takes them into account.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "roomId",
+          "meetingId",
+          "text",
+          "revision"
+        ],
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "meetingId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
           }
         }
       }

@@ -430,5 +430,27 @@
   "actionItems.type.request": "依頼",
   "actionItems.type.question": "質問",
   "actionItems.requester": "依頼者",
-  "actionItems.owner": "担当者"
+  "actionItems.owner": "担当者",
+
+  "ask.tab": "質問",
+  "ask.label": "この会議についての質問",
+  "ask.placeholder": "この会議について質問…",
+  "ask.submit": "質問",
+  "ask.asking": "回答中…",
+  "ask.hint": "回答は会議での発言のみに基づき、根拠となる発言を示します。保存しない限り何も記録されません。",
+  "ask.empty": "例：見積もりを送るのは誰？リリース日はいつに決まった？",
+  "ask.nothingYet": "回答に使える字幕がまだありません。",
+  "ask.save": "ファイルに保存",
+  "ask.saving": "保存中…",
+  "ask.saved": "qa.md に保存しました",
+  "ask.alreadySaved": "qa.md に保存済み",
+  "ask.noTranscript": "会議の処理が終わると質問できます。",
+  "notes.tab": "メモ",
+  "notes.label": "この会議のメモ",
+  "notes.placeholder": "大事な点を書き留めましょう…",
+  "notes.insertTime": "時刻を挿入",
+  "notes.saving": "保存中…",
+  "notes.saved": "保存しました",
+  "notes.empty": "メモはありません。",
+  "notes.hint": "ファイルの notes.md に自動保存され、要約に反映されます。"
 }

@@ -21,6 +21,15 @@ const MIN_LINES = 3;
 
 type Status = 'idle' | 'loading' | 'ready' | 'error';
 
+/** The meeting's finalized caption lines so far, each with its speaker's current name — what live summaries and live questions are answered from. */
+export function liveCaptionLines(state: RecordingState, t: (key: string, vars?: Record<string, string | number>) => string): LiveSummaryLine[] {
+  const speakerKeys = Object.keys(state.speakerMap);
+  return buildSegments(state, (key) => {
+    if (!key) return t('recording.speakerBadge.speaking');
+    return state.speakerMap[key]?.displayName ?? t('recording.speakerBadge.numbered', { n: speakerKeys.indexOf(key) + 1 });
+  });
+}
+
 /** Finalized caption lines -> the summarizer's line payload, with each line's effective (corrected) speaker name. */
 function buildSegments(state: RecordingState, speakerName: (key: string | undefined) => string): LiveSummaryLine[] {
   const out: LiveSummaryLine[] = [];
@@ -69,12 +78,7 @@ export function LiveSummaryPanel() {
     if (runningRef.current) return;
     const current = stateRef.current;
     if (!current.meetingId) return;
-    const speakerKeys = Object.keys(current.speakerMap);
-    const speakerName = (key: string | undefined): string => {
-      if (!key) return t('recording.speakerBadge.speaking');
-      return current.speakerMap[key]?.displayName ?? t('recording.speakerBadge.numbered', { n: speakerKeys.indexOf(key) + 1 });
-    };
-    const segments = buildSegments(current, speakerName);
+    const segments = liveCaptionLines(current, t);
     if (segments.length < MIN_LINES) return;
 
     runningRef.current = true;

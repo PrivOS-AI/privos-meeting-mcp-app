@@ -13,16 +13,15 @@
  * pipeline. Also rewrites transcript.json/.md/.srt so a translate-bundled
  * re-run's `.translation` fields are not silently lost.
  */
-import { text as streamToText } from 'node:stream/consumers';
 
 import { AppError } from '../../shared/app-error.js';
-import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
+import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { uploadBotFile } from '../files/hub-file-upload.js';
-import { fetchFileReadable } from '../media/hub-file-download.js';
 import { summarizeTranscript } from '../jobs/meeting-job.js';
 import { upsertMeeting } from '../jobs/meeting-repository.js';
 import { buildTranscriptMarkdown } from '../transcript/markdown-writer.js';
-import { buildTranscriptJson, serializeTranscriptJson, type TranscriptJson } from '../transcript/transcript-json.js';
+import { loadStoredTranscript } from '../transcript/stored-transcript.js';
+import { buildTranscriptJson, serializeTranscriptJson } from '../transcript/transcript-json.js';
 import { buildSrt } from '../transcript/srt-writer.js';
 import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool, ToolRuntime } from './registry.js';
@@ -30,12 +29,6 @@ import { ROOM_AND_MEETING } from './schema-parts.js';
 
 function asString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
-}
-
-function isTranscriptJson(value: unknown): value is TranscriptJson {
-  if (!value || typeof value !== 'object') return false;
-  const record = value as Record<string, unknown>;
-  return Array.isArray(record.segments) && Array.isArray(record.tokens) && Array.isArray(record.speakers);
 }
 
 export const summarizeTool: AppTool = {
@@ -57,32 +50,7 @@ export const summarizeTool: AppTool = {
     const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
     if (!folderId) throw new AppError('Meeting has no storage folder yet.', 'INVALID_STATE');
 
-    const readable = await fetchFileReadable(runtime.agentBotHub, meeting.transcriptJsonFileId);
-    const raw = await streamToText(readable);
-    let transcriptDoc: unknown;
-    try {
-      transcriptDoc = JSON.parse(raw);
-    } catch {
-      throw new AppError('Could not read transcript.json — invalid file.', 'INVALID_INPUT');
-    }
-    if (!isTranscriptJson(transcriptDoc)) {
-      throw new AppError('transcript.json is not in the expected format.', 'INVALID_INPUT');
-    }
-
-    // Prefer the CURRENT `meeting_speakers` display names (may have been corrected by `speaker_resolve` since the
-    // job ran) over the names frozen inside transcript.json at write time.
-    const speakerRows = extractDbRecords(
-      await db.query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 }),
-    );
-    const displayNameBySpeaker: Record<string, string> = {};
-    for (const row of speakerRows) {
-      if (typeof row.speakerId === 'string' && typeof row.displayName === 'string' && row.displayName) {
-        displayNameBySpeaker[row.speakerId] = row.displayName;
-      }
-    }
-    for (const s of transcriptDoc.speakers) {
-      if (!displayNameBySpeaker[s.speakerId] && s.displayName) displayNameBySpeaker[s.speakerId] = s.displayName;
-    }
+    const { doc: transcriptDoc, displayNameBySpeaker } = await loadStoredTranscript(db, runtime.agentBotHub, meeting);
 
     const speakers = transcriptDoc.speakers.map((s) => ({
       speakerId: s.speakerId,

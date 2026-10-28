@@ -30,6 +30,8 @@ export interface MeetingReadModel {
   summaryFileId?: string;
   summaryText?: string;
   summaryError?: string;
+  /** The owner's notes (`meeting_notes_save`). */
+  notesText?: string;
   keyTopics?: string[];
   sentToChatAt?: string;
 }
@@ -55,6 +57,7 @@ function asMeetingReadModel(record: { _id: string; [key: string]: unknown }): Me
     summaryFileId: typeof record.summaryFileId === 'string' ? record.summaryFileId : undefined,
     summaryText: typeof record.summaryText === 'string' ? record.summaryText : undefined,
     summaryError: typeof record.summaryError === 'string' ? record.summaryError : undefined,
+    notesText: typeof record.notesText === 'string' ? record.notesText : undefined,
     keyTopics: Array.isArray(record.keyTopics) ? record.keyTopics.filter((t): t is string => typeof t === 'string') : undefined,
     sentToChatAt: typeof record.sentToChatAt === 'string' ? record.sentToChatAt : undefined,
   };

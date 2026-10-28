@@ -403,3 +403,166 @@
   font-style: italic;
   color: var(--ma-fg-3);
 }
+
+/* ---------- ask about the meeting ---------- */
+
+.ma-ask__form {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.ma-ask__input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  background: var(--ma-surface);
+  color: var(--ma-fg-1);
+  font: inherit;
+}
+
+.ma-ask__submit,
+.ma-ask__save,
+.ma-notes__stamp {
+  min-height: auto;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  background: none;
+  font-size: var(--body-sm-size);
+  white-space: nowrap;
+}
+
+.ma-ask__submit {
+  border-color: var(--ma-brand-blue);
+  background: var(--ma-brand-blue);
+  color: var(--ma-fg-inverse);
+}
+
+.ma-ask__hint {
+  margin: var(--space-2) 0 var(--space-3);
+  font-size: var(--caption-size);
+  color: var(--ma-fg-3);
+}
+
+.ma-ask__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ma-ask__item {
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--ma-border-1);
+}
+
+.ma-ask__question {
+  margin: 0 0 var(--space-2);
+  font-weight: var(--weight-semibold);
+  color: var(--ma-fg-1);
+}
+
+.ma-ask__pending,
+.ma-ask__answer--unknown {
+  color: var(--ma-fg-3);
+}
+
+.ma-ask__error {
+  margin: 0;
+  color: var(--ma-status-danger);
+  font-size: var(--body-sm-size);
+}
+
+.ma-ask__citations {
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ma-ask__citation {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-left: 2px solid var(--ma-border-2);
+  background: none;
+  color: var(--ma-fg-2);
+  font: inherit;
+  font-size: var(--caption-size);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ma-ask__citation:disabled {
+  cursor: default;
+}
+
+.ma-ask__citation:not(:disabled):hover {
+  border-left-color: var(--ma-brand-blue);
+}
+
+.ma-ask__citation-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--ma-brand-blue);
+  font-family: var(--ma-font-mono);
+}
+
+.ma-ask__citation q {
+  font-style: italic;
+}
+
+.ma-ask__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.ma-ask__saved {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--ma-status-success);
+  font-size: var(--caption-size);
+}
+
+/* ---------- meeting notes ---------- */
+
+.ma-notes__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  min-height: 28px;
+}
+
+.ma-notes__state {
+  margin-left: auto;
+  font-size: var(--caption-size);
+  color: var(--ma-fg-3);
+}
+
+.ma-notes__area {
+  width: 100%;
+  min-height: 260px;
+  padding: var(--space-3);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  background: var(--ma-surface);
+  color: var(--ma-fg-1);
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.ma-notes__readonly {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--ma-fg-2);
+}

@@ -432,5 +432,27 @@
   "actionItems.type.request": "Yêu cầu",
   "actionItems.type.question": "Câu hỏi",
   "actionItems.requester": "Người yêu cầu",
-  "actionItems.owner": "Người phụ trách"
+  "actionItems.owner": "Người phụ trách",
+
+  "ask.tab": "Hỏi",
+  "ask.label": "Câu hỏi về cuộc họp này",
+  "ask.placeholder": "Hỏi về cuộc họp này…",
+  "ask.submit": "Hỏi",
+  "ask.asking": "Đang trả lời…",
+  "ask.hint": "Câu trả lời chỉ dựa trên nội dung cuộc họp, kèm câu gốc. Không lưu gì trừ khi bạn bấm lưu.",
+  "ask.empty": "Ví dụ: Ai nhận gửi báo giá? Chốt ngày phát hành nào?",
+  "ask.nothingYet": "Chưa có phụ đề nào để trả lời.",
+  "ask.save": "Lưu vào Files",
+  "ask.saving": "Đang lưu…",
+  "ask.saved": "Đã lưu vào qa.md",
+  "ask.alreadySaved": "Đã có trong qa.md",
+  "ask.noTranscript": "Hỏi đáp có sau khi cuộc họp được xử lý xong.",
+  "notes.tab": "Ghi chú",
+  "notes.label": "Ghi chú của bạn cho cuộc họp này",
+  "notes.placeholder": "Ghi lại điểm quan trọng…",
+  "notes.insertTime": "Chèn mốc thời gian",
+  "notes.saving": "Đang lưu…",
+  "notes.saved": "Đã lưu",
+  "notes.empty": "Chưa có ghi chú.",
+  "notes.hint": "Tự lưu vào notes.md trong Files và được dùng khi viết tóm tắt."
 }

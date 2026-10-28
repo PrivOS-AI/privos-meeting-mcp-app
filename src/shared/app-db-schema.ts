@@ -106,6 +106,9 @@ export const SCHEMAS: readonly CollectionSchema[] = [
       { name: 'audioDeletedAt', type: 'date' },
       { name: 'sentToChatAt', type: 'date' },
       { name: 'summaryError', type: 'string', maxLength: 4000 },
+      /** The owner's notes and their save revision (`meeting_notes_save`). */
+      { name: 'notesText', type: 'string', maxLength: 20000 },
+      { name: 'notesRevision', type: 'number' },
     ],
     indexes: [{ fields: { startedAt: -1 } }, { fields: { status: 1 } }],
   },
