@@ -163,6 +163,18 @@
   padding: var(--space-2) var(--space-5);
 }
 
+.ma-settings-panel__example {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--body-sm-size);
+  background: var(--ma-surface-raised);
+  border: 1px solid var(--ma-border-1);
+  border-radius: var(--ma-radius-md);
+}
+
 .ma-settings-panel__policy {
   background: var(--ma-bg-canvas);
   border-radius: var(--ma-radius-md);

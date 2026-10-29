@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.3.0] — 2026-10-29
+
+- **The Room's agent records a Google Meet call.** One chat message —
+  "@agent vào https://meet.google.com/… và ghi lại cuộc họp" — and the agent
+  joins with the Room's shared browser (PrivOS Remote Browser) and has this
+  app record it; "kết thúc ghi" ends it and returns the summary.
+  - New tools for the agent, called through the Hub's `mcp-apps.tool-call` as
+    the person who asked: `meeting_listen_start` (creates the meeting and its
+    Files folder on the server, starts listening; refuses until the user
+    confirmed the participants were told; a repeated start continues the same
+    meeting), `meeting_listen_status` (latest captions, or the summary once
+    processed), `meeting_listen_stop` (last part, then processing).
+  - The Meeting skill for the agent (`agent-sets/privos-meeting`, content-hashed
+    name like Remote Browser's) is installed from **Settings → Room agent**.
+    New optional scopes `sandbox:skills:use` and `sandbox:agent-sets:upload`.
+  - A recording running in the Room browser shows in the app as a banner with
+    **Watch live** (captions from the start) and **End & summarize**.
+- Fix: a Room-browser recording now updates `lastPartAt` / `partCount` after
+  every part, so the startup sweep no longer marks it `interrupted` after
+  10 minutes.
+
 ## [1.2.0] — 2026-10-29
 
 - **Record a Google Meet call through the Room's shared browser.** When the

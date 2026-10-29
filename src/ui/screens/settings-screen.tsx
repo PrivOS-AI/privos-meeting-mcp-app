@@ -1,5 +1,5 @@
 /**
- * Settings shell: 240px nav + 7 panels (plan.md § Settings, design nav 1e).
+ * Settings shell: 240px nav + 8 panels (plan.md § Settings, design nav 1e).
  * Each panel owns its own data loading/saving — this component is pure
  * navigation state.
  */
@@ -11,12 +11,13 @@ import { CaptionDisplayPanel } from './settings/caption-display-panel.js';
 import { LanguagePanel } from './settings/language-panel.js';
 import { MicrophonePanel } from './settings/microphone-panel.js';
 import { PrivacyPanel } from './settings/privacy-panel.js';
+import { RoomAgentPanel } from './settings/room-agent-panel.js';
 import { SpeakerIdentificationPanel } from './settings/speaker-identification-panel.js';
 import { SpeechRecognitionPanel } from './settings/speech-recognition-panel.js';
 
-type SettingsSection = 'language' | 'speech' | 'microphone' | 'speaker' | 'summary' | 'privacy' | 'caption';
+type SettingsSection = 'language' | 'speech' | 'microphone' | 'speaker' | 'summary' | 'privacy' | 'caption' | 'agent';
 
-const SECTIONS: readonly SettingsSection[] = ['language', 'speech', 'microphone', 'speaker', 'summary', 'privacy', 'caption'];
+const SECTIONS: readonly SettingsSection[] = ['language', 'speech', 'microphone', 'speaker', 'summary', 'privacy', 'caption', 'agent'];
 
 export function SettingsScreen() {
   const { t } = useI18n();
@@ -45,6 +46,7 @@ export function SettingsScreen() {
         {section === 'summary' ? <AiSummaryPanel /> : null}
         {section === 'privacy' ? <PrivacyPanel /> : null}
         {section === 'caption' ? <CaptionDisplayPanel /> : null}
+        {section === 'agent' ? <RoomAgentPanel /> : null}
       </div>
     </div>
   );

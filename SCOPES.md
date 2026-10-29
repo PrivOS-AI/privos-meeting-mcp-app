@@ -17,6 +17,8 @@ before `meeting_bootstrap`.
 | `db:write` | required | both | `src/server/hub/app-db-bot-client.ts` (`mcpapp.db.create/update/delete`: meetings, jobs, encrypted voiceprints, action items, decisions); `src/ui/data/app-db-client.ts` (drafts, bookmarks, action item done/pushed; deleting a meeting deletes its rows) | — |
 | `sandbox:generate` | required | user | `src/server/hub/hub-ai-client.ts` (summary, live summary, translation, `meeting_ask` questions) | — |
 | `sandbox:botkey:push` | optional | user | `src/ui/data/sandbox-bot-key.ts` (`agents.sandbox.botKeyStatus`, `agents.sandbox.pushBotKey`) | An admin pushes the bot key manually; Hub AI summary and translation stay unavailable until then |
+| `sandbox:skills:use` | optional | user | `src/ui/data/agent-skill.ts` (`rooms.listPrivOSSandboxSkills`, `rooms.syncPrivOSSandboxSkills`: enable the Meeting skill for the Room's agent, Settings > Room agent) | The Room's agent cannot record calls; people still record from the app |
+| `sandbox:agent-sets:upload` | optional | user (workspace admin) | `src/ui/data/agent-skill.ts` (`agents.sandbox.agentSets.preview` / `.confirm` / `.delete`: upload the read-only Meeting skill to Agent Factory, only when this version is not there yet) | A workspace admin adds the skill to Agent Factory another way |
 | `rooms:read` | optional | user | `src/ui/data/room-members.ts` (`groups.members` / `channels.members` for the speaker member picker, and the room's member list for avatars in `src/ui/data/people.tsx`); `src/ui/data/open-in-files.ts` (`rooms.info`, the room type and name for the **Open in Files** link) | The user types a speaker name instead of picking a member; avatars show initials instead of photos; **Open in Files** assumes a private group named as the host reports it |
 | `rooms:roles:read` | optional | user | No API call: the Hub adds the signed `room_roles` / `workspace_roles` claims to the caller's identity; read in `src/server/tools/can-manage-room-settings.ts` (`meeting_settings_set`, full view of `meeting_stt_status`) and `src/server/tools/is-workspace-admin.ts` (admin access to any voiceprint profile) | Nobody can change the room's settings in the app (fail closed); the room keeps its current values or the defaults, and Settings shows them read-only. Workspace admins lose admin access to other people's voiceprints; creators keep access to their own |
 | `lists:read` | optional | user | `src/ui/data/action-list-provisioner.ts` (`lists.listByRoomId`, `lists.info`) | The "Push to Smart List" button is hidden |
@@ -28,3 +30,13 @@ before `meeting_bootstrap`.
 Reserved environment keys for the bot: `PRIVOS_AGENT_BOT_USER_ID`,
 `PRIVOS_AGENT_BOT_CREDENTIAL`. The credential never reaches the iframe or tool
 results; `meeting_agent_bot_credential_check` reports only valid/invalid.
+
+### The Room's agent records a call
+
+The Meeting skill (`agent-sets/privos-meeting`, packaged by
+`npm run package:agent-set`) runs in the Room's PrivOS Sandbox. It calls this
+app's `meeting_listen_start` / `_status` / `_stop` (and `meeting_ask`) through
+the Hub's `mcp-apps.tool-call` as the person the agent works for: the verified
+actor is that person, every tool keeps its owner and room checks, and the skill
+holds no credential. The app adds no permission for it beyond the two above.
+

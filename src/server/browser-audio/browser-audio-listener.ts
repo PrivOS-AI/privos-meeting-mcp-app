@@ -254,6 +254,9 @@ export class BrowserAudioListener {
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           await uploadBotFile({ hub, roomId, folderId, fileName: partFileName(seq, meetingId), mimeType: 'audio/webm', data, duplicateAction: 'keep_both' });
+          // The same heartbeat the iframe's recorder writes: the startup sweep marks a `recording`
+          // meeting without a recent part `interrupted`.
+          await this.ctx.db.update('meetings', 'room', meetingId, { partCount: seq + 1, lastPartAt: new Date().toISOString() }).catch(() => undefined);
           return;
         } catch (error) {
           console.warn(`[browser-audio] uploading part ${seq} failed (attempt ${attempt}):`, meetingId, error instanceof Error ? error.message : error);

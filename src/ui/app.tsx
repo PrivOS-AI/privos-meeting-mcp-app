@@ -99,7 +99,7 @@ export function App() {
           {missingAssistant ? (
             <AssistantRoomBanner botSlug={missingAssistant.botSlug} onJoined={() => void runBootstrap().catch(() => undefined)} />
           ) : null}
-          <RecoveryBanner />
+          <RecoveryBanner onWatchLive={() => setRoute('live')} />
           <RoutedScreens route={route} setRoute={setRoute} selectedMeetingId={selectedMeetingId} openMeeting={openMeeting} />
         </div>
       </div>
