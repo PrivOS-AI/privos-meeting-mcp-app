@@ -12,7 +12,7 @@ import { SUPPORTED_LANGUAGES, LANGUAGE_ENDONYMS, type Language } from '../i18n/l
 import { defaultTranslationTarget } from '../../shared/languages.js';
 import { loadLocalPreferences, saveLocalPreference } from '../data/local-preferences.js';
 import { loadWorkspaceSettings } from '../data/settings-store.js';
-import { useRecordingStore } from '../stores/recording-store.js';
+import { useRecordingStore, type CaptureSource } from '../stores/recording-store.js';
 import { Icon } from '../components/icon.js';
 
 export interface NewMeetingScreenProps {
@@ -36,6 +36,9 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
   const [recognitionOn, setRecognitionOn] = useState(true);
   const [noticeAcknowledged, setNoticeAcknowledged] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
+  // The Room's shared browser (Remote Browser in a Meet call) can be recorded instead of the mic, when the deployment links the two apps.
+  const [browserAudio, setBrowserAudio] = useState(false);
+  const [source, setSource] = useState<CaptureSource>('mic');
   const [micError, setMicError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
 
@@ -45,8 +48,9 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
       .callServerTool({ name: 'meeting_stt_status', arguments: {} })
       .then((raw) => {
         if (cancelled) return;
-        const parsed = parseToolResult(raw) as { activeRealtimeProvider?: string };
+        const parsed = parseToolResult(raw) as { activeRealtimeProvider?: string; browserAudio?: boolean };
         setProvider(parsed?.activeRealtimeProvider ?? null);
+        setBrowserAudio(parsed?.browserAudio === true);
       })
       .catch(() => {
         if (!cancelled) setProvider(null);
@@ -75,7 +79,7 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
     // Remember the picked main language as the default for the next new meeting.
     saveLocalPreference('meetingLanguage', language);
     try {
-      await store.startRecording({ title: title.trim() || t('screen.new.untitled'), language, translationLang: translationLang === language ? defaultTranslationTarget(language) : translationLang, translationEnabled, voiceprintNoticeAcknowledged: recognitionOn && noticeAcknowledged });
+      await store.startRecording({ title: title.trim() || t('screen.new.untitled'), language, translationLang: translationLang === language ? defaultTranslationTarget(language) : translationLang, translationEnabled, voiceprintNoticeAcknowledged: recognitionOn && noticeAcknowledged, captureSource: browserAudio ? source : 'mic' });
       onStarted();
     } catch (error) {
       // Keep the raw cause for diagnosis; the on-screen text is classified below.
@@ -119,6 +123,25 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
           placeholder={t('screen.new.untitled')}
         />
       </label>
+
+      {browserAudio ? (
+        <fieldset className="ma-field ma-new-meeting__source">
+          <legend className="ma-field__label">{t('screen.new.source')}</legend>
+          {(['mic', 'browser'] as const).map((value) => (
+            <label key={value} className="ma-field ma-field--checkbox">
+              <input type="radio" name="ma-capture-source" value={value} checked={source === value} onChange={() => setSource(value)} />
+              <Icon name={value === 'mic' ? 'microphone' : 'globe'} size={16} />
+              <span>{t(value === 'mic' ? 'screen.new.sourceMic' : 'screen.new.sourceBrowser')}</span>
+            </label>
+          ))}
+          {source === 'browser' ? (
+            <p className="ma-notice ma-notice--info">
+              <Icon name="lightbulb" size={16} />
+              <span>{t('screen.new.sourceBrowserHint')}</span>
+            </p>
+          ) : null}
+        </fieldset>
+      ) : null}
 
       <label className="ma-field">
         <span className="ma-field__label">{t('screen.new.language')}</span>

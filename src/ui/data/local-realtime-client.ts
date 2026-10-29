@@ -73,6 +73,34 @@ export function floatToPcm16Base64(samples: Float32Array): string {
   return btoa(binary);
 }
 
+/**
+ * Turns one answer of the server's live session (finals since the cursor, plus
+ * the draft of speech still in progress) into caption events. Shared by the
+ * microphone path (`meeting_audio_push`) and the Room-browser path
+ * (`meeting_browser_audio` poll), which read the same session.
+ */
+export function createCaptionEmitter(onCaption: RealtimeConnectionOptions['onCaption']): (response: Pick<AudioPushResponse, 'captions' | 'draft'>) => void {
+  /** Id of the draft line on screen, if any. */
+  let shownDraft: string | null = null;
+  return (response) => {
+    for (const caption of response.captions) {
+      const event: CaptionEvent = { kind: 'final', id: caption.id, text: caption.text, atSec: caption.atSec, endSec: caption.endSec, lang: caption.lang, ...(caption.speakerKey ? { speakerKey: caption.speakerKey } : {}) };
+      onCaption(event);
+    }
+    const draft = response.draft ?? null;
+    if (draft) {
+      onCaption({ kind: 'draft', id: draft.id, text: draft.text, atSec: draft.atSec, endSec: draft.endSec, lang: draft.lang });
+      shownDraft = draft.id;
+    } else if (shownDraft && response.captions.length === 0) {
+      // Speech that came to nothing (a cough, noise): clear the draft. A new final replaces it on its own.
+      onCaption({ kind: 'draft', id: shownDraft, text: '', atSec: 0, endSec: 0 });
+      shownDraft = null;
+    } else {
+      shownDraft = null;
+    }
+  };
+}
+
 export interface LocalConnectionOptions extends RealtimeConnectionOptions {
   pushAudio: (request: AudioPushRequest) => Promise<AudioPushResponse>;
 }
@@ -120,28 +148,7 @@ export function createLocalConnection(opts: RealtimeConnectionOptions): Realtime
   mute.connect(context.destination);
   void context.resume();
 
-  /** Id of the draft line on screen, if any. */
-  let shownDraft: string | null = null;
-  const emitDraft = (response: AudioPushResponse) => {
-    const draft = response.draft ?? null;
-    if (draft) {
-      opts.onCaption({ kind: 'draft', id: draft.id, text: draft.text, atSec: draft.atSec, endSec: draft.endSec, lang: draft.lang });
-      shownDraft = draft.id;
-    } else if (shownDraft && response.captions.length === 0) {
-      // Speech that came to nothing (a cough, noise): clear the draft. A new final replaces it on its own.
-      opts.onCaption({ kind: 'draft', id: shownDraft, text: '', atSec: 0, endSec: 0 });
-      shownDraft = null;
-    } else {
-      shownDraft = null;
-    }
-  };
-
-  const emit = (captions: AudioPushResponse['captions']) => {
-    for (const caption of captions) {
-      const event: CaptionEvent = { kind: 'final', id: caption.id, text: caption.text, atSec: caption.atSec, endSec: caption.endSec, lang: caption.lang, ...(caption.speakerKey ? { speakerKey: caption.speakerKey } : {}) };
-      opts.onCaption(event);
-    }
-  };
+  const showCaptions = createCaptionEmitter(opts.onCaption);
 
   const pushOnce = async (): Promise<void> => {
     if (inFlight || pendingStartSec === null || pending.length === 0) return;
@@ -154,8 +161,7 @@ export function createLocalConnection(opts: RealtimeConnectionOptions): Realtime
       pendingStartSec += take / TARGET_RATE;
       seq++;
       cursor = response.cursor;
-      emit(response.captions);
-      emitDraft(response);
+      showCaptions(response);
       if (!live) {
         live = true;
         opts.onStatus('live', { sessionIndex: 0 });

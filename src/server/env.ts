@@ -91,6 +91,10 @@ export interface AppEnv {
    */
   speakerCoherenceThreshold: number;
   voiceprintEncKey?: string;
+  /** PrivOS Remote Browser controller on the same deployment (`REMOTE_BROWSER_AUDIO_URL`), e.g. `http://remote-browser:8787` — meetings recorded from the Room's shared browser read its `/audio-tap`. */
+  remoteBrowserAudioUrl?: string;
+  /** The operator secret Remote Browser's `REMOTE_BROWSER_AUDIO_TAP_KEY` is set to. Both unset: the option is hidden. */
+  remoteBrowserAudioTapKey?: string;
   summaryModel?: string;
   /** Hub AI provider id paired with `summaryModel` (Hub default when unset). */
   summaryProvider?: string;
@@ -155,6 +159,8 @@ export function loadEnv(): AppEnv {
     speakerLiveEnrolCoherence: num('SPEAKER_LIVE_ENROL_COHERENCE', 0.5),
     speakerCoherenceThreshold: num('SPEAKER_COHERENCE_THRESHOLD', 0.3),
     voiceprintEncKey: str('VOICEPRINT_ENC_KEY'),
+    remoteBrowserAudioUrl: str('REMOTE_BROWSER_AUDIO_URL'),
+    remoteBrowserAudioTapKey: str('REMOTE_BROWSER_AUDIO_TAP_KEY'),
     summaryModel: str('SUMMARY_MODEL'),
     summaryProvider: str('SUMMARY_PROVIDER'),
     translateModel: str('TRANSLATE_MODEL'),

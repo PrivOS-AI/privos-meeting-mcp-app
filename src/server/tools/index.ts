@@ -9,6 +9,7 @@ import { askTool, saveAnswerTool } from './ask-tool.js';
 import { notesTool } from './notes-tool.js';
 import { audioPushTool } from './audio-push-tool.js';
 import { botCredentialCheckTool } from './bot-credential-check-tool.js';
+import { browserAudioTool } from './browser-audio-tool.js';
 import { bootstrapTool } from './bootstrap-tool.js';
 import { chunkReadyTool } from './chunk-ready-tool.js';
 import { forgetVoiceprintsTool } from './forget-voiceprints-tool.js';
@@ -48,6 +49,7 @@ export function registerAllTools(): void {
   registerTool(relabelSpeakerTool);
   registerTool(forgetVoiceprintsTool);
   registerTool(audioPushTool);
+  registerTool(browserAudioTool);
   registerTool(askTool);
   registerTool(saveAnswerTool);
   registerTool(notesTool);
