@@ -24,14 +24,17 @@ export function RecordingFooter({ muted, paused, ending, waveform, showCaptureCo
   const { t } = useI18n();
   return (
     <div className="ma-rec-footer">
-      <div className="ma-rec-footer__group" hidden={!showCaptureControls}>
-        <button type="button" className="ma-rec-footer__icon-btn" aria-pressed={muted} aria-label={t('recording.footer.mute')} onClick={onToggleMute}>
-          <Icon name={muted ? 'microphone-off' : 'microphone'} size={20} />
-        </button>
-        <button type="button" className="ma-rec-footer__icon-btn" aria-label={paused ? t('recording.footer.resume') : t('recording.footer.pause')} onClick={onTogglePause}>
-          <Icon name={paused ? 'play' : 'pause'} size={20} />
-        </button>
-      </div>
+      {/* Rendered or not, never `hidden`: the group's `display: flex` overrides the attribute. */}
+      {showCaptureControls ? (
+        <div className="ma-rec-footer__group">
+          <button type="button" className="ma-rec-footer__icon-btn" aria-pressed={muted} aria-label={t('recording.footer.mute')} onClick={onToggleMute}>
+            <Icon name={muted ? 'microphone-off' : 'microphone'} size={20} />
+          </button>
+          <button type="button" className="ma-rec-footer__icon-btn" aria-label={paused ? t('recording.footer.resume') : t('recording.footer.pause')} onClick={onTogglePause}>
+            <Icon name={paused ? 'play' : 'pause'} size={20} />
+          </button>
+        </div>
+      ) : null}
       {waveform ? <div className="ma-rec-footer__wave">{waveform}</div> : null}
       <button type="button" className="ma-rec-footer__end" disabled={ending} onClick={onEnd}>
         {ending ? t('recording.footer.ending') : t('recording.footer.end')}
