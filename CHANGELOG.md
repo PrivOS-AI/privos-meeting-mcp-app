@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.1] — 2026-10-29
+
+- Fix: a Room-browser recording showed the microphone and pause buttons (the
+  `hidden` attribute lost to the group's `display: flex`); they are no longer
+  rendered for that source.
+
 ## [1.3.0] — 2026-10-29
 
 - **The Room's agent records a Google Meet call.** One chat message —
