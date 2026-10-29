@@ -2,7 +2,7 @@
   "schemaVersion": 3,
   "kind": "mcp-app",
   "name": "ai.privos.meeting-agent",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "title": "PrivOS Meeting App",
   "description": "A PrivOS MCP app for offline meeting capture: bilingual live captions with speaker labels, cross-session speaker identity via voiceprints, Hub-AI summaries, and transcript storage in PrivOS Files.",
   "icon": "/public/icon.svg",
@@ -115,6 +115,24 @@
       "feature": "meeting.ai.botkey",
       "reason": "Push the bot key to PrivOS Sandbox at init to pre-provision the Hub AI VM (without it, summary/translation report 'container unavailable').",
       "degradedBehavior": "Ask an admin to push the bot key manually; Hub AI summary/translation stays unavailable until the VM is provisioned."
+    },
+    {
+      "scope": "sandbox:skills:use",
+      "requirement": "optional",
+      "context": "room",
+      "executionContext": "user",
+      "feature": "meeting.agent.skill",
+      "reason": "Enable the app's Meeting skill for the Room's agent, so it can record a call the Room's shared browser joined (Settings > Room agent).",
+      "degradedBehavior": "The Room's agent cannot record calls; people still record from the app."
+    },
+    {
+      "scope": "sandbox:agent-sets:upload",
+      "requirement": "optional",
+      "context": "workspace",
+      "executionContext": "user",
+      "feature": "meeting.agent.skill-upload",
+      "reason": "Upload the app's read-only Meeting skill to the workspace Agent Factory (workspace admin: preview, then confirm).",
+      "degradedBehavior": "The skill cannot be uploaded from the app; a workspace admin adds it to Agent Factory another way."
     },
     {
       "scope": "rooms:read",
@@ -940,6 +958,97 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 10000000
+          }
+        }
+      }
+    },
+    {
+      "name": "meeting_listen_start",
+      "title": "Start recording the Room browser",
+      "description": "Start recording a meeting from the Room's shared browser (PrivOS Remote Browser) after it joined the call (e.g. Google Meet): live captions, then transcript and summary at the end. Only after the user confirmed the participants were told the meeting is recorded.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "roomId",
+          "participantsInformed"
+        ],
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Meeting title; defaults to \"Google Meet <date>\"."
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "vi",
+              "en",
+              "fr",
+              "zh",
+              "ko",
+              "ja",
+              "de",
+              "tr"
+            ],
+            "description": "Main spoken language (default vi)."
+          },
+          "participantsInformed": {
+            "type": "boolean",
+            "const": true,
+            "description": "The user confirmed the participants were told the meeting is recorded and voices may be recognised."
+          }
+        }
+      }
+    },
+    {
+      "name": "meeting_listen_status",
+      "title": "Room browser recording status",
+      "description": "Whether a meeting recorded from the Room browser hears the call (and the latest captions), or its summary once processed — only the meeting owner.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "roomId",
+          "meetingId"
+        ],
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "meetingId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    {
+      "name": "meeting_listen_stop",
+      "title": "Stop recording the Room browser",
+      "description": "Stop recording a meeting from the Room browser, save the last audio and start the transcript and summary — only the meeting owner. Poll meeting_listen_status for the summary.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "roomId",
+          "meetingId"
+        ],
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "meetingId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
           }
         }
       }

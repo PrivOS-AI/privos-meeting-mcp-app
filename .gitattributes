@@ -3,6 +3,7 @@
 * text=auto eol=lf
 *.onnx binary
 *.wav binary
+*.tar.gz binary
 
 # Excluded from `git archive` (npm run package / privos-app publish): the Portal
 # rejects .env* files, and agent-context and design material is not app source.

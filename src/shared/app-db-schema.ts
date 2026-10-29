@@ -109,6 +109,8 @@ export const SCHEMAS: readonly CollectionSchema[] = [
       /** The owner's notes and their save revision (`meeting_notes_save`). */
       { name: 'notesText', type: 'string', maxLength: 20000 },
       { name: 'notesRevision', type: 'number' },
+      /** `browser`: recorded from the Room's shared browser by the app server (the UI or the Room's agent started it); absent = this device's microphone. */
+      { name: 'captureSource', type: 'string', maxLength: 20 },
     ],
     indexes: [{ fields: { startedAt: -1 } }, { fields: { status: 1 } }],
   },

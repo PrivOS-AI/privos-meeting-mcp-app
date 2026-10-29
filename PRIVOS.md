@@ -59,6 +59,13 @@ PrivOS has no app-to-app call yet; `src/server/browser-audio/`. To turn it on:
 
 Unset, the "Audio source" choice is hidden and nothing changes.
 
+The Room's agent can do the same from the Room chat ("@agent vào <Meet link> và
+ghi lại cuộc họp") once the Meeting skill is installed (Settings → Room agent):
+it joins with Remote Browser's skill, then calls `meeting_listen_*` through the
+Hub. After editing `agent-sets/privos-meeting/`, run `npm run package:agent-set`
+(a test fails if the archive is stale) — the archive is part of the UI, so it
+needs a version bump like any UI change.
+
 ## Settings
 
 - STT provider (built-in by default; Soniox/ElevenLabs, realtime + async) is switched from Settings

@@ -22,6 +22,7 @@ import { startHostMicStream } from '../data/host-mic-stream.js';
 import { listParts, notifyChunkReady, uploadPart } from '../data/meeting-part-upload.js';
 import { uploadLiveCaptions, type CaptionExportLine } from '../data/meeting-caption-upload.js';
 import { PartUploadQueue } from '../data/part-upload-queue.js';
+import { isLanguageCode } from '../../shared/languages.js';
 import { createBrowserAudioConnection, type BrowserAudioProblem, type BrowserAudioResponse, type BrowserAudioState } from '../data/browser-audio-client.js';
 import { createRealtimeClient, type CaptionEvent, type CaptionStatus, type LiveTurn, type RealtimeConnection } from '../data/realtime-client.js';
 import { LiveSpeakerPoll, type LiveSpeaker, type ServerTurn } from '../data/live-speaker-poll.js';
@@ -606,6 +607,40 @@ export class RecordingStore {
   private tickElapsed(): void {
     if (this.state.status !== 'recording') return;
     this.setState({ elapsedSec: Math.floor((performance.now() - this.state.recorderEpochMs) / 1000) });
+  }
+
+  /**
+   * Shows a Room-browser recording that is already running on the server (the Room's agent
+   * started it with `meeting_listen_start`, or this tab was reloaded): same live view, captions
+   * from the start, End & summarize as usual. The server keeps recording whether or not a tab watches.
+   */
+  async resumeBrowserRecording(meeting: { _id: string; title?: string; folderId?: string; startedAt?: string; language?: string }): Promise<void> {
+    if (this.state.status === 'recording' || !meeting.folderId) return;
+    const startedAtMs = meeting.startedAt ? Date.parse(meeting.startedAt) : Date.now();
+    const recorderEpochMs = performance.now() - Math.max(0, Date.now() - (Number.isFinite(startedAtMs) ? startedAtMs : Date.now()));
+    this.meetingLanguage = isLanguageCode(meeting.language) ? meeting.language : 'vi';
+    this.clock = new MeetingClock(recorderEpochMs);
+    this.allTurns = [];
+    const prefs = loadLocalPreferences();
+    this.setState({
+      ...initialState(),
+      meetingId: meeting._id,
+      title: meeting.title ?? '',
+      folderId: meeting.folderId,
+      status: 'recording',
+      recorderEpochMs,
+      startedAt: Number.isFinite(startedAtMs) ? startedAtMs : Date.now(),
+      stageCaptionSize: prefs.stageCaptionSize,
+      showSpeakerLabels: prefs.showLiveSpeakerLabels,
+      captureSource: 'browser',
+    });
+    this.timer = setInterval(() => this.tickElapsed(), 1000);
+    try {
+      await this.startBrowserAudio(meeting._id, false);
+    } catch (error) {
+      this.setState({ status: 'error', error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
   }
 
   // ------------------------------------------------------------ realtime

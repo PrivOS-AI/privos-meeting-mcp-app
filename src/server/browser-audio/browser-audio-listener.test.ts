@@ -41,7 +41,7 @@ let meetingCount = 0;
 /** A fresh meeting per test: listeners are kept per meeting id. */
 function newCtx(now?: () => number) {
   meetingCount += 1;
-  return { db: {} as never, hub: {} as never, roomId: 'room-1', folderId: 'folder-1', meetingId: `meeting-abcdef1${meetingCount}`, ...(now ? { now } : {}) };
+  return { db: { update: async () => ({}) } as never, hub: {} as never, roomId: 'room-1', folderId: 'folder-1', meetingId: `meeting-abcdef1${meetingCount}`, ...(now ? { now } : {}) };
 }
 
 /** A fetch whose /audio-tap answer streams `chunks` (pushed by the test) until `end()`. */

@@ -88,6 +88,9 @@ export interface ActiveRecordingMeeting {
   folderId?: string;
   startedAt?: string;
   endedAt?: string;
+  language?: string;
+  /** `browser`: the app server records it from the Room's shared browser (maybe started by the Room's agent); it is live, not stuck. */
+  captureSource?: string;
 }
 
 /** Meetings owned by the current user that look abandoned — drives the recovery banner. */

@@ -13,6 +13,7 @@ import { browserAudioTool } from './browser-audio-tool.js';
 import { bootstrapTool } from './bootstrap-tool.js';
 import { chunkReadyTool } from './chunk-ready-tool.js';
 import { forgetVoiceprintsTool } from './forget-voiceprints-tool.js';
+import { listenStartTool, listenStatusTool, listenStopTool } from './listen-tools.js';
 import { liveSpeakersTool } from './live-speakers-tool.js';
 import { liveSummaryTool } from './live-summary-tool.js';
 import { processTool } from './process-tool.js';
@@ -50,6 +51,9 @@ export function registerAllTools(): void {
   registerTool(forgetVoiceprintsTool);
   registerTool(audioPushTool);
   registerTool(browserAudioTool);
+  registerTool(listenStartTool);
+  registerTool(listenStatusTool);
+  registerTool(listenStopTool);
   registerTool(askTool);
   registerTool(saveAnswerTool);
   registerTool(notesTool);
