@@ -380,7 +380,7 @@ describe('chunk-worker processChunk — profile-match retry backoff (no cap, gat
     env.speakerMatchMargin = 0;
   });
 
-  it('waits for >=15s of quality speech before the FIRST attempt, then backs off until another 15s before retrying — with no cap on attempts', async () => {
+  it('tries a sticky speaker once it has >=6s of quality speech, then backs off until another 15s before retrying — with no cap on attempts', async () => {
     const meetingId = `m-${Math.random()}`;
     // `computeEmbedding` is mocked to always return the SAME vector, so every
     // turn that reaches the registry at all (>= SPEAKER_MIN_SEGMENT_SEC, the
@@ -392,22 +392,19 @@ describe('chunk-worker processChunk — profile-match retry backoff (no cap, gat
     await processChunk(ctx(), { roomId: 'room-1', meetingId, seq: 0, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 0, endMs: 9_000, final: true }] }, new AbortController().signal);
     expect(cachedProfilesMock).not.toHaveBeenCalled();
 
-    // Part 1 [60000,120000): turn 2, +2s -> sticky (11s, 2 turns) but only 11s quality speech, still < 15s.
+    // Part 1 [60000,120000): turn 2, +2s -> sticky (11s, 2 turns) with 11s of quality speech (>= 6s) — first attempt fires this chunk.
     currentChunkPcm = toneChunk(60);
     await processChunk(ctx(), { roomId: 'room-1', meetingId, seq: 1, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 60_000, endMs: 62_000, final: true }] }, new AbortController().signal);
-    expect(cachedProfilesMock).not.toHaveBeenCalled();
-
-    // Part 2 [120000,180000): turn 3, +4s -> 15s quality speech total — first attempt fires this chunk.
-    currentChunkPcm = toneChunk(60);
-    await processChunk(ctx(), { roomId: 'room-1', meetingId, seq: 2, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 120_000, endMs: 124_000, final: true }] }, new AbortController().signal);
     expect(cachedProfilesMock).toHaveBeenCalledTimes(1);
 
-    // Part 3 [180000,240000): turn 4, +2s only -> backed off right after the last attempt (2s < 15s), no new call.
+    // Parts 2-3: +4s, +2s -> only 6s since the last attempt (< 15s), backed off, no new call.
+    currentChunkPcm = toneChunk(60);
+    await processChunk(ctx(), { roomId: 'room-1', meetingId, seq: 2, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 120_000, endMs: 124_000, final: true }] }, new AbortController().signal);
     currentChunkPcm = toneChunk(60);
     await processChunk(ctx(), { roomId: 'room-1', meetingId, seq: 3, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 180_000, endMs: 182_000, final: true }] }, new AbortController().signal);
     expect(cachedProfilesMock).toHaveBeenCalledTimes(1);
 
-    // Part 4 [240000,300000): turn 5, +15s more quality speech since the last attempt -> retries, no cap on the number of attempts.
+    // Part 4 [240000,300000): turn 5, +15s more -> 21s since the last attempt -> retries, no cap on the number of attempts.
     currentChunkPcm = toneChunk(60);
     await processChunk(ctx(), { roomId: 'room-1', meetingId, seq: 4, durationMs: 60_000, segments: [{ speaker: 's0:1', startMs: 240_000, endMs: 255_000, final: true }] }, new AbortController().signal);
     expect(cachedProfilesMock).toHaveBeenCalledTimes(2);

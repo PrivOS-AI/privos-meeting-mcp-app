@@ -11,6 +11,7 @@ import { AppError } from '../../shared/app-error.js';
 import { meetingId8 } from '../../shared/meeting-slug.js';
 import { DEFAULT_WORKSPACE_SETTINGS } from '../../shared/app-settings.js';
 import { finishLiveSession } from '../asr/live-asr-session.js';
+import { stopBrowserAudio } from '../browser-audio/browser-audio-listener.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { getSetting } from '../hub/app-settings.js';
 import { upsertMeeting } from '../jobs/meeting-repository.js';
@@ -79,6 +80,8 @@ export const processTool: AppTool = {
 
     const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
     if (!folderId) throw new AppError('Meeting has no storage folder yet — cannot process.', 'INVALID_STATE');
+    // A meeting recorded from the Room browser: its last part is uploaded before the parts are listed.
+    await stopBrowserAudio(meetingId);
     const parts = await discoverParts(runtime, roomId, folderId, meetingId);
     if (parts.length === 0) throw new AppError('Meeting has no recording parts to process.', 'INVALID_STATE');
 

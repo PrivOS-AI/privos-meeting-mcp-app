@@ -96,23 +96,26 @@ describe('MeetingSessionRegistry', () => {
     expect(snap.filter((s) => !s.mergedInto)).toHaveLength(2);
   });
 
-  it('(f) sticky only turns on after >=2 turns AND >= LIVE_MIN_SPEECH_SEC of speech; a profile-match candidate additionally needs >=15s of quality speech before its first attempt', () => {
+  it('(f) sticky only turns on after >=2 turns AND >= LIVE_MIN_SPEECH_SEC of speech; the first profile-match attempt additionally needs >=6s of quality speech', () => {
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 9, seg('s0:1', 0)); // enough speech, but only 1 turn
     expect(reg.candidatesForProfileMatch()).toHaveLength(0);
 
-    reg.observe('s0:1', vec(0.99, 0.14), 1, seg('s0:1', 12000)); // 2nd turn -> now sticky (10s total), but this short turn (<SPEAKER_UPDATE_MIN_SEGMENT_SEC) never clears UPDATE, so quality speech is still just 9s (<15s)
-    expect(reg.candidatesForProfileMatch()).toHaveLength(0);
-
-    reg.observe('s0:1', vec(0.99, 0.14), 6, seg('s0:1', 20000)); // +6s of quality speech -> 15s total -> now a candidate
+    reg.observe('s0:1', vec(0.99, 0.14), 1, seg('s0:1', 12000)); // 2nd turn -> now sticky (10s total); 9s of quality speech >= 6s -> a candidate
     expect(reg.candidatesForProfileMatch()).toHaveLength(1);
+
+    const short = new MeetingSessionRegistry('m2');
+    short.observe('s0:1', vec(1, 0), 5, seg('s0:1', 0));
+    for (let i = 1; i <= 3; i++) short.observe('s0:1', vec(0.99, 0.14), 1, seg('s0:1', i * 3000)); // short turns (<SPEAKER_UPDATE_MIN_SEGMENT_SEC): sticky at 8s, but quality speech is still 5s
+    expect(short.candidatesForProfileMatch()).toHaveLength(0);
+    short.observe('s0:1', vec(0.99, 0.14), 2, seg('s0:1', 12000)); // +2s of quality speech -> 7s -> a candidate
+    expect(short.candidatesForProfileMatch()).toHaveLength(1);
   });
 
   it('candidatesForProfileMatch retries after another >=15s of quality speech since the last attempt, with NO cap on the number of attempts', () => {
     const reg = new MeetingSessionRegistry('m1');
     reg.observe('s0:1', vec(1, 0), 9, seg('s0:1', 0));
     reg.observe('s0:1', vec(0.99, 0.14), 1, seg('s0:1', 12000)); // rejected-short, no quality contribution
-    reg.observe('s0:1', vec(0.99, 0.14), 6, seg('s0:1', 20000)); // 15s quality speech -> a candidate
     const id = reg.snapshot()[0].sessionSpeakerId;
     expect(reg.candidatesForProfileMatch()).toEqual([id]);
 

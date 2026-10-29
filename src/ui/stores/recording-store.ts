@@ -22,6 +22,7 @@ import { startHostMicStream } from '../data/host-mic-stream.js';
 import { listParts, notifyChunkReady, uploadPart } from '../data/meeting-part-upload.js';
 import { uploadLiveCaptions, type CaptionExportLine } from '../data/meeting-caption-upload.js';
 import { PartUploadQueue } from '../data/part-upload-queue.js';
+import { createBrowserAudioConnection, type BrowserAudioProblem, type BrowserAudioResponse, type BrowserAudioState } from '../data/browser-audio-client.js';
 import { createRealtimeClient, type CaptionEvent, type CaptionStatus, type LiveTurn, type RealtimeConnection } from '../data/realtime-client.js';
 import { LiveSpeakerPoll, type LiveSpeaker, type ServerTurn } from '../data/live-speaker-poll.js';
 import { speakerResolve, type RealtimeAssignChoice } from '../data/speaker-api.js';
@@ -96,8 +97,14 @@ export interface RecordingState {
   bookmarkIdsBySec: Record<number, string>;
   /** Bumped on every bookmark add/remove so the side panel refetches its list. */
   bookmarkRev: number;
+  /** Where the audio comes from: this device's microphone, or the Room's shared browser (a Google Meet call it joined). */
+  captureSource: CaptureSource;
+  /** Room-browser recordings: the server listener's state and, while it cannot hear the browser, why. */
+  browserAudio?: { state: BrowserAudioState; problem?: BrowserAudioProblem };
   error?: string;
 }
+
+export type CaptureSource = 'mic' | 'browser';
 
 export interface StartRecordingInput {
   title: string;
@@ -107,6 +114,8 @@ export interface StartRecordingInput {
   translationEnabled: boolean;
   /** The recorder confirmed they told participants about voiceprint recognition (only asked while it is on). */
   voiceprintNoticeAcknowledged?: boolean;
+  /** `browser`: record the Room's shared browser (server-side) instead of this device's microphone. */
+  captureSource?: CaptureSource;
 }
 
 const PALETTE = ['blue', 'gold', 'green', 'purple', 'red', 'teal'];
@@ -142,6 +151,7 @@ function initialState(): RecordingState {
     showSpeakerLabels: true,
     showTranslation: false,
     wakeLock: { supported: false, active: false },
+    captureSource: 'mic',
   };
 }
 
@@ -490,6 +500,7 @@ export class RecordingStore {
   async startRecording(input: StartRecordingInput): Promise<void> {
     this.meetingLanguage = input.language;
     this.translationTarget = input.translationLang;
+    const fromBrowser = input.captureSource === 'browser';
     try {
       // Guard the async host context: without a room every downstream call
       // (meeting row, Files folder, realtime token) is meaningless, and a
@@ -500,7 +511,8 @@ export class RecordingStore {
       // the host (it records under its own origin) and rebuild a MediaStream the
       // recorder + realtime SDK can consume. An older host without brokered mic
       // returns `unsupported` — only then fall back to direct getUserMedia.
-      const stream = await this.acquireMicStream();
+      // A Room-browser recording opens no microphone: the app's server reads the browser's audio.
+      const stream = fromBrowser ? null : await this.acquireMicStream();
       this.stream = stream;
 
       this.wakeLock = new ScreenWakeLock({ onChange: (wakeLock) => this.setState({ wakeLock }) });
@@ -545,7 +557,15 @@ export class RecordingStore {
         showTranslation: input.translationEnabled,
         stageCaptionSize: prefs.stageCaptionSize,
         showSpeakerLabels: prefs.showLiveSpeakerLabels,
+        captureSource: fromBrowser ? 'browser' : 'mic',
       });
+
+      if (fromBrowser) {
+        // The server records the parts itself; this tab only shows captions.
+        this.timer = setInterval(() => this.tickElapsed(), 1000);
+        await this.startBrowserAudio(meetingId, input.translationEnabled);
+        return;
+      }
 
       this.uploadQueue = new PartUploadQueue(
         (part) => this.handleUpload(meetingId, folderId, part),
@@ -561,7 +581,7 @@ export class RecordingStore {
       );
 
       this.recorder = new MediaRecorderService(
-        stream,
+        stream!,
         recorderEpochMs,
         (part) => {
           this.uploadQueue?.enqueue(part.seq, part.blob, part.partStartMs, part.durationMs);
@@ -589,6 +609,62 @@ export class RecordingStore {
   }
 
   // ------------------------------------------------------------ realtime
+
+  private browserAudioCall(meetingId: string, action: 'start' | 'poll' | 'stop', cursor = 0): Promise<BrowserAudioResponse> {
+    return this.app
+      .callServerTool({ name: 'meeting_browser_audio', arguments: { roomId: this.ctx.roomId, meetingId, action, cursor } })
+      .then((raw) => parseToolResultOrThrow(raw) as unknown as BrowserAudioResponse);
+  }
+
+  /** Room-browser recording: the server starts listening; captions and speakers come from its live session, as for `local`. */
+  private async startBrowserAudio(meetingId: string, translationEnabled: boolean): Promise<void> {
+    const started = await this.browserAudioCall(meetingId, 'start');
+    this.setState({
+      provider: 'local',
+      capabilities: { translation: false, speakerLabels: false, liveSpeakers: true },
+      browserAudio: { state: started.state, ...(started.problem ? { problem: started.problem } : {}) },
+    });
+    if (translationEnabled) {
+      this.translateBuffer = new TranslateBuffer(this.app, {
+        roomId: this.ctx.roomId,
+        meetingId,
+        target: this.translationTarget,
+        onTranslated: (translations) => {
+          const lines = [...this.state.lines];
+          for (const t of translations) {
+            const idx = lines.findIndex((l) => l.id === t.id);
+            if (idx >= 0) lines[idx] = { ...lines[idx], translation: t.text };
+          }
+          this.setState({ lines });
+        },
+      });
+    }
+    this.speakerPoll = new LiveSpeakerPoll(this.app, {
+      roomId: this.ctx.roomId,
+      meetingId,
+      onUpdate: (speakers, turns, meta) => this.applyPollUpdate(speakers, turns, meta),
+    });
+    this.realtime = createBrowserAudioConnection({
+      poll: (cursor) => this.browserAudioCall(meetingId, 'poll', cursor),
+      onStarted: (sessionIndex) => {
+        this.clock?.registerSessionStart(sessionIndex);
+        this.setState({ sessionIndex });
+      },
+      onCaption: (event) => {
+        const speakerMap = { ...this.state.speakerMap };
+        const lines = applyCaption(this.state.lines, event, speakerMap);
+        this.setState({ lines, speakerMap });
+        if (this.translateBuffer && event.kind === 'final' && !event.translationOf) {
+          this.translateBuffer.push({ id: event.id, text: event.text, lang: event.lang });
+        }
+      },
+      onStatus: (status) => this.setState({ captionStatus: status }),
+      onBrowserState: (state, problem) => {
+        const current = this.state.browserAudio;
+        if (current?.state !== state || current?.problem !== problem) this.setState({ browserAudio: { state, ...(problem ? { problem } : {}) } });
+      },
+    });
+  }
 
   private async startRealtime(meetingId: string, translationEnabled: boolean): Promise<void> {
     let token: RealtimeToken;
@@ -947,6 +1023,11 @@ export class RecordingStore {
     const deadline = Date.now() + 30_000;
     while ((this.uploadQueue?.pendingCount ?? 0) > 0 && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    // Room-browser recording: the server uploads its last part before the parts are counted.
+    if (this.state.captureSource === 'browser') {
+      await this.browserAudioCall(meetingId, 'stop').catch((error) => console.warn('meeting_browser_audio stop failed (meeting_process stops it too):', error));
     }
 
     // Final caption flush so the last (<60s) lines are saved before processing.

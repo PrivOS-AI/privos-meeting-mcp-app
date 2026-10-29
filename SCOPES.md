@@ -10,7 +10,7 @@ before `meeting_bootstrap`.
 |---|---|---|---|---|
 | `basic:information` | required | both | `src/server/index.ts` (boot credential check, `GET /api/v1/me`), `src/server/tools/bot-credential-check-tool.ts` | — |
 | `files:read` | required | both | `src/server/media/hub-file-download.ts` (metadata, list, download of audio parts, transcripts, summaries) | — |
-| `files:write` | required | both | `src/server/files/hub-file-upload.ts` (upload merged audio, transcript, summary; `qa.md` from `meeting_save_answer`, `notes.md` from `meeting_notes_save`), `src/server/media/hub-file-download.ts` (delete original audio and the live working files after processing) | — |
+| `files:write` | required | both | `src/server/files/hub-file-upload.ts` (upload merged audio, transcript, summary; `qa.md` from `meeting_save_answer`, `notes.md` from `meeting_notes_save`; the audio parts of a meeting recorded from the Room browser, `browser-audio/browser-audio-listener.ts`), `src/server/media/hub-file-download.ts` (delete original audio and the live working files after processing) | — |
 | `db:schema:read` | required | both | `src/server/hub/app-db-bot-client.ts` (`mcpapp.db.getSchema`, `mcpapp.db.listCollections`) | — |
 | `db:schema:write` | required | both | `src/server/hub/app-db-bot-client.ts` (register collections in `meeting_bootstrap`) | — |
 | `db:read` | required | both | `src/server/hub/app-db-bot-client.ts` (`mcpapp.db.query`, `mcpapp.db.get`); `src/ui/data/app-db-client.ts` (history, detail screens) | — |

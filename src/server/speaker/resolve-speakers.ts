@@ -133,8 +133,8 @@ export function openPendingEmbedding(json: string, expectedProfileId: string): {
   };
 }
 
-/** Historical post-meeting coherence rule, unchanged: a single picked range is trivially coherent (its own `minPairwiseCosine` is forced to 1 at seal time); two or more ranges must clear `threshold`. */
-export function isPostMeetingCoherent(pending: { minPairwiseCosine: number; rangeCount: number }, threshold: number): boolean {
+/** Post-meeting coherence rule: a single picked range is trivially coherent (its own `minPairwiseCosine` is forced to 1 at seal time); two or more ranges must clear `SPEAKER_COHERENCE_THRESHOLD`. */
+export function isPostMeetingCoherent(pending: { minPairwiseCosine: number; rangeCount: number }, threshold: number = env.speakerCoherenceThreshold): boolean {
   return pending.rangeCount < 2 || pending.minPairwiseCosine >= threshold;
 }
 
@@ -301,7 +301,7 @@ export async function resolveSpeakers(
     }
 
     const coherence = minPairwiseCosine(rangeEmbeddings);
-    const coherent = coherence >= threshold;
+    const coherent = isPostMeetingCoherent({ minPairwiseCosine: coherence, rangeCount: rangeEmbeddings.length });
     const representative = averageVectors(rangeEmbeddings);
     const sampleRange = plan.ranges[0];
 

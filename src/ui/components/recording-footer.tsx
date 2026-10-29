@@ -13,16 +13,18 @@ export interface RecordingFooterProps {
   ending: boolean;
   /** The live waveform, shown between the controls. */
   waveform?: ReactNode;
+  /** False for a Room-browser recording: there is no microphone here to mute, and the server keeps listening. */
+  showCaptureControls?: boolean;
   onToggleMute(): void;
   onTogglePause(): void;
   onEnd(): void;
 }
 
-export function RecordingFooter({ muted, paused, ending, waveform, onToggleMute, onTogglePause, onEnd }: RecordingFooterProps) {
+export function RecordingFooter({ muted, paused, ending, waveform, showCaptureControls = true, onToggleMute, onTogglePause, onEnd }: RecordingFooterProps) {
   const { t } = useI18n();
   return (
     <div className="ma-rec-footer">
-      <div className="ma-rec-footer__group">
+      <div className="ma-rec-footer__group" hidden={!showCaptureControls}>
         <button type="button" className="ma-rec-footer__icon-btn" aria-pressed={muted} aria-label={t('recording.footer.mute')} onClick={onToggleMute}>
           <Icon name={muted ? 'microphone-off' : 'microphone'} size={20} />
         </button>

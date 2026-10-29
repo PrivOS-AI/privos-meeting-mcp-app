@@ -41,7 +41,8 @@ describe('meeting_stt_status', () => {
     const roomless = context();
     (roomless.actor as { roomId?: string }).roomId = undefined;
     const result = (await sttStatusTool.execute({}, roomless, {} as never)) as Record<string, unknown>;
-    expect(Object.keys(result)).toEqual(['ok']);
+    // Plus `browserAudio` (a deployment capability every member's new-meeting screen needs) — never a vendor name, model or usage.
+    expect(Object.keys(result).sort()).toEqual(['browserAudio', 'ok']);
   });
 
   it.each([
@@ -49,7 +50,8 @@ describe('meeting_stt_status', () => {
     ['a caller whose dispatch carries no role signal', {}],
   ])('%s only gets {ok}', async (_label, roles) => {
     const result = (await sttStatusTool.execute({}, context(roles), {} as never)) as Record<string, unknown>;
-    expect(Object.keys(result)).toEqual(['ok']);
+    // Plus `browserAudio` (a deployment capability every member's new-meeting screen needs) — never a vendor name, model or usage.
+    expect(Object.keys(result).sort()).toEqual(['browserAudio', 'ok']);
   });
 
   it('an admin caller gets the full status shape with both vendors, never a key', async () => {

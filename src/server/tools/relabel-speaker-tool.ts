@@ -18,7 +18,7 @@ import { sanitizeDisplayName } from '../../shared/sanitize-display-name.js';
 import { AppError } from '../../shared/app-error.js';
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
 import * as profileStore from '../speaker/profile-store.js';
-import { isPostMeetingCoherent, isSpeakerRecognitionEnabled, openPendingEmbedding, readMatchThreshold } from '../speaker/resolve-speakers.js';
+import { isPostMeetingCoherent, isSpeakerRecognitionEnabled, openPendingEmbedding } from '../speaker/resolve-speakers.js';
 import { logEvent } from '../speaker/speaker-diagnostics-log.js';
 import { isWorkspaceAdmin, requireMeetingOwner, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
@@ -89,8 +89,7 @@ export const relabelSpeakerTool: AppTool = {
       const pendingJson = typeof row.pendingEmbedding === 'string' && row.pendingEmbedding ? row.pendingEmbedding : null;
       const pending = pendingJson ? openPendingEmbedding(pendingJson, `pending:${meetingId}:${speakerId}`) : null;
       if (pending) {
-        const threshold = await readMatchThreshold(db);
-        const coherent = isPostMeetingCoherent(pending, threshold);
+        const coherent = isPostMeetingCoherent(pending);
         if (coherent) {
           movedVector = pending.vector;
           movedDurationSec = pending.durationSec;

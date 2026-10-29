@@ -14,6 +14,7 @@ import { requireVerifiedActor } from './authz.js';
 import { canManageRoomSettings } from './can-manage-room-settings.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { env } from '../env.js';
+import { browserAudioConfigured } from '../browser-audio/browser-audio-listener.js';
 import { allProviderStatuses, realtimeProviderFor, resolveAsyncVendor, resolveRealtimeVendor } from '../stt/stt-provider-registry.js';
 import { countActiveRealtimeRecordings } from './realtime-token-tool.js';
 import type { AppTool } from './registry.js';
@@ -34,7 +35,8 @@ export const sttStatusTool: AppTool = {
       // Not a room owner/moderator or workspace admin: only "is the currently active realtime provider usable" —
       // never the vendor name, model, or usage.
       const ok = realtimeVendor ? (await realtimeProviderFor(realtimeVendor).status()).ok : false;
-      return { ok };
+      // `browserAudio`: the Room browser can be recorded instead of the microphone (deployment setting, nothing secret).
+      return { ok, browserAudio: browserAudioConfigured() };
     }
 
     const [statuses, asyncVendor, activeSessions] = await Promise.all([
@@ -48,6 +50,7 @@ export const sttStatusTool: AppTool = {
       activeRealtimeProvider: realtimeVendor,
       activeAsyncProvider: asyncVendor,
       providers: statuses,
+      browserAudio: browserAudioConfigured(),
       liveConcurrency: { active: activeSessions, max: env.liveMaxConcurrentRecordings },
       checkedAt: new Date().toISOString(),
     };

@@ -7,6 +7,7 @@ import { usePrivosApp, usePrivosContext } from '@privos_ai/app-react';
 
 import { BookmarksPanel } from '../components/bookmarks-panel.js';
 import { CapacityNotice } from '../components/capacity-notice.js';
+import { BrowserAudioNotice } from '../components/browser-audio-notice.js';
 import { CaptionLine } from '../components/caption-line.js';
 import { DegradedLabelsNotice } from '../components/degraded-labels-notice.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -85,6 +86,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
       muted={state.muted}
       paused={state.status === 'paused'}
       ending={state.status === 'ending'}
+      showCaptureControls={state.captureSource === 'mic'}
       waveform={<VoiceWaveform stream={store.getStream()} muted={state.muted} speakers={pickerSpeakers} activeKey={activeSpeakerKey} />}
       onToggleMute={() => store.toggleMute()}
       onTogglePause={() => store.togglePause()}
@@ -96,6 +98,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
     <>
       {!state.wakeLock.supported || state.wakeLock.error ? <KeepAwakeNotice /> : null}
       {state.captionStatus === 'capacity' ? <CapacityNotice /> : null}
+      {state.browserAudio?.problem ? <BrowserAudioNotice problem={state.browserAudio.problem} /> : null}
       <UploadStatusNotice pendingParts={state.pendingParts} lostParts={state.lostParts} issue={state.uploadIssue} />
       {state.capabilities && !(state.capabilities.liveSpeakers ?? state.capabilities.speakerLabels) ? <DegradedLabelsNotice /> : null}
     </>

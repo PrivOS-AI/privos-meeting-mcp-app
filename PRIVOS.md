@@ -44,6 +44,21 @@ differs from the one locked for the current version. The container log has one
 `[ui] resources/read …` line per UI read: a Hub that reads only `shell` and
 never the assets it names is serving a stale asset set.
 
+### Recording from the Room browser (Google Meet)
+
+A meeting can be recorded from the Room's shared browser (PrivOS Remote Browser
+sitting in a Google Meet call) instead of the microphone. The app server reads
+Remote Browser's `GET /audio-tap?roomId=` (raw 16 kHz PCM) directly, because
+PrivOS has no app-to-app call yet; `src/server/browser-audio/`. To turn it on:
+
+- set the same random secret (32+ characters) as `REMOTE_BROWSER_AUDIO_TAP_KEY`
+  in both apps' `.env`, and `REMOTE_BROWSER_AUDIO_URL` in this app's (the
+  Remote Browser controller, e.g. `http://remote-browser-dev:8787`);
+- put both containers on one Docker network (`docker network connect`), so the
+  URL resolves without publishing the route anywhere new.
+
+Unset, the "Audio source" choice is hidden and nothing changes.
+
 ## Settings
 
 - STT provider (built-in by default; Soniox/ElevenLabs, realtime + async) is switched from Settings

@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.2.0] — 2026-10-29
+
+- **Record a Google Meet call through the Room's shared browser.** When the
+  deployment links PrivOS Remote Browser, "Audio source" on the new-meeting
+  screen offers the Room's browser besides this device's microphone. Open
+  Remote Browser, join the call there, start: no microphone, headphones are
+  fine.
+  - The server reads Remote Browser's `GET /audio-tap` (16 kHz PCM; shared
+    operator secret `REMOTE_BROWSER_AUDIO_TAP_KEY`, URL `REMOTE_BROWSER_AUDIO_URL`).
+    It feeds the same live session (captions, live speakers), and encodes the
+    usual 60 s `audio.part-*` webm parts itself, so processing is unchanged.
+  - A gap in the stream becomes silence, so caption times and bookmarks keep
+    wall-clock time. A dropped stream is retried every 4 s, and the screen says
+    why it cannot hear the browser (none running, no audio, busy, unreachable).
+  - New tool `meeting_browser_audio` (`start` / `poll` / `stop`, meeting owner
+    only). `meeting_process` stops a running listener before listing parts.
+  - Checked end to end on the dev server: Remote Browser (sandboxed Chromium,
+    production security options) played speech, and this app captioned every
+    sentence and saved a part that decodes.
+- Voice memory recognises people who only take short turns. The post-meeting
+  coherence check has its own bar (`SPEAKER_COHERENCE_THRESHOLD`, default 0.3)
+  instead of the 0.5 naming threshold. Two 2–3 s ranges of one person score
+  about 0.35–0.6 against each other, while a cluster mixing two voices scores
+  0.1 or less. Before, such speakers were parked unnamed and never enrolled.
+- Live: a returning person is matched against saved voiceprints once they are
+  sticky with 6 s of clean speech, instead of after 15 s. Retries still need
+  another 15 s.
+- `scripts/eval-voice-memory.ts` runs the cross-meeting path end to end with the
+  real code: enrol in meeting 1 (sealed vectors), recognise in meeting 2 (live
+  registry and `resolveSpeakers`), with a stranger who must stay unnamed.
+  `scripts/eval-speakers.ts` measures voiceprint separation by segment length
+  and noise.
+
 ## [1.1.0] — 2026-10-28
 
 Marketplace packaging, built-in speech recognition and meeting intelligence.

@@ -2,7 +2,7 @@
   "schemaVersion": 3,
   "kind": "mcp-app",
   "name": "ai.privos.meeting-agent",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "title": "PrivOS Meeting App",
   "description": "A PrivOS MCP app for offline meeting capture: bilingual live captions with speaker labels, cross-session speaker identity via voiceprints, Hub-AI summaries, and transcript storage in PrivOS Files.",
   "icon": "/public/icon.svg",
@@ -907,6 +907,44 @@
       }
     },
     {
+      "name": "meeting_browser_audio",
+      "title": "Record from the Room browser",
+      "description": "Record a meeting from the Room's shared browser (for example a Google Meet call it joined) instead of the microphone: start, poll for live captions, stop — only the meeting owner.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "roomId",
+          "meetingId",
+          "action"
+        ],
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "meetingId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "start",
+              "poll",
+              "stop"
+            ]
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000
+          }
+        }
+      }
+    },
+    {
       "name": "meeting_ask",
       "title": "Ask about a meeting",
       "description": "Answer a question about one meeting from its transcript (or, while it runs, the captions so far), citing the lines that support the answer. Nothing is stored.",
@@ -1246,6 +1284,18 @@
       "key": "VOICEPRINT_ENC_KEY",
       "description": "32-byte AES-256-GCM key, base64. LOSING THIS KEY = LOSING ALL VOICEPRINTS — back it up.",
       "required": true,
+      "secret": true
+    },
+    {
+      "key": "REMOTE_BROWSER_AUDIO_URL",
+      "description": "Optional. PrivOS Remote Browser controller on this deployment (e.g. http://remote-browser:8787): meetings can then be recorded from the Room browser.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "REMOTE_BROWSER_AUDIO_TAP_KEY",
+      "description": "Optional. The same secret Remote Browser has in REMOTE_BROWSER_AUDIO_TAP_KEY (32+ chars). Both unset: the Room-browser option is hidden.",
+      "required": false,
       "secret": true
     },
     {

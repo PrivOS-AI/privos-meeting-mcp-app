@@ -82,7 +82,19 @@ export interface AppEnv {
   liveEnrolMinSpeechSec: number;
   /** Own coherence bar for the live one-shot enrol decision — a min-pairwise-cosine over ~2-5s noisy shared-mic turns is a different distribution than the post-meeting picked-range coherence, so it must not share `speakerMatchThreshold`. */
   speakerLiveEnrolCoherence: number;
+  /**
+   * Post-meeting coherence bar: the minimum pairwise cosine between a speaker's picked ranges before their
+   * averaged vector is trusted (matched, auto-enrolled, or enrolled on a later confirmation). Its own value,
+   * not `speakerMatchThreshold`: two 2-3 s ranges of ONE person score ~0.35-0.6 against each other, while a
+   * cluster that mixes two voices scores ~0.1 or lower — so the 0.5 naming bar wrongly parked people who
+   * only took short turns.
+   */
+  speakerCoherenceThreshold: number;
   voiceprintEncKey?: string;
+  /** PrivOS Remote Browser controller on the same deployment (`REMOTE_BROWSER_AUDIO_URL`), e.g. `http://remote-browser:8787` — meetings recorded from the Room's shared browser read its `/audio-tap`. */
+  remoteBrowserAudioUrl?: string;
+  /** The operator secret Remote Browser's `REMOTE_BROWSER_AUDIO_TAP_KEY` is set to. Both unset: the option is hidden. */
+  remoteBrowserAudioTapKey?: string;
   summaryModel?: string;
   /** Hub AI provider id paired with `summaryModel` (Hub default when unset). */
   summaryProvider?: string;
@@ -145,7 +157,10 @@ export function loadEnv(): AppEnv {
     liveChunkOverlapSec: num('LIVE_CHUNK_OVERLAP_SEC', 8),
     liveEnrolMinSpeechSec: num('LIVE_ENROL_MIN_SPEECH_SEC', 20),
     speakerLiveEnrolCoherence: num('SPEAKER_LIVE_ENROL_COHERENCE', 0.5),
+    speakerCoherenceThreshold: num('SPEAKER_COHERENCE_THRESHOLD', 0.3),
     voiceprintEncKey: str('VOICEPRINT_ENC_KEY'),
+    remoteBrowserAudioUrl: str('REMOTE_BROWSER_AUDIO_URL'),
+    remoteBrowserAudioTapKey: str('REMOTE_BROWSER_AUDIO_TAP_KEY'),
     summaryModel: str('SUMMARY_MODEL'),
     summaryProvider: str('SUMMARY_PROVIDER'),
     translateModel: str('TRANSLATE_MODEL'),
