@@ -32,7 +32,9 @@ import { listActionItems, listDecisions, type ActionItemRecord, type DecisionRec
 import { downloadMeetingDocx, downloadMeetingSrt } from '../data/meeting-export.js';
 import { getMeeting, listSpeakersForMeetings, renameMeeting, type MeetingReadModel, type MeetingSpeakerSummary } from '../data/meeting-read-model.js';
 import { useAiChatContext } from '../data/chat-context.js';
-import { resolveFileUrl } from '../data/file-download.js';
+import { copyText } from '../data/copy-text.js';
+import { filesFolderUrl } from '../data/open-in-files.js';
+import { usePeople } from '../data/people.js';
 import { labelUnnamedSpeakers } from '../data/speaker-labels.js';
 import { loadTranscript, resolveAudioUrl, type TranscriptDoc } from '../data/transcript-loader.js';
 import { useI18n } from '../i18n/i18n-provider.js';
@@ -52,7 +54,8 @@ const SAVE_TO_FILES_ARTIFACTS: Array<{ labelKey: string; key: keyof MeetingReadM
 
 export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenProps) {
   const app = usePrivosApp();
-  const { roomId, userId } = usePrivosContext();
+  const { roomId, userId, roomName } = usePrivosContext();
+  const people = usePeople();
   const { t, language } = useI18n();
   const playerRef = useRef<AudioPlayerHandle>(null);
 
@@ -79,6 +82,8 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioErrored, setAudioErrored] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The shared link, and whether it reached the clipboard (if not, it is shown to copy by hand). */
+  const [shareLink, setShareLink] = useState<{ url: string; copied: boolean } | null>(null);
   const [audioUnavailable, setAudioUnavailable] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -188,11 +193,19 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
   }
 
-  async function shareSummary(): Promise<void> {
-    if (!meeting?.summaryFileId) return;
+  // Shares the meeting's folder in the room's Files (transcript, summary, notes): a Hub link room
+  // members can open, unlike a file's download URL, which expires (or is a blob of this tab).
+  async function shareMeeting(): Promise<void> {
+    if (!meeting?.folderId) return;
     try {
-      const { url } = await resolveFileUrl(app, meeting.summaryFileId, 'text/markdown');
-      await navigator.clipboard.writeText(url);
+      const url = await filesFolderUrl(app, { id: roomId, name: roomName }, meeting.folderId, people.hubOrigin);
+      if (!url) {
+        setError(t('detail.shareUnavailable'));
+        return;
+      }
+      const copied = await copyText(url);
+      setShareLink({ url, copied });
+      if (copied) setTimeout(() => setShareLink((current) => (current?.url === url ? null : current)), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -310,18 +323,32 @@ export function MeetingDetailScreen({ meetingId, onBack }: MeetingDetailScreenPr
           </p>
         ) : null}
 
+        {shareLink ? (
+          <div className="ma-detail__share" role="status">
+            <Icon name={shareLink.copied ? 'checkmark-circle' : 'share'} size={16} />
+            {shareLink.copied ? (
+              <span>{t('detail.shareCopied')}</span>
+            ) : (
+              <>
+                <span>{t('detail.shareCopyHint')}</span>
+                <input className="ma-detail__share-link" readOnly value={shareLink.url} onFocus={(e) => e.currentTarget.select()} autoFocus />
+              </>
+            )}
+          </div>
+        ) : null}
+
         <MeetingDetailActions
           roomId={roomId}
           meetingId={meetingId}
           canBookmark={Boolean(audioUrl)}
-          canShare={Boolean(meeting.summaryFileId)}
+          canShare={Boolean(meeting.folderId)}
           hasSummary={Boolean(meeting.summaryText)}
           sentToChatAt={meeting.sentToChatAt}
           onBookmarkHere={() => void addBookmarkHere()}
           onExportSrt={() => void runExport(() => downloadMeetingSrt(app, meeting))}
           onExportDocx={() => void runExport(() => downloadMeetingDocx(app, meeting))}
           onSaveToFiles={() => setShowSaveModal(true)}
-          onShare={() => void shareSummary()}
+          onShare={() => void shareMeeting()}
           onSentToChat={() => void reload()}
         />
 

@@ -293,6 +293,9 @@
   "detail.audioDeleted": "L'audio original a été supprimé conformément au paramètre de stockage",
   "detail.saveToFiles": "Enregistrer dans Files",
   "detail.share": "Partager",
+  "detail.shareCopied": "Lien vers le dossier de la réunion dans Fichiers copié — les membres du salon peuvent l’ouvrir.",
+  "detail.shareCopyHint": "Copiez ce lien vers le dossier de la réunion dans Fichiers :",
+  "detail.shareUnavailable": "Impossible de créer un lien vers cette réunion dans Fichiers.",
 
   "bookmarks.empty": "Aucun favori pour l'instant.",
   "bookmarks.delete": "Supprimer le favori",

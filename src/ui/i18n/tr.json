@@ -295,6 +295,9 @@
   "detail.audioDeleted": "Orijinal ses, depolama ayarı gereği silindi",
   "detail.saveToFiles": "Dosyalar'a kaydet",
   "detail.share": "Paylaş",
+  "detail.shareCopied": "Dosyalar’daki toplantı klasörünün bağlantısı kopyalandı — oda üyeleri açabilir.",
+  "detail.shareCopyHint": "Dosyalar’daki toplantı klasörünün bağlantısını kopyalayın:",
+  "detail.shareUnavailable": "Dosyalar’da bu toplantıya bağlantı oluşturulamadı.",
 
   "bookmarks.empty": "Henüz yer imi yok.",
   "bookmarks.delete": "Yer imini sil",

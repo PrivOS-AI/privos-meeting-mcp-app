@@ -293,6 +293,9 @@
   "detail.audioDeleted": "保存設定に従い、元の音声は削除されました",
   "detail.saveToFiles": "Filesに保存",
   "detail.share": "共有",
+  "detail.shareCopied": "ファイル内の会議フォルダへのリンクをコピーしました。ルームのメンバーが開けます。",
+  "detail.shareCopyHint": "ファイル内の会議フォルダへのリンクをコピーしてください：",
+  "detail.shareUnavailable": "ファイル内のこの会議へのリンクを作成できませんでした。",
 
   "bookmarks.empty": "ブックマークはまだありません。",
   "bookmarks.delete": "ブックマークを削除",

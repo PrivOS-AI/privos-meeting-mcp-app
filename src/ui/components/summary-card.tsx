@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { parseToolResult, usePrivosApp } from '@privos_ai/app-react';
 
+import { copyText } from '../data/copy-text.js';
 import { useI18n } from '../i18n/i18n-provider.js';
 import { MarkdownText } from './markdown-text.js';
 import { Icon } from './icon.js';
@@ -46,12 +47,10 @@ export function SummaryCard({ roomId, meetingId, summaryText, keyTopics, summary
 
   async function copy(): Promise<void> {
     if (!summaryText) return;
-    try {
-      await navigator.clipboard.writeText(summaryText);
+    // Without the Clipboard API (blocked in the Hub's iframe) the text stays selectable on screen.
+    if (await copyText(summaryText)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard API can be unavailable in the opaque iframe origin — the text stays selectable regardless.
     }
   }
 

@@ -295,6 +295,9 @@
   "detail.audioDeleted": "Das Originalaudio wurde gemäß der Speichereinstellung gelöscht",
   "detail.saveToFiles": "In Files speichern",
   "detail.share": "Teilen",
+  "detail.shareCopied": "Link zum Ordner des Meetings in Dateien kopiert – Raummitglieder können ihn öffnen.",
+  "detail.shareCopyHint": "Diesen Link zum Meeting-Ordner in Dateien kopieren:",
+  "detail.shareUnavailable": "Es konnte kein Link zu diesem Meeting in Dateien erstellt werden.",
 
   "bookmarks.empty": "Noch keine Lesezeichen.",
   "bookmarks.delete": "Lesezeichen löschen",
