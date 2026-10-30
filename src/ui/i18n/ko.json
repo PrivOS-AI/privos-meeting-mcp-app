@@ -318,6 +318,8 @@
   "settings.agent.install": "룸 에이전트에 설치",
   "settings.agent.update": "스킬 업데이트",
   "settings.agent.installing": "설치 중…",
+  "settings.agent.scopesMissing": "PrivOS가 아직 이 앱에 {scopes} 권한을 주지 않았습니다. 워크스페이스 관리자가 관리 → 앱 → PrivOS Meeting App → 권한에서 승인하면 이 페이지에서 스킬을 설치할 수 있습니다.",
+  "settings.agent.retry": "다시 확인",
   "settings.agent.problem.not-allowed": "PrivOS가 허용하지 않았습니다. 업로드는 워크스페이스 관리자, 활성화는 룸 소유자가 필요합니다.",
   "settings.agent.problem.collocated": "이 룸의 Sandbox는 공유 모드라 스킬을 불러올 수 없습니다. 운영자에게 전용 모드로 바꿔 달라고 요청하세요.",
   "settings.agent.problem.failed": "설치에 실패했습니다. 다시 시도하세요.",

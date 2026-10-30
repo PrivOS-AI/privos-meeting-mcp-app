@@ -318,6 +318,8 @@
   "settings.agent.install": "为房间智能体安装",
   "settings.agent.update": "更新技能",
   "settings.agent.installing": "正在安装…",
+  "settings.agent.scopesMissing": "PrivOS 尚未授予此应用 {scopes} 权限。工作区管理员在 管理 → 应用 → PrivOS Meeting App → 权限 中批准后，即可在此页面安装技能。",
+  "settings.agent.retry": "重新检查",
   "settings.agent.problem.not-allowed": "PrivOS 不允许此操作：上传需要工作区管理员，启用需要房间所有者。",
   "settings.agent.problem.collocated": "此房间的 Sandbox 运行在共享模式，无法加载技能。请运维人员切换到专用模式。",
   "settings.agent.problem.failed": "安装失败，请重试。",

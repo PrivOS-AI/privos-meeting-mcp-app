@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.3] — 2026-10-30
+
+- Settings → Room agent says why installing the skill fails instead of only
+  "Installing the skill failed": the Hub's own error text is shown under the
+  message (and logged to the console), and a missing `sandbox:skills:use` /
+  `sandbox:agent-sets:upload` grant is named up front with where an admin
+  approves it. A refusal the Hub returns as an answer (`success: false`, or an
+  HTTP error status) is read as an error, and `data`/`body` wrapping is
+  unwrapped as Remote Browser does. A "Check again" button retries the check.
+
 ## [1.4.2] — 2026-10-30
 
 Smoother interface, checked in the mock host (light and dark):

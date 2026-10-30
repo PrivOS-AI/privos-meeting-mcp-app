@@ -163,6 +163,20 @@
   padding: var(--space-2) var(--space-5);
 }
 
+.ma-settings-panel__error p {
+  margin: 0;
+}
+
+/* The Hub's own error text under the friendly one: what an admin needs to fix it. */
+.ma-settings-panel__error-detail {
+  display: block;
+  margin-top: var(--space-1);
+  font-family: var(--ma-font-mono);
+  font-size: var(--caption-size);
+  color: var(--ma-fg-3);
+  word-break: break-word;
+}
+
 .ma-settings-panel__example {
   margin: var(--space-2) 0 0;
   padding: var(--space-2) var(--space-3);

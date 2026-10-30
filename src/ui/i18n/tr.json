@@ -320,6 +320,8 @@
   "settings.agent.install": "Oda ajanına kur",
   "settings.agent.update": "Beceriyi güncelle",
   "settings.agent.installing": "Kuruluyor…",
+  "settings.agent.scopesMissing": "PrivOS bu uygulamaya henüz {scopes} izni vermedi. Bir çalışma alanı yöneticisi Yönetim → Uygulamalar → PrivOS Meeting App → izinler bölümünden onaylayınca bu sayfa beceriyi kurabilir.",
+  "settings.agent.retry": "Tekrar kontrol et",
   "settings.agent.problem.not-allowed": "PrivOS izin vermedi: yükleme için çalışma alanı yöneticisi, açmak için oda sahibi gerekir.",
   "settings.agent.problem.collocated": "Bu odanın Sandbox'ı paylaşımlı modda çalışıyor ve beceri yükleyemiyor. Bir operatörden özel moda geçirmesini isteyin.",
   "settings.agent.problem.failed": "Kurulum başarısız oldu. Tekrar deneyin.",

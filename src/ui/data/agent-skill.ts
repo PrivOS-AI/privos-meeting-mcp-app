@@ -15,11 +15,14 @@
 import type { McpApp } from '@privos_ai/app-react';
 
 import { MEETING_AGENT_SET } from './agent-set-name.js';
-import { unwrapRestBody } from './rest-body.js';
 
 const SKILL_PREFIX = 'privos-meeting';
-const NOT_ALLOWED = /error-not-allowed|not allowed|forbidden|insufficient scope/i;
+const NOT_ALLOWED = /error-not-allowed|not allowed|forbidden|insufficient.?scope|not granted|permission|unauthori[sz]ed|\b40[13]\b/i;
 const COLLOCATED = /collocation-agent-sets-disabled/i;
+
+/** The scopes the two steps need: enabling a skill for the Room, and uploading it to Agent Factory. */
+export const SKILL_USE_SCOPE = 'sandbox:skills:use';
+export const SKILL_UPLOAD_SCOPE = 'sandbox:agent-sets:upload';
 
 export type AgentSkillState = 'ready' | 'outdated' | 'not-enabled' | 'missing';
 export type AgentSkillProblem = 'not-allowed' | 'collocated' | 'failed';
@@ -43,10 +46,25 @@ function classify(error: unknown): AgentSkillError {
   return new AgentSkillError('failed', message);
 }
 
+/** The JSON body under any `{ statusCode, body }` / `{ data }` wrapping the bridge or the route adds. */
+function unwrap(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const record = value as Record<string, unknown>;
+  if (record.body && typeof record.body === 'object') return unwrap(record.body);
+  if (record.data && typeof record.data === 'object' && !Array.isArray(record.data)) return unwrap(record.data);
+  return record;
+}
+
 async function post(app: McpApp, path: string, body: Record<string, unknown>): Promise<Record<string, unknown>> {
   const raw = await app.rest({ method: 'POST', path, body });
-  const value = unwrapRestBody<Record<string, unknown>>(raw);
-  return value && typeof value === 'object' ? value : {};
+  const status = (raw as { statusCode?: unknown } | null)?.statusCode;
+  const value = unwrap(raw);
+  // A refusal can come back as an answer rather than a throw: read it as the error it is.
+  if (value.success === false || (typeof status === 'number' && status >= 400)) {
+    const reason = typeof value.error === 'string' ? value.error : typeof value.message === 'string' ? value.message : `HTTP ${typeof status === 'number' ? status : '?'}`;
+    throw new Error(`${path}: ${reason}`);
+  }
+  return value;
 }
 
 export function isMeetingAgentSet(name: string): boolean {

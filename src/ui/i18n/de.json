@@ -320,6 +320,8 @@
   "settings.agent.install": "Für den Raum-Agenten installieren",
   "settings.agent.update": "Skill aktualisieren",
   "settings.agent.installing": "Wird installiert…",
+  "settings.agent.scopesMissing": "PrivOS hat dieser App {scopes} noch nicht erteilt. Ein Workspace-Admin genehmigt es unter Admin → Apps → PrivOS Meeting App → Berechtigungen; danach kann diese Seite den Skill installieren.",
+  "settings.agent.retry": "Erneut prüfen",
   "settings.agent.problem.not-allowed": "PrivOS hat das nicht erlaubt: Hochladen braucht einen Workspace-Admin, Aktivieren einen Raum-Besitzer.",
   "settings.agent.problem.collocated": "Die Sandbox dieses Raums läuft im gemeinsamen Modus und kann keine Skills laden. Bitte einen Betreiber, sie auf den dedizierten Modus umzustellen.",
   "settings.agent.problem.failed": "Die Installation ist fehlgeschlagen. Bitte erneut versuchen.",

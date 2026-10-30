@@ -318,6 +318,8 @@
   "settings.agent.install": "ルームのエージェントにインストール",
   "settings.agent.update": "スキルを更新",
   "settings.agent.installing": "インストール中…",
+  "settings.agent.scopesMissing": "PrivOS はまだこのアプリに {scopes} を許可していません。ワークスペース管理者が 管理 → アプリ → PrivOS Meeting App → 権限 で承認すると、このページからスキルをインストールできます。",
+  "settings.agent.retry": "再確認",
   "settings.agent.problem.not-allowed": "PrivOS に許可されませんでした。アップロードにはワークスペース管理者、有効化にはルームのオーナーが必要です。",
   "settings.agent.problem.collocated": "このルームの Sandbox は共有モードのため、スキルを読み込めません。運用者に専用モードへの切り替えを依頼してください。",
   "settings.agent.problem.failed": "インストールに失敗しました。もう一度お試しください。",

@@ -318,6 +318,8 @@
   "settings.agent.install": "Installer pour l'agent du salon",
   "settings.agent.update": "Mettre à jour la compétence",
   "settings.agent.installing": "Installation…",
+  "settings.agent.scopesMissing": "PrivOS n'a pas encore accordé {scopes} à cette application. Un admin de l'espace de travail l'approuve dans Admin → Apps → PrivOS Meeting App → autorisations, puis cette page peut installer la compétence.",
+  "settings.agent.retry": "Vérifier à nouveau",
   "settings.agent.problem.not-allowed": "PrivOS ne l'a pas permis : l'envoi demande un admin de l'espace de travail, l'activation un propriétaire du salon.",
   "settings.agent.problem.collocated": "Le Sandbox de ce salon fonctionne en mode partagé et ne peut pas charger de compétences. Demandez à un opérateur de passer en mode dédié.",
   "settings.agent.problem.failed": "L'installation a échoué. Réessayez.",

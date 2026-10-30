@@ -320,6 +320,8 @@
   "settings.agent.install": "Cài cho agent của room",
   "settings.agent.update": "Cập nhật skill",
   "settings.agent.installing": "Đang cài…",
+  "settings.agent.scopesMissing": "PrivOS chưa cấp cho app quyền {scopes}. Admin workspace duyệt quyền ở Admin → Apps → PrivOS Meeting App → phần quyền, rồi quay lại đây để cài skill.",
+  "settings.agent.retry": "Kiểm tra lại",
   "settings.agent.problem.not-allowed": "PrivOS không cho phép: tải skill lên cần admin workspace, bật cho room cần chủ room.",
   "settings.agent.problem.collocated": "Sandbox của room đang chạy chế độ dùng chung, không nạp được skill. Nhờ người vận hành chuyển sang chế độ riêng (dedicated).",
   "settings.agent.problem.failed": "Cài skill không thành công. Thử lại nhé.",
