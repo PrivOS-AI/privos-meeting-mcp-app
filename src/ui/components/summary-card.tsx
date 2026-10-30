@@ -83,7 +83,11 @@ export function SummaryCard({ roomId, meetingId, summaryText, keyTopics, summary
         </p>
       ) : null}
 
-      {summaryText ? <MarkdownText source={summaryText} className="ma-summary-card__text" /> : <p className="ma-summary-card__empty">{t('summary.empty')}</p>}
+      {summaryText ? (
+        <MarkdownText source={withoutRepeatedTitle(summaryText, t('summary.title'))} className="ma-summary-card__text" />
+      ) : (
+        <p className="ma-summary-card__empty">{t('summary.empty')}</p>
+      )}
 
       {keyTopics && keyTopics.length > 0 ? (
         <ul className="ma-summary-card__topics">
@@ -95,3 +99,15 @@ export function SummaryCard({ roomId, meetingId, summaryText, keyTopics, summary
     </section>
   );
 }
+
+const fold = (text: string) => text.trim().toLowerCase().normalize('NFC');
+const SUMMARY_HEADINGS = new Set(['summary', 'tóm tắt']);
+
+/** The summary without its first line when that line is just a heading repeating the card's own title ("## Tóm tắt"). */
+export function withoutRepeatedTitle(text: string, title: string): string {
+  const match = /^\s*#{1,3}\s+(.+?)\s*(?:\r?\n|$)/.exec(text);
+  if (!match) return text;
+  const heading = fold(match[1]);
+  return heading === fold(title) || SUMMARY_HEADINGS.has(heading) ? text.slice(match[0].length).replace(/^\s+/, '') : text;
+}
+

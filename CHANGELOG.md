@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.4.2] — 2026-10-30
+
+Smoother interface, checked in the mock host (light and dark):
+- Motion: every button, field and transcript line changes state with one short,
+  decelerating transition (`--ma-ease`, 120–180 ms); buttons press down 1 px.
+  With "reduce motion" set, nothing moves.
+- Meeting detail side panel: the six tabs are a segmented control (equal tiles,
+  two even rows in a narrow panel) instead of tabs wrapping onto a ragged
+  second row.
+- Meeting toolbar: one compact button style with hover, a dashed outline when
+  unavailable, and Send to Chat as the primary button.
+- Transcript: a light tint on hover; the playing line keeps a soft tint and a
+  blue bar (an older duplicate rule painted it a heavy blue).
+- History: the table sits on a rounded card with a header band.
+- The summary no longer repeats "Tóm tắt" under the card's own "Tóm tắt" title.
+- The "recording cannot be played here" note is a quiet inline notice.
+
 ## [1.4.1] — 2026-10-30
 
 - Fix: **Share** failed with "The Clipboard API has been blocked because of a
