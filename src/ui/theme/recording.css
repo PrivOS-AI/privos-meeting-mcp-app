@@ -455,34 +455,49 @@
   height: 100%;
 }
 
+/* A segmented control: equal tiles on a sunken track. Six tabs fill two even rows in a
+   narrow panel and one row in a wide one — never a ragged, half-empty second row. */
 .ma-side-panel__tabs {
-  display: flex;
-  /* More tabs than fit wrap onto a second row — every tab stays visible, none hides off to the side. */
-  flex-wrap: wrap;
-  border-bottom: 1px solid var(--ma-border-1);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 2px;
+  margin: var(--space-3) var(--space-3) 0;
+  padding: 3px;
+  background: var(--bg-sunken);
+  border-radius: var(--ma-radius-md);
 }
 
 .ma-side-panel__tab {
-  /* Never narrower than its label: tabs that do not fit move to the next row instead of overlapping. */
-  flex: 1 0 auto;
-  padding: 0 var(--space-2);
-  white-space: nowrap;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-1);
-  height: 44px;
-  min-height: 44px;
+  gap: 6px;
+  min-width: 0;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 var(--space-2);
+  white-space: nowrap;
   font-size: var(--body-sm-size);
-  color: var(--ma-fg-3);
+  font-weight: var(--weight-medium);
+  color: var(--ma-fg-2);
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-radius: calc(var(--ma-radius-md) - 3px);
+}
+
+.ma-side-panel__tab:hover:not(.ma-side-panel__tab--active) {
+  color: var(--ma-fg-1);
+  background: color-mix(in srgb, var(--ma-surface) 55%, transparent);
 }
 
 .ma-side-panel__tab--active {
   color: var(--ma-brand-blue);
-  border-bottom-color: var(--ma-brand-blue);
+  background: var(--ma-surface);
+  box-shadow: var(--shadow-xs), 0 0 0 1px var(--ma-border-1);
+}
+
+.ma-side-panel__tab:active:not(:disabled) {
+  transform: none;
 }
 
 .ma-side-panel__body {
@@ -1279,9 +1294,12 @@
 
 .ma-detail__no-audio {
   flex: 0 0 auto;
-  margin: 0;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
   color: var(--ma-fg-3);
   font-size: var(--body-sm-size);
+  background: var(--bg-sunken);
+  border-radius: var(--ma-radius-md);
 }
 
 .ma-detail .ma-side-panel__body {
@@ -1318,18 +1336,19 @@
   gap: var(--space-3);
   height: 76px;
   box-sizing: border-box;
-  padding: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--ma-radius-md);
   cursor: pointer;
+  transition: background-color var(--ma-duration) var(--ma-ease), box-shadow var(--ma-duration) var(--ma-ease);
 }
 
 .ma-transcript-line:hover {
-  background: var(--bg-sunken);
+  background: var(--bg-hover);
 }
 
 .ma-transcript-line--active {
-  background: var(--bg-sunken);
-  box-shadow: inset 2px 0 0 var(--ma-brand-blue);
+  background: var(--bg-hover);
+  box-shadow: inset 3px 0 0 var(--ma-brand-blue);
 }
 
 .ma-transcript-line__body {

@@ -91,13 +91,31 @@
 .ma-meeting-detail__toolbar-row button {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  background: none;
-  border: 1px solid var(--ma-border-2);
-  border-radius: var(--ma-radius-sm);
-  padding: var(--space-1) var(--space-3);
-  min-height: auto;
+  gap: 6px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 var(--space-3);
   font-size: var(--body-sm-size);
+  font-weight: var(--weight-medium);
+  color: var(--ma-fg-2);
+  background: var(--ma-surface);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-md);
+  box-shadow: var(--shadow-xs);
+}
+
+.ma-meeting-detail__toolbar-row button:hover:not(:disabled) {
+  color: var(--ma-fg-1);
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--ma-surface) 92%, var(--privos-blue));
+}
+
+.ma-meeting-detail__toolbar-row button:disabled {
+  opacity: 1;
+  color: var(--ma-fg-3);
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
 }
 
 /* Share: what was copied, or the link to copy by hand when the clipboard is blocked. */
@@ -298,21 +316,7 @@
   min-height: 300px;
 }
 
-.ma-transcript-line {
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-2);
-  border-radius: var(--ma-radius-sm);
-  cursor: pointer;
-}
-
-.ma-transcript-line:hover {
-  background: var(--bg-hover);
-}
-
-.ma-transcript-line--active {
-  background: var(--bg-active);
-}
+/* The line's box, hover and playing states live with the chat-style transcript in recording.css. */
 
 .ma-transcript-line__meta {
   display: flex;

@@ -59,10 +59,22 @@
   margin-bottom: var(--space-3);
 }
 
+/* The table sits on a card. Corners are rounded on the edge cells, not with overflow: hidden,
+   which would clip the last row's "…" menu. */
 .ma-history-screen__table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--ma-surface);
+  border: 1px solid var(--ma-border-1);
+  border-radius: var(--ma-radius-lg);
+  box-shadow: var(--shadow-xs);
 }
+
+.ma-history-screen__table th:first-child { border-top-left-radius: var(--ma-radius-lg); }
+.ma-history-screen__table th:last-child { border-top-right-radius: var(--ma-radius-lg); }
+.ma-history-screen__table tr:last-child td:first-child { border-bottom-left-radius: var(--ma-radius-lg); }
+.ma-history-screen__table tr:last-child td:last-child { border-bottom-right-radius: var(--ma-radius-lg); }
 
 .ma-history-screen__load-more {
   display: block;
@@ -250,13 +262,19 @@
 /* ---------- meeting-history-row ---------- */
 
 .ma-history-row td {
-  padding: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--ma-border-1);
   vertical-align: middle;
+  transition: background-color var(--ma-duration-fast) var(--ma-ease);
+}
+
+.ma-history-row:last-child td {
+  border-bottom: none;
 }
 
 .ma-history-screen__table th {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-sunken);
   border-bottom: 1px solid var(--ma-border-2);
   color: var(--ma-fg-3);
   font-size: var(--caption-size);

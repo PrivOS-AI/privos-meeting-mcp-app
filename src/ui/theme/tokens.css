@@ -94,6 +94,11 @@
   --radius-xl: 24px;
   --radius-pill: 999px;
 
+  /* Motion: short, decelerating; every interactive state change uses these. */
+  --ma-ease: cubic-bezier(0.2, 0, 0, 1);
+  --ma-duration-fast: 120ms;
+  --ma-duration: 180ms;
+
   /* ---------- SPACING ---------- */
   --space-1: 4px;
   --space-2: 8px;
@@ -243,6 +248,24 @@ button {
   font-size: inherit;
   color: inherit;
   cursor: pointer;
+  transition:
+    background-color var(--ma-duration-fast) var(--ma-ease),
+    border-color var(--ma-duration-fast) var(--ma-ease),
+    color var(--ma-duration-fast) var(--ma-ease),
+    box-shadow var(--ma-duration-fast) var(--ma-ease),
+    transform var(--ma-duration-fast) var(--ma-ease);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+input,
+select,
+textarea {
+  transition:
+    border-color var(--ma-duration-fast) var(--ma-ease),
+    box-shadow var(--ma-duration-fast) var(--ma-ease);
 }
 
 button:disabled {
@@ -253,4 +276,19 @@ button:disabled {
 :focus-visible {
   outline: 2px solid var(--ma-link);
   outline-offset: 2px;
+}
+
+/* People who ask for less motion get state changes without movement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  button:active:not(:disabled) {
+    transform: none;
+  }
 }
