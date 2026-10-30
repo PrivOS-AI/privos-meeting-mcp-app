@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.1] — 2026-10-30
+
+- Fix: **Share** failed with "The Clipboard API has been blocked because of a
+  permissions policy" (the Hub does not give app iframes `clipboard-write`).
+  Copying now falls back to `execCommand('copy')`, and when that is refused too,
+  the link is shown to copy by hand. The same fix applies to copying a summary.
+- Share now copies a lasting Hub link to the meeting's folder in Files
+  (transcript, summary, notes), which room members can open. Before, it copied
+  the summary file's download URL, which expires or only works in that tab.
+  It is available as soon as the meeting has a folder.
+- Fix: **Send to Chat** was invisible in the meeting toolbar (white text on a
+  transparent button); it is the toolbar's primary button again, and greyed but
+  readable once sent.
+
 ## [1.4.0] — 2026-10-30
 
 - **Faster live captions.** Measured on screen with the real models and a

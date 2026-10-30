@@ -293,6 +293,9 @@
   "detail.audioDeleted": "原始音频已根据存储设置被删除",
   "detail.saveToFiles": "保存到 Files",
   "detail.share": "分享",
+  "detail.shareCopied": "已复制文件中会议文件夹的链接，房间成员可以打开。",
+  "detail.shareCopyHint": "复制这个指向文件中会议文件夹的链接：",
+  "detail.shareUnavailable": "无法在文件中创建此会议的链接。",
 
   "bookmarks.empty": "暂无书签。",
   "bookmarks.delete": "删除书签",

@@ -295,6 +295,9 @@
   "detail.audioDeleted": "The original audio was deleted per the storage setting",
   "detail.saveToFiles": "Save to Files",
   "detail.share": "Share",
+  "detail.shareCopied": "Link to the meeting's folder in Files copied — room members can open it.",
+  "detail.shareCopyHint": "Copy this link to the meeting folder in Files:",
+  "detail.shareUnavailable": "Could not build a link to this meeting in Files.",
 
   "bookmarks.empty": "No bookmarks yet.",
   "bookmarks.delete": "Delete bookmark",

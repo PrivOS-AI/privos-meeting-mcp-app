@@ -38,6 +38,18 @@ async function roomInfo(app: McpApp, roomId: string): Promise<RoomInfo | null> {
   }
 }
 
+/**
+ * The full Hub link to a folder of this room's Files (`https://<hub>/group/<room>/files/<folderId>`),
+ * for sharing: room members open it, and it does not expire like a file's download URL.
+ * `null` when the room name or the Hub origin is unknown.
+ */
+export async function filesFolderUrl(app: McpApp, room: { id: string; name?: string }, folderId: string, hubOrigin: string | null): Promise<string | null> {
+  if (!hubOrigin) return null;
+  const info = await roomInfo(app, room.id);
+  const path = filesFolderPath({ id: room.id, type: info?.t, name: info?.name || room.name }, folderId);
+  return path ? `${hubOrigin}${path}` : null;
+}
+
 /** Resolves `false` when no URL could be built (no room name known). */
 export async function openInFiles(app: McpApp, room: { id: string; name?: string }, folderId: string): Promise<boolean> {
   const info = await roomInfo(app, room.id);

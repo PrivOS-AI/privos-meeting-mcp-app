@@ -2,7 +2,7 @@
   "schemaVersion": 3,
   "kind": "mcp-app",
   "name": "ai.privos.meeting-agent",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "title": "PrivOS Meeting App",
   "description": "A PrivOS MCP app for offline meeting capture: bilingual live captions with speaker labels, cross-session speaker identity via voiceprints, Hub-AI summaries, and transcript storage in PrivOS Files.",
   "icon": "/public/icon.svg",

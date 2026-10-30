@@ -287,6 +287,21 @@
   padding: var(--space-2) var(--space-4);
 }
 
+/* In the detail toolbar, `.ma-meeting-detail__toolbar-row button` (background: none) outranks the rule
+   above while the white text stayed: the button turned invisible. Keep it the toolbar's primary action. */
+.ma-meeting-detail__toolbar-row .ma-send-to-chat__button {
+  background: var(--ma-brand-blue);
+  color: var(--ma-fg-inverse);
+  border-color: var(--ma-brand-blue);
+}
+
+.ma-meeting-detail__toolbar-row .ma-send-to-chat__button:disabled {
+  background: var(--ma-surface-raised);
+  color: var(--ma-fg-3);
+  border-color: var(--ma-border-2);
+  cursor: not-allowed;
+}
+
 .ma-send-to-chat__error {
   color: var(--ma-status-danger);
   font-size: var(--caption-size);

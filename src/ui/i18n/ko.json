@@ -293,6 +293,9 @@
   "detail.audioDeleted": "저장 설정에 따라 원본 오디오가 삭제되었습니다",
   "detail.saveToFiles": "Files에 저장",
   "detail.share": "공유",
+  "detail.shareCopied": "파일의 회의 폴더 링크를 복사했습니다. 룸 멤버가 열 수 있습니다.",
+  "detail.shareCopyHint": "파일의 회의 폴더 링크를 복사하세요:",
+  "detail.shareUnavailable": "파일에서 이 회의의 링크를 만들 수 없습니다.",
 
   "bookmarks.empty": "아직 북마크가 없습니다.",
   "bookmarks.delete": "북마크 삭제",

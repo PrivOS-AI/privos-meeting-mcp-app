@@ -23,9 +23,11 @@ interface People {
   /** The avatar image for a person, or null when they cannot be told apart from others or the Hub is unknown. */
   avatarUrl(person: PersonRef): string | null;
   setHubOrigin(origin: string): void;
+  /** The Hub's origin (`https://…`), for links people open outside this iframe; null when unknown. */
+  hubOrigin: string | null;
 }
 
-const PeopleContext = createContext<People>({ avatarUrl: () => null, setHubOrigin: () => undefined });
+const PeopleContext = createContext<People>({ avatarUrl: () => null, setHubOrigin: () => undefined, hubOrigin: null });
 
 function httpOrigin(value: string | undefined | null): string | null {
   if (!value) return null;
@@ -75,6 +77,7 @@ export function PeopleProvider({ children }: { children: ReactNode }) {
       }
     }
     return {
+      hubOrigin: hub,
       setHubOrigin: (origin) => {
         const clean = httpOrigin(origin);
         if (clean) setHub(clean);
