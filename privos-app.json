@@ -2,7 +2,7 @@
   "schemaVersion": 3,
   "kind": "mcp-app",
   "name": "ai.privos.meeting-agent",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "title": "PrivOS Meeting App",
   "description": "A PrivOS MCP app for offline meeting capture: bilingual live captions with speaker labels, cross-session speaker identity via voiceprints, Hub-AI summaries, and transcript storage in PrivOS Files.",
   "icon": "/public/icon.svg",
@@ -920,6 +920,51 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 10000000
+          },
+          "captions": {
+            "type": "boolean",
+            "description": "false: just feed the audio and answer at once (the client reads captions with meeting_captions_wait)."
+          }
+        }
+      }
+    },
+    {
+      "name": "meeting_captions_wait",
+      "title": "Wait for live captions",
+      "description": "Get the meeting's new live captions as soon as they are recognised (held open briefly until there are some) — only the meeting owner, while recording.",
+      "inputSchema": {
+        "type": "object",
+        "required": [
+          "roomId",
+          "meetingId",
+          "cursor"
+        ],
+        "properties": {
+          "roomId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "meetingId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "draftRev": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000,
+            "description": "The draft revision the client shows; a newer draft answers at once."
+          },
+          "waitMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6000
           }
         }
       }

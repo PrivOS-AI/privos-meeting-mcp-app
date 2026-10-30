@@ -46,7 +46,7 @@ vi.mock('../asr/asr-engine.js', async (importOriginal) => {
 let store: Store;
 let fakeHub: ReturnType<typeof installFakeHub>;
 
-const { audioPushTool, resetAudioPushOwnerChecksForTests } = await import('./audio-push-tool.js');
+const { audioPushTool, captionsWaitTool, resetAudioPushOwnerChecksForTests } = await import('./audio-push-tool.js');
 const { resetLiveSessionsForTests, liveSessionFor } = await import('../asr/live-asr-session.js');
 const { resetRateLimits } = await import('./rate-limiter.js');
 const { env } = await import('../env.js');
@@ -110,3 +110,44 @@ describe('meeting_audio_push', () => {
     }
   });
 });
+
+describe('meeting_captions_wait', () => {
+  beforeEach(() => {
+    resetLiveSessionsForTests();
+    resetRateLimits();
+    resetAudioPushOwnerChecksForTests();
+    store = { meetings: [{ _id: 'meeting-1', roomId: 'room-1', ownerUserId: 'owner-1', status: 'recording' }] };
+    fakeHub = installFakeHub({ store });
+  });
+  const wait = (over: Record<string, unknown> = {}, who = 'owner-1') =>
+    captionsWaitTool.execute({ roomId: 'room-1', meetingId: 'meeting-1', cursor: 0, draftRev: 0, waitMs: 3000, ...over }, ctx(who), {} as never) as Promise<{ captions: Array<{ text: string }>; cursor: number }>;
+
+  it('a push that only feeds audio answers at once, and the wait hands over the caption as soon as it is decoded', async () => {
+    // Speech with no pause yet: nothing to caption, the push answers without waiting for a decode.
+    const talking = Buffer.alloc(4 * 512 * 2);
+    for (let i = 0; i < 4 * 512; i++) talking.writeInt16LE(16000, i * 2);
+    const pushed = await audioPushTool.execute(args({ pcm: talking.toString('base64'), captions: false }), ctx(), {} as never);
+    expect(pushed).toEqual({ cursor: 0, degraded: false });
+    const waiting = wait();
+    await audioPushTool.execute(args({ seq: 1, chunkStartSec: 0.128, pcm: pcm(0), captions: false }), ctx(), {} as never);
+    const started = Date.now();
+    const answer = await waiting;
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(answer.captions.map((c) => c.text)).toEqual(['Xin chào']);
+    expect(answer.cursor).toBe(1);
+  });
+
+  it('comes back shortly, empty, before any audio arrived', async () => {
+    const started = Date.now();
+    await expect(wait({ waitMs: 200 })).resolves.toMatchObject({ captions: [], cursor: 0, draft: null });
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it('refuses anyone but the meeting owner, a meeting that is not recording, and a wait longer than 6 s', async () => {
+    await expect(wait({}, 'someone-else')).rejects.toMatchObject({ code: 'NOT_MEETING_OWNER' });
+    await expect(wait({ waitMs: 60_000 })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    store.meetings[0].status = 'summarized';
+    await expect(wait({ waitMs: 10 })).rejects.toMatchObject({ code: 'INVALID_STATE' });
+  });
+});
+

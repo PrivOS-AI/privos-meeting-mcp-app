@@ -35,8 +35,8 @@ import { createLocalSpeakerAttributor } from '../live-speakers/local-attribution
 
 const SAMPLE_RATE = 16_000;
 const BYTES_PER_SECOND = SAMPLE_RATE * 2;
-/** Audio handed to the recognizer per push, like the iframe's ~500 ms. */
-const PUSH_BYTES = BYTES_PER_SECOND / 2;
+/** Audio handed to the recognizer per push: the session reacts at chunk ends, and 0.25 s brought the first draft ~0.3 s sooner than 0.5 s (scripts/eval-caption-latency.ts). */
+const PUSH_BYTES = BYTES_PER_SECOND / 4;
 /** Seconds of audio per uploaded part. */
 const PART_SEC = 60;
 /** The stream may lag the wall clock by this much before the gap is filled with silence. */

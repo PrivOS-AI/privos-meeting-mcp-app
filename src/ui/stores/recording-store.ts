@@ -645,6 +645,13 @@ export class RecordingStore {
 
   // ------------------------------------------------------------ realtime
 
+  /** One `meeting_captions_wait`: answers as soon as a caption or a new draft is decoded. */
+  private waitCaptions(meetingId: string, request: import('../data/local-realtime-client.js').CaptionsWaitRequest): Promise<import('../data/local-realtime-client.js').AudioPushResponse> {
+    return this.app
+      .callServerTool({ name: 'meeting_captions_wait', arguments: { roomId: this.ctx.roomId, meetingId, ...request } })
+      .then((raw) => parseToolResultOrThrow(raw) as unknown as import('../data/local-realtime-client.js').AudioPushResponse);
+  }
+
   private browserAudioCall(meetingId: string, action: 'start' | 'poll' | 'stop', cursor = 0): Promise<BrowserAudioResponse> {
     return this.app
       .callServerTool({ name: 'meeting_browser_audio', arguments: { roomId: this.ctx.roomId, meetingId, action, cursor } })
@@ -680,7 +687,9 @@ export class RecordingStore {
       onUpdate: (speakers, turns, meta) => this.applyPollUpdate(speakers, turns, meta),
     });
     this.realtime = createBrowserAudioConnection({
+      recorderEpochMs: this.state.recorderEpochMs,
       poll: (cursor) => this.browserAudioCall(meetingId, 'poll', cursor),
+      waitCaptions: (request) => this.waitCaptions(meetingId, request),
       onStarted: (sessionIndex) => {
         this.clock?.registerSessionStart(sessionIndex);
         this.setState({ sessionIndex });
@@ -756,6 +765,7 @@ export class RecordingStore {
         const raw = await this.app.callServerTool({ name: 'meeting_audio_push', arguments: { roomId: this.ctx.roomId, meetingId, ...request } });
         return parseToolResultOrThrow(raw) as unknown as import('../data/local-realtime-client.js').AudioPushResponse;
       },
+      waitCaptions: (request) => this.waitCaptions(meetingId, request),
       onStarted: (sessionIndex) => {
         this.clock?.registerSessionStart(sessionIndex);
         this.setState({ sessionIndex });

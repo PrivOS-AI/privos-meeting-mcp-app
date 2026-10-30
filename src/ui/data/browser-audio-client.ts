@@ -2,14 +2,15 @@
  * Live captions for a meeting recorded from the Room's shared browser
  * (PrivOS Remote Browser in a Google Meet call). The audio never passes
  * through this iframe — the app's server reads it from Remote Browser — so
- * there is nothing to push: this asks `meeting_browser_audio` (action `poll`)
- * about once a second for the captions since its cursor and the listener's
- * state, one request at a time.
+ * there is nothing to push: `meeting_captions_wait` requests held open
+ * answer the moment a caption or a new draft is decoded, and the listener's
+ * state (`meeting_browser_audio` poll) is asked every few seconds for the
+ * "waiting for the Room browser" notice.
  */
-import { createCaptionEmitter, type AudioPushResponse } from './local-realtime-client.js';
+import { createCaptionEmitter, createLatencyMeter, runCaptionWaits, withTimeout, type AudioPushResponse, type CaptionsWaitRequest } from './local-realtime-client.js';
 import type { RealtimeConnection, RealtimeConnectionCallbacks } from './realtime-client.js';
 
-const POLL_INTERVAL_MS = 800;
+const STATUS_EVERY_MS = 3_000;
 
 export type BrowserAudioState = 'connecting' | 'listening' | 'waiting' | 'stopped';
 export type BrowserAudioProblem = 'no_browser' | 'no_audio' | 'busy' | 'unavailable' | 'unauthorized';
@@ -22,45 +23,52 @@ export interface BrowserAudioResponse extends AudioPushResponse {
 }
 
 export interface BrowserAudioConnectionOptions extends Pick<RealtimeConnectionCallbacks, 'onCaption' | 'onStatus' | 'onStarted'> {
+  recorderEpochMs: number;
+  /** The listener's state (`meeting_browser_audio` poll). */
   poll: (cursor: number) => Promise<BrowserAudioResponse>;
+  waitCaptions: (request: CaptionsWaitRequest) => Promise<AudioPushResponse>;
   /** The listener's state, for the "waiting for the Room browser" notice. */
   onBrowserState: (state: BrowserAudioState, problem: BrowserAudioProblem | undefined) => void;
 }
 
 export function createBrowserAudioConnection(opts: BrowserAudioConnectionOptions): RealtimeConnection {
   const showCaptions = createCaptionEmitter(opts.onCaption);
+  const measure = createLatencyMeter(opts.recorderEpochMs, 'room browser');
   let cursor = 0;
-  let stopped = false;
-  let inFlight = false;
+  let draftRev = 0;
+  let closed = false;
+  const onCaptions = (response: AudioPushResponse) => {
+    if (response.cursor < cursor) return;
+    cursor = response.cursor;
+    if (typeof response.draftRev === 'number') draftRev = response.draftRev;
+    showCaptions(response);
+    measure(response);
+  };
 
-  const pollOnce = async (): Promise<void> => {
-    if (inFlight || stopped) return;
-    inFlight = true;
+  const pollStatus = async (): Promise<void> => {
     try {
       const response = await opts.poll(cursor);
-      cursor = response.cursor;
-      showCaptions(response);
       opts.onBrowserState(response.state, response.problem);
       opts.onStatus(response.state === 'listening' ? 'live' : 'reconnecting', { sessionIndex: 0, ...(response.problem ? { error: response.problem } : {}) });
     } catch (error) {
       opts.onStatus('reconnecting', { sessionIndex: 0, error: error instanceof Error ? error.message : String(error) });
-    } finally {
-      inFlight = false;
     }
   };
 
+
   opts.onStatus('connecting', { sessionIndex: 0 });
   opts.onStarted(0, 0);
-  const timer = setInterval(() => void pollOnce(), POLL_INTERVAL_MS);
+  void pollStatus();
+  const timer = setInterval(() => void pollStatus(), STATUS_EVERY_MS);
+  runCaptionWaits(opts.waitCaptions, () => ({ cursor, draftRev }), onCaptions, () => closed);
 
   return {
     async stop() {
-      if (stopped) return;
-      while (inFlight) await new Promise((resolve) => setTimeout(resolve, 50));
-      // One last read so the final utterance shows before the screen moves on.
-      await pollOnce();
-      stopped = true;
+      if (closed) return;
       clearInterval(timer);
+      // One last read so the final utterance shows before the screen moves on.
+      await withTimeout(opts.waitCaptions({ cursor, draftRev, waitMs: 1_500 }).then(onCaptions), 2_500).catch(() => undefined);
+      closed = true;
       opts.onStatus('off', { sessionIndex: 0 });
     },
   };

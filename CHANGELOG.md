@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.4.0] — 2026-10-30
+
+- **Faster live captions.** Measured on screen with the real models and a
+  simulated relay of 0.5 s each way (`scripts/eval-caption-relay.ts`): the
+  first draft of what someone says shows after **~1.9–2.4 s instead of ~3.1 s**,
+  and the slowest final caption after ~2.7–3.1 s instead of ~4 s (the typical
+  final stays ~2.4 s: 0.4 s of silence to end a sentence, ~0.35 s to decode and
+  name the speaker, ~1 s of relay).
+  - Audio and captions travel separately. Pushes go every 0.25 s, up to three
+    at a time; the server feeds them in `seq` order (one that overtakes another
+    waits up to 1.5 s). They only feed audio and answer at once.
+  - New tool `meeting_captions_wait`: held open on the server and answered the
+    moment a caption or a new draft is decoded. The client keeps two open,
+    staggered, so one is always waiting when a caption is ready.
+  - Drafts start after 0.35 s of speech (was 0.6 s) and refresh every 0.5 s
+    (was 1 s), spaced out automatically when the CPU is slower than that.
+  - Room-browser recordings feed the recognizer every 0.25 s and use the same
+    caption waits.
+  - The console logs the measured delays every 10 captions
+    (`[captions:mic] first draft … s, final … s`).
+  - Ending a meeting no longer hangs on a stalled last caption request.
+  - `scripts/eval-caption-latency.ts` measures the server side alone.
+
 ## [1.3.1] — 2026-10-29
 
 - Fix: a Room-browser recording showed the microphone and pause buttons (the

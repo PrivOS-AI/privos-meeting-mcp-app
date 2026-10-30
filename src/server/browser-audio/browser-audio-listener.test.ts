@@ -75,7 +75,7 @@ describe('browser audio listener', () => {
     expect(() => startBrowserAudio(newCtx())).toThrow(expect.objectContaining({ code: 'PROVIDER_NOT_CONFIGURED' }));
   });
 
-  it("reads the Room's tap with the operator key and feeds the live session in ~0.5 s pushes on the meeting clock", async () => {
+  it("reads the Room's tap with the operator key and feeds the live session in 0.25 s pushes on the meeting clock", async () => {
     const tap = tapStream();
     vi.stubGlobal('fetch', tap.fetchMock);
     const ctx = newCtx();
@@ -84,13 +84,13 @@ describe('browser audio listener', () => {
     expect(tap.calls[0]).toEqual({ url: 'http://remote-browser:8787/audio-tap?roomId=room-1', auth: `Bearer ${'k'.repeat(40)}` });
 
     tap.stream.write(Buffer.alloc(SECOND)); // 1 s
-    await vi.waitFor(() => expect(pushes).toHaveLength(2));
-    expect(pushes.map((p) => [p.seq, p.atSec, p.samples])).toEqual([[0, 0, 8000], [1, 0.5, 8000]]);
+    await vi.waitFor(() => expect(pushes).toHaveLength(4));
+    expect(pushes.map((p) => [p.seq, p.atSec, p.samples])).toEqual([[0, 0, 4000], [1, 0.25, 4000], [2, 0.5, 4000], [3, 0.75, 4000]]);
 
     tap.stream.write(Buffer.alloc(SECOND / 4)); // a quarter second: stays pending until stop
     await new Promise((resolve) => setTimeout(resolve, 50));
     const status = await stopBrowserAudio(ctx.meetingId);
-    expect(pushes.at(-1)).toMatchObject({ seq: 2, atSec: 1, samples: 4000 });
+    expect(pushes.at(-1)).toMatchObject({ seq: 4, atSec: 1, samples: 4000 });
     expect(status).toMatchObject({ state: 'stopped', heardSec: 1.3, partsUploaded: 1 });
     // One continuous encoded stream, uploaded as a keep_both part named like the iframe's.
     expect(uploads).toEqual([{ fileName: `audio.part-0000-${meetingId8(ctx.meetingId)}.webm`, bytes: SECOND * 1.25, duplicateAction: 'keep_both' }]);
