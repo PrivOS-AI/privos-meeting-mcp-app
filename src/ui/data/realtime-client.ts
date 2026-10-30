@@ -58,6 +58,8 @@ export interface RealtimeConnectionOptions extends RealtimeConnectionCallbacks {
   translateTo?: import('../../shared/languages.js').LanguageCode;
   /** `local` provider only: sends one audio chunk to `meeting_audio_push` and returns its answer. */
   pushAudio?: (request: import('./local-realtime-client.js').AudioPushRequest) => Promise<import('./local-realtime-client.js').AudioPushResponse>;
+  /** `local` provider only: long-polls `meeting_captions_wait` for the captions (audio pushes then only feed audio). */
+  waitCaptions?: (request: import('./local-realtime-client.js').CaptionsWaitRequest) => Promise<import('./local-realtime-client.js').AudioPushResponse>;
 }
 
 export interface RealtimeConnection {

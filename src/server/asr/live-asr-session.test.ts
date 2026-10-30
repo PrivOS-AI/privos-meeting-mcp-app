@@ -111,6 +111,38 @@ describe('LiveAsrSession', () => {
     expect(engine.recognizeCalls.map((c) => Math.round(c.atSec))).toEqual([0, 30]);
   });
 
+  it('feeds chunks that arrive out of order in seq order (pushes travel in parallel)', async () => {
+    const engine = fakeEngine();
+    const session = new LiveAsrSession('m1', engine);
+    const all = join(speech(3), silence(2));
+    const cut = WINDOW * 2;
+    await session.push(0, 0, all.subarray(0, WINDOW));
+    // seq 2 overtakes seq 1: it waits for it instead of being fed first.
+    const early = session.push(2, cut / RATE, all.subarray(cut));
+    await session.push(1, WINDOW / RATE, all.subarray(WINDOW, cut));
+    await early;
+    await session.finish();
+    expect(session.degraded).toBe(false);
+    expect(engine.recognizeCalls).toEqual([{ atSec: 0, length: 3 * WINDOW }]);
+  });
+
+  it('wakes a waiting client the moment a caption is decoded, and times out quietly otherwise', async () => {
+    const engine = fakeEngine();
+    const session = new LiveAsrSession('m1', engine);
+    const started = Date.now();
+    await session.waitForUpdate(0, session.captionsSince(0).draftRev, 50);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(40);
+
+    const waiting = session.waitForUpdate(0, session.captionsSince(0).draftRev, 5_000);
+    await session.push(0, 0, join(speech(3), silence(1)));
+    const t = Date.now();
+    await waiting;
+    expect(Date.now() - t).toBeLessThan(1_000);
+    expect(session.captionsSince(0).captions).toHaveLength(1);
+    // Nothing new since: answers at once with what the client already has only when asked with an old cursor.
+    await expect(session.waitForUpdate(0, session.captionsSince(0).draftRev, 5_000)).resolves.toBeUndefined();
+  });
+
   it('carries samples that do not fill a whole VAD window into the next chunk', async () => {
     const engine = fakeEngine();
     const session = new LiveAsrSession('m1', engine);
@@ -180,18 +212,35 @@ describe('LiveAsrSession drafts', () => {
     expect(done.captions.map((c) => c.text)).toEqual(['Chốt thứ Sáu']);
   });
 
-  it('decodes a draft at most about once a second', async () => {
+  it('decodes a draft about twice a second while someone talks', async () => {
     const engine = draftEngine();
     const session = new LiveAsrSession('m1', engine);
-    // Six pushes of ~0.32 s of continuous speech (~1.9 s in all).
+    // Six pushes of ~0.32 s of continuous speech (~1.9 s in all): drafts at ~0.64, ~1.28 and ~1.92 s.
     for (let seq = 0; seq < 6; seq++) {
       await session.push(seq, (seq * 10 * WINDOW) / RATE, speech(10));
       await session.settle(50);
     }
-    expect(engine.draftCalls.length).toBe(1);
+    expect(engine.draftCalls.length).toBe(3);
   });
 
-  it('emits no draft for a blip shorter than 0.6 s', async () => {
+  it('spaces drafts out when a draft decode is slow, so they never pile up on the CPU', async () => {
+    let drafts = 0;
+    const engine = Object.assign(fakeEngine(), {
+      async recognizeDraft() {
+        drafts++;
+        await new Promise((resolve) => setTimeout(resolve, 600)); // a 0.6 s decode: the next one no sooner than 1.2 s of audio later
+        return 'chậm';
+      },
+    });
+    const session = new LiveAsrSession('m1', engine);
+    for (let seq = 0; seq < 6; seq++) {
+      await session.push(seq, (seq * 10 * WINDOW) / RATE, speech(10));
+      await session.settle(700);
+    }
+    expect(drafts).toBe(2);
+  });
+
+  it('emits no draft for a blip shorter than 0.35 s', async () => {
     const engine = draftEngine();
     const session = new LiveAsrSession('m1', engine);
     await session.push(0, 0, speech(10));

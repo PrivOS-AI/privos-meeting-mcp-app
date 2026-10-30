@@ -25,13 +25,21 @@ const REANCHOR_SEC = 1;
 const IDLE_TTL_MS = 60_000;
 /** Captions kept per session for clients catching up. */
 const MAX_CAPTIONS = 2_000;
-/** A new draft at most this often, and only once this much speech is in. */
-const DRAFT_EVERY_SEC = 1;
-const DRAFT_MIN_SEC = 0.6;
+/**
+ * A new draft at most this often (or twice the last draft's decode time, when the CPU
+ * is slower than that), and only once this much speech is in.
+ */
+const DRAFT_EVERY_SEC = 0.5;
+const DRAFT_MIN_SEC = 0.35;
 /** A draft decodes at most the last this many seconds (a long utterance is cut at 10 s anyway). */
 const DRAFT_WINDOW_SEC = 10;
 /** The VAD confirms speech ~0.25 s in; the draft starts a little before that. */
 const DRAFT_LEAD_SEC = 0.3;
+/**
+ * Pushes travel in parallel, so a chunk can arrive before the one ahead of it: it waits
+ * this long for the missing one before the gap is accepted (and the session marked degraded).
+ */
+const REORDER_WAIT_MS = 1_500;
 
 /** The speech in progress, decoded so far; replaced by the final caption. */
 export interface LiveDraft {
@@ -96,6 +104,16 @@ export class LiveAsrSession {
   private lastDraftAt = 0;
   private draftRun: Promise<void> | null = null;
   private draft: LiveDraft | null = null;
+  /** Bumped whenever the draft changes or goes, so a waiting client knows its copy is stale. */
+  private draftRev = 0;
+  private lastDraftDecodeSec = 0;
+  /** Chunks that arrived ahead of a missing one, by seq. */
+  private readonly held = new Map<number, { chunkStartSec: number; pcm: Float32Array; at: number }>();
+  /** Serial feed chain: chunks enter the VAD one at a time, in seq order. */
+  private feeding: Promise<void> = Promise.resolve();
+  private heldTimer: NodeJS.Timeout | null = null;
+  /** Clients waiting for the next caption or draft (`waitForUpdate`). */
+  private readonly waiters = new Set<() => void>();
   private lastLang: AsrLanguage = 'vi';
   degraded = false;
   lastActivityMs = Date.now();
@@ -109,14 +127,47 @@ export class LiveAsrSession {
 
   /**
    * Feeds one chunk. `seq` makes it idempotent: a chunk at or below the last
-   * accepted seq is ignored (a retried push), a jump marks the session
-   * degraded (audio lost) and re-anchors on `chunkStartSec`.
+   * accepted seq is ignored (a retried push). Chunks are fed in seq order: one
+   * that arrives early waits for the missing one up to `REORDER_WAIT_MS`; then
+   * the gap is accepted, the session marked degraded (audio lost) and the
+   * clock re-anchored on `chunkStartSec`.
    */
   async push(seq: number, chunkStartSec: number, pcm: Float32Array): Promise<void> {
     this.lastActivityMs = Date.now();
-    if (seq <= this.lastSeq) return;
-    if (this.lastSeq >= 0 && seq > this.lastSeq + 1) this.degraded = true;
-    this.lastSeq = seq;
+    if (seq <= this.lastSeq || this.held.has(seq)) return;
+    this.held.set(seq, { chunkStartSec, pcm, at: Date.now() });
+    this.feeding = this.feeding.then(() => this.feedHeld(false));
+    await this.feeding;
+  }
+
+  /** Feeds the held chunks that are next in line; with `force`, also across gaps (end of recording). */
+  private async feedHeld(force: boolean): Promise<void> {
+    for (;;) {
+      let seq = this.lastSeq + 1;
+      if (!this.held.has(seq)) {
+        if (this.held.size === 0) return;
+        const oldest = Math.min(...this.held.keys());
+        const waited = Date.now() - this.held.get(oldest)!.at;
+        const firstChunk = this.lastSeq < 0 && oldest === 0;
+        if (!force && !firstChunk && waited < REORDER_WAIT_MS) {
+          this.heldTimer ??= setTimeout(() => {
+            this.heldTimer = null;
+            this.feeding = this.feeding.then(() => this.feedHeld(false));
+          }, REORDER_WAIT_MS - waited);
+          this.heldTimer.unref?.();
+          return;
+        }
+        if (this.lastSeq >= 0) this.degraded = true;
+        seq = oldest;
+      }
+      const chunk = this.held.get(seq)!;
+      this.held.delete(seq);
+      this.lastSeq = seq;
+      await this.feed(chunk.chunkStartSec, chunk.pcm);
+    }
+  }
+
+  private async feed(chunkStartSec: number, pcm: Float32Array): Promise<void> {
     this.vad ??= await this.engine.createVad();
 
     const expectedSec = this.originSec === null ? null : this.originSec + (this.samplesFed + this.carry.length) / SAMPLE_RATE;
@@ -161,7 +212,7 @@ export class LiveAsrSession {
     const decodeDraft = this.engine.recognizeDraft;
     if (!decodeDraft || this.speechStart === null || this.draftRun || this.pendingFinals > 0 || this.originSec === null) return;
     if (this.samplesFed - this.speechStart < DRAFT_MIN_SEC * SAMPLE_RATE) return;
-    if (this.samplesFed - this.lastDraftAt < DRAFT_EVERY_SEC * SAMPLE_RATE) return;
+    if (this.samplesFed - this.lastDraftAt < Math.max(DRAFT_EVERY_SEC, 2 * this.lastDraftDecodeSec) * SAMPLE_RATE) return;
     const from = Math.max(this.speechStart, this.recentStart);
     const samples = this.recent.slice(from - this.recentStart);
     const utterance = this.speechStart;
@@ -169,10 +220,12 @@ export class LiveAsrSession {
     const endSec = this.originSec + this.samplesFed / SAMPLE_RATE;
     const lang = this.lastLang;
     this.lastDraftAt = this.samplesFed;
+    const startedMs = Date.now();
     this.draftRun = decodeDraft(samples, lang)
       .then((text) => {
+        this.lastDraftDecodeSec = (Date.now() - startedMs) / 1000;
         // The utterance may have ended (and its final been queued) while this decoded.
-        if (this.speechStart === utterance && text) this.draft = { id: `${this.meetingId}:local:draft`, text, atSec, endSec, lang };
+        if (this.speechStart === utterance && text) this.setDraft({ id: `${this.meetingId}:local:draft`, text, atSec, endSec, lang });
       })
       .catch((error: unknown) => console.warn('[live-asr] draft failed:', this.meetingId, error instanceof Error ? error.message : error))
       .finally(() => {
@@ -180,14 +233,45 @@ export class LiveAsrSession {
       });
   }
 
-  /** Captions from `cursor` on, and the cursor to send next time. */
-  captionsSince(cursor: number): { captions: LiveCaption[]; cursor: number; draft: LiveDraft | null } {
+  /** Captions from `cursor` on, the cursor to send next time, and the draft with its revision. */
+  captionsSince(cursor: number): { captions: LiveCaption[]; cursor: number; draft: LiveDraft | null; draftRev: number } {
     const fresh = this.captions.filter((caption) => caption.index >= cursor);
-    return { captions: fresh, cursor: this.nextIndex, draft: this.draft };
+    return { captions: fresh, cursor: this.nextIndex, draft: this.draft, draftRev: this.draftRev };
   }
 
-  /** Flushes the pending utterance and waits for every decode (end of recording, tests). */
+  /**
+   * Resolves as soon as there is a caption at or after `cursor` or the draft is no longer
+   * revision `draftRev` — at once if that is already so — or after `timeoutMs`. Lets a
+   * client hold one request open and get each caption the moment it is decoded.
+   */
+  waitForUpdate(cursor: number, draftRev: number, timeoutMs: number): Promise<void> {
+    if (this.nextIndex > cursor || this.draftRev !== draftRev || timeoutMs <= 0) return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        this.waiters.delete(done);
+        resolve();
+      };
+      const timer = setTimeout(done, timeoutMs);
+      this.waiters.add(done);
+    });
+  }
+
+  private notify(): void {
+    for (const wake of [...this.waiters]) wake();
+  }
+
+  private setDraft(draft: LiveDraft | null): void {
+    if (draft === null && this.draft === null) return;
+    this.draft = draft;
+    this.draftRev++;
+    this.notify();
+  }
+
+  /** Feeds what is still held (across gaps), flushes the pending utterance and waits for every decode (end of recording, tests). */
   async finish(): Promise<void> {
+    this.feeding = this.feeding.then(() => this.feedHeld(true));
+    await this.feeding;
     if (this.vad) {
       this.vad.flush();
       this.drain();
@@ -208,7 +292,7 @@ export class LiveAsrSession {
     this.recentStart = 0;
     this.speechStart = null;
     this.lastDraftAt = 0;
-    this.draft = null;
+    this.setDraft(null);
   }
 
   private drain(): void {
@@ -224,7 +308,7 @@ export class LiveAsrSession {
       // 10 s limit leaves the VAD in speech, so the next draft starts right here.
       this.speechStart = this.vad.isDetected?.() ? this.samplesFed : null;
       this.lastDraftAt = this.samplesFed;
-      this.draft = null;
+      this.setDraft(null);
       this.pendingFinals++;
       this.decoding = this.decoding
         .then(async () => {
@@ -236,6 +320,7 @@ export class LiveAsrSession {
           const speakerKey = this.attributeSpeaker ? await this.attributeSpeaker({ index, samples, atSec, endSec }).catch(() => undefined) : undefined;
           this.captions.push({ index, id: `${this.meetingId}:local:${index}`, text: result.text, atSec, endSec, lang: result.lang, ...(speakerKey ? { speakerKey } : {}) });
           if (this.captions.length > MAX_CAPTIONS) this.captions.splice(0, this.captions.length - MAX_CAPTIONS);
+          this.notify();
         })
         .catch((error: unknown) => {
           this.degraded = true;
@@ -295,6 +380,11 @@ export function activeLiveSessionCount(): number {
 }
 
 /** Test-only. */
+/** The meeting's session if one is running (a caption wait never creates one). */
+export function existingLiveSession(meetingId: string): LiveAsrSession | undefined {
+  return sessions.get(meetingId);
+}
+
 export function resetLiveSessionsForTests(): void {
   sessions.clear();
 }

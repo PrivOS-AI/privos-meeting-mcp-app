@@ -6,7 +6,7 @@
  * while recording; idempotent per `seq` (a retried push is not fed twice).
  */
 import { AppError } from '../../shared/app-error.js';
-import { liveSessionFor, pcm16ToFloat32 } from '../asr/live-asr-session.js';
+import { existingLiveSession, liveSessionFor, pcm16ToFloat32 } from '../asr/live-asr-session.js';
 import { createLocalSpeakerAttributor } from '../live-speakers/local-attribution.js';
 import { SAMPLE_RATE } from '../asr/asr-engine.js';
 import { env } from '../env.js';
@@ -49,6 +49,7 @@ export const audioPushTool: AppTool = {
       sampleRate: { type: 'integer', enum: [SAMPLE_RATE] },
       pcm: { type: 'string', maxLength: MAX_PCM_BASE64, description: 'Base64 little-endian PCM16 mono.' },
       cursor: { type: 'integer', minimum: 0, maximum: 10_000_000 },
+      captions: { type: 'boolean', description: 'false: just feed the audio and answer at once (the client reads captions with meeting_captions_wait).' },
     },
   },
   async execute(args, context, runtime) {
@@ -96,9 +97,69 @@ export const audioPushTool: AppTool = {
     const bytes = Buffer.from(pcm, 'base64');
     if (bytes.length > MAX_PCM_BYTES || bytes.length % 2 !== 0) throw new AppError('Audio chunk must be whole PCM16 samples, at most 128 KB.', 'INVALID_INPUT');
     await session.push(seq, chunkStartSec, pcm16ToFloat32(bytes));
+    if (args.captions === false) return { cursor: session.captionsSince(cursor).cursor, degraded: session.degraded };
     // An utterance that just ended is usually decoded within this wait, so its caption
     // rides this answer instead of the next push ~1.5 s later.
     await session.settle(SETTLE_MS);
+    return { ...session.captionsSince(cursor), degraded: session.degraded };
+  },
+};
+
+/** Caption waits per meeting per window: the client keeps two open, each re-asked as it answers (about every draft). */
+const WAIT_LIMIT = 80;
+const WAIT_WINDOW_MS = 10_000;
+/** Longest a wait is held open; well under any relay timeout. */
+const MAX_WAIT_MS = 6_000;
+
+/**
+ * `meeting_captions_wait` — live captions as soon as they are decoded: answers at
+ * once when there is a caption at or after `cursor` or the draft moved past
+ * `draftRev`, otherwise holds the request open (at most `waitMs`) until there is.
+ * The client keeps one wait open while it pushes audio, so a caption no longer
+ * waits for the next push to ride back on. Meeting owner only, while recording;
+ * it never starts a session (audio pushes and the Room-browser listener do).
+ */
+export const captionsWaitTool: AppTool = {
+  name: 'meeting_captions_wait',
+  title: 'Wait for live captions',
+  description: "Get the meeting's new live captions as soon as they are recognised (held open briefly until there are some) — only the meeting owner, while recording.",
+  inputSchema: {
+    type: 'object',
+    required: ['roomId', 'meetingId', 'cursor'],
+    properties: {
+      ...ROOM_AND_MEETING,
+      cursor: { type: 'integer', minimum: 0, maximum: 10_000_000 },
+      draftRev: { type: 'integer', minimum: 0, maximum: 1_000_000_000, description: 'The draft revision the client shows; a newer draft answers at once.' },
+      waitMs: { type: 'integer', minimum: 0, maximum: MAX_WAIT_MS },
+    },
+  },
+  async execute(args, context) {
+    const actor = requireVerifiedActor(context);
+    const roomId = typeof args.roomId === 'string' ? args.roomId.trim() : '';
+    const meetingId = typeof args.meetingId === 'string' ? args.meetingId.trim() : '';
+    const cursor = Number(args.cursor);
+    const draftRev = args.draftRev === undefined ? -1 : Number(args.draftRev);
+    const waitMs = args.waitMs === undefined ? MAX_WAIT_MS : Number(args.waitMs);
+    if (!roomId || !meetingId || !Number.isInteger(cursor) || cursor < 0 || !Number.isInteger(draftRev) || !Number.isInteger(waitMs) || waitMs < 0 || waitMs > MAX_WAIT_MS) {
+      throw new AppError('Invalid meeting_captions_wait parameters.', 'INVALID_INPUT');
+    }
+    const checkKey = `${meetingId}:${actor.userId}`;
+    const check = ownerChecks.get(checkKey);
+    if (!check || check.until < Date.now()) {
+      const meeting = await requireMeetingOwner(new AppDbBotClient(roomId), actor, roomId, meetingId);
+      if (meeting.status !== 'recording') throw new AppError('Meeting is not currently recording.', 'INVALID_STATE');
+      ownerChecks.set(checkKey, { until: Date.now() + OWNER_CHECK_TTL_MS, folderId: typeof meeting.folderId === 'string' ? meeting.folderId : '' });
+    }
+    if (!checkRateLimit('meeting_captions_wait', meetingId, WAIT_LIMIT, WAIT_WINDOW_MS)) {
+      throw new AppError('Too many caption requests for this meeting — slow down.', 'RATE_LIMITED');
+    }
+    const session = existingLiveSession(meetingId);
+    if (!session) {
+      // No audio has arrived yet: come back shortly instead of holding a request for nothing.
+      await new Promise((resolve) => setTimeout(resolve, Math.min(waitMs, 1_000)));
+      return { captions: [], cursor, draft: null, draftRev: 0, degraded: false };
+    }
+    await session.waitForUpdate(cursor, draftRev, waitMs);
     return { ...session.captionsSince(cursor), degraded: session.degraded };
   },
 };

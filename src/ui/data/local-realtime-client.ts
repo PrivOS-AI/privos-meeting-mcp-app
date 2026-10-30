@@ -2,24 +2,41 @@
  * Live captions from the app's own recognizer (`local` provider). The iframe
  * cannot reach the container directly, so audio goes through the host bridge:
  * the meeting's `MediaStream` is tapped with WebAudio, downsampled to 16 kHz
- * mono, and sent every ~500 ms as PCM16 to `meeting_audio_push`, one push at a
- * time. Each answer carries the captions recognised since our cursor; they
- * arrive per utterance on the meeting clock, preceded by a `draft` of the
- * speech still in progress that the final replaces.
+ * mono, and sent every ~250 ms as PCM16 to `meeting_audio_push`.
  *
- * A failed push keeps its chunk and is retried with the next one (same `seq`,
- * so the server never feeds it twice); the backlog is capped, and audio
- * dropped past the cap just costs captions — the recording is separate.
+ * Two independent paths, so neither waits for the other's relay round trip
+ * (~1 s):
+ *  - audio: up to `MAX_IN_FLIGHT` pushes travel at once (the server feeds them
+ *    in `seq` order); a push only feeds audio and answers at once;
+ *  - captions: `meeting_captions_wait` requests held open answer the moment a
+ *    caption or a new draft is decoded (two, staggered: `runCaptionWaits`).
+ *
+ * A failed push keeps its chunk and is sent again (same `seq`, so the server
+ * never feeds it twice); the backlog is capped, and audio dropped past the cap
+ * just costs captions — the recording is separate.
  */
 import type { CaptionEvent, RealtimeConnection, RealtimeConnectionOptions } from './realtime-client.js';
 
 const TARGET_RATE = 16_000;
-const PUSH_INTERVAL_MS = 500;
-/** At most ~4 s per push (the server's 128 KB cap): a push sends everything captured during the previous round trip. */
+const PUSH_INTERVAL_MS = 250;
+/** Pushes travelling at once: enough to keep audio flowing through a ~1 s relay round trip. */
+const MAX_IN_FLIGHT = 3;
+/** A push carries at least this much audio (except the last one), at most ~4 s (the server's 128 KB cap). */
+const MIN_PUSH_SAMPLES = TARGET_RATE * 0.2;
 const MAX_PUSH_SAMPLES = TARGET_RATE * 4;
 /** Unsent audio kept while pushes fail, ~20 s. */
 const MAX_BACKLOG_SAMPLES = TARGET_RATE * 20;
 const PROCESSOR_FRAMES = 4096;
+/** How long one caption wait is held open on the server. */
+const CAPTION_WAIT_MS = 5_000;
+/**
+ * Two waits are kept open, the second about half a relay round trip behind the
+ * first: while one answer travels back, the other is already waiting on the
+ * server, so a caption decoded at that moment does not wait for a new request.
+ * Measured with scripts/eval-caption-relay.ts: final captions ~0.15 s sooner.
+ */
+const CAPTION_WAITERS = 2;
+const WAITER_STAGGER_MS = 500;
 
 export interface AudioPushRequest {
   seq: number;
@@ -27,6 +44,14 @@ export interface AudioPushRequest {
   sampleRate: number;
   pcm: string;
   cursor: number;
+  /** false: the push only feeds audio (captions come from `meeting_captions_wait`). */
+  captions?: boolean;
+}
+
+export interface CaptionsWaitRequest {
+  cursor: number;
+  draftRev: number;
+  waitMs: number;
 }
 
 export interface AudioPushResponse {
@@ -36,6 +61,8 @@ export interface AudioPushResponse {
   degraded?: boolean;
   /** The speech still in progress; `null` once it ended (its final is in `captions`) or nobody talks. */
   draft?: { id: string; text: string; atSec: number; endSec: number; lang: string } | null;
+  /** Revision of `draft`, for the next caption wait. */
+  draftRev?: number;
 }
 
 /** Averages `input` (at `inputRate`) down to 16 kHz. Carries the fractional position across calls. */
@@ -82,8 +109,12 @@ export function floatToPcm16Base64(samples: Float32Array): string {
 export function createCaptionEmitter(onCaption: RealtimeConnectionOptions['onCaption']): (response: Pick<AudioPushResponse, 'captions' | 'draft'>) => void {
   /** Id of the draft line on screen, if any. */
   let shownDraft: string | null = null;
+  /** Finals already shown: two caption waits can both hand over the same one. */
+  const shownFinals = new Set<string>();
   return (response) => {
     for (const caption of response.captions) {
+      if (shownFinals.has(caption.id)) continue;
+      shownFinals.add(caption.id);
       const event: CaptionEvent = { kind: 'final', id: caption.id, text: caption.text, atSec: caption.atSec, endSec: caption.endSec, lang: caption.lang, ...(caption.speakerKey ? { speakerKey: caption.speakerKey } : {}) };
       onCaption(event);
     }
@@ -101,13 +132,98 @@ export function createCaptionEmitter(onCaption: RealtimeConnectionOptions['onCap
   };
 }
 
+/**
+ * How late captions show, measured where it matters (on screen, meeting clock):
+ * the first draft of each utterance after its speech started, each final after
+ * the speaker stopped. Logged to the console every 10 finals as medians.
+ */
+export function createLatencyMeter(recorderEpochMs: number, label: string): (response: Pick<AudioPushResponse, 'captions' | 'draft'>) => void {
+  const draftLags: number[] = [];
+  const finalLags: number[] = [];
+  const seenDrafts = new Set<number>();
+  const seenFinals = new Set<string>();
+  const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+  return (response) => {
+    const nowSec = (performance.now() - recorderEpochMs) / 1000;
+    const draft = response.draft;
+    if (draft && !seenDrafts.has(Math.round(draft.atSec * 10))) {
+      seenDrafts.add(Math.round(draft.atSec * 10));
+      draftLags.push(nowSec - draft.atSec);
+    }
+    let added = 0;
+    for (const caption of response.captions) {
+      if (seenFinals.has(caption.id)) continue;
+      seenFinals.add(caption.id);
+      finalLags.push(nowSec - caption.endSec);
+      added++;
+    }
+    if (added > 0 && finalLags.length % 10 === 0) {
+      const last = (xs: number[]) => xs.slice(-30);
+      console.info(`[captions:${label}] first draft ${median(last(draftLags))?.toFixed(2) ?? '–'} s after speech starts, final ${median(last(finalLags)).toFixed(2)} s after it stops (median of the last ${last(finalLags).length})`);
+    }
+  };
+}
+
+/** `promise`, or a rejection after `ms`: ending a meeting never hangs on a stalled request. */
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timed out')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+/**
+ * Keeps `CAPTION_WAITERS` caption waits open until `isClosed()`, handing each answer to
+ * `onAnswer`. `position()` is the client's cursor and draft revision at the time of asking.
+ */
+export function runCaptionWaits(
+  waitCaptions: (request: CaptionsWaitRequest) => Promise<AudioPushResponse>,
+  position: () => { cursor: number; draftRev: number },
+  onAnswer: (response: AudioPushResponse) => void,
+  isClosed: () => boolean,
+): void {
+  for (let waiter = 0; waiter < CAPTION_WAITERS; waiter++) {
+    void (async () => {
+      if (waiter > 0) await new Promise((resolve) => setTimeout(resolve, WAITER_STAGGER_MS * waiter));
+      while (!isClosed()) {
+        try {
+          const response = await waitCaptions({ ...position(), waitMs: CAPTION_WAIT_MS });
+          if (!isClosed()) onAnswer(response);
+          // The staggered waiter stays behind the first one instead of falling into step with it.
+          if (waiter > 0) await new Promise((resolve) => setTimeout(resolve, WAITER_STAGGER_MS * waiter));
+        } catch {
+          if (!isClosed()) await new Promise((resolve) => setTimeout(resolve, 1_000));
+        }
+      }
+    })();
+  }
+}
+
 export interface LocalConnectionOptions extends RealtimeConnectionOptions {
   pushAudio: (request: AudioPushRequest) => Promise<AudioPushResponse>;
+  /** Long-polls the captions; without it captions ride the push answers, one push at a time. */
+  waitCaptions?: (request: CaptionsWaitRequest) => Promise<AudioPushResponse>;
+}
+
+interface Chunk {
+  seq: number;
+  startSec: number;
+  samples: Float32Array;
 }
 
 export function createLocalConnection(opts: RealtimeConnectionOptions): RealtimeConnection {
-  const pushAudio = (opts as Partial<LocalConnectionOptions>).pushAudio;
+  const { pushAudio, waitCaptions } = opts as Partial<LocalConnectionOptions>;
   if (!pushAudio) throw new Error('The local caption client needs pushAudio.');
+  const maxInFlight = waitCaptions ? MAX_IN_FLIGHT : 1;
 
   const context = new AudioContext();
   const source = context.createMediaStreamSource(opts.stream);
@@ -119,11 +235,17 @@ export function createLocalConnection(opts: RealtimeConnectionOptions): Realtime
   let pending = new Float32Array(0);
   /** Meeting-clock second of `pending[0]`. */
   let pendingStartSec: number | null = null;
-  let seq = 0;
+  /** Cut but not yet accepted by the server, in seq order (a failed push goes back here). */
+  let unsent: Chunk[] = [];
+  let nextSeq = 0;
+  let inFlight = 0;
   let cursor = 0;
+  let draftRev = 0;
   let stopped = false;
-  let inFlight = false;
+  let closed = false;
   let live = false;
+  /** After a failed push, nothing is sent for a moment: a down relay is not hammered three pushes at a time. */
+  let pausedUntil = 0;
 
   processor.onaudioprocess = (event) => {
     if (stopped) return;
@@ -135,13 +257,7 @@ export function createLocalConnection(opts: RealtimeConnectionOptions): Realtime
     const merged = new Float32Array(pending.length + chunk.length);
     merged.set(pending);
     merged.set(chunk, pending.length);
-    const overflow = merged.length - MAX_BACKLOG_SAMPLES;
-    if (overflow > 0) {
-      pending = merged.slice(overflow);
-      pendingStartSec += overflow / TARGET_RATE;
-    } else {
-      pending = merged;
-    }
+    pending = merged;
   };
   source.connect(processor);
   processor.connect(mute);
@@ -149,37 +265,67 @@ export function createLocalConnection(opts: RealtimeConnectionOptions): Realtime
   void context.resume();
 
   const showCaptions = createCaptionEmitter(opts.onCaption);
+  const measure = createLatencyMeter(opts.recorderEpochMs, 'mic');
+  const onCaptions = (response: AudioPushResponse) => {
+    // Two waits answer independently: an older answer never moves the cursor back.
+    if (response.cursor < cursor) return;
+    cursor = response.cursor;
+    if (typeof response.draftRev === 'number') draftRev = response.draftRev;
+    showCaptions(response);
+    measure(response);
+  };
+  const setLive = (ok: boolean, error?: unknown) => {
+    if (ok && !live) opts.onStatus('live', { sessionIndex: 0 });
+    if (!ok) opts.onStatus('reconnecting', { sessionIndex: 0, error: error instanceof Error ? error.message : String(error) });
+    live = ok;
+  };
 
-  const pushOnce = async (): Promise<void> => {
-    if (inFlight || pendingStartSec === null || pending.length === 0) return;
-    inFlight = true;
-    const take = Math.min(pending.length, MAX_PUSH_SAMPLES);
-    const samples = pending.subarray(0, take);
-    try {
-      const response = await pushAudio({ seq, chunkStartSec: pendingStartSec, sampleRate: TARGET_RATE, pcm: floatToPcm16Base64(samples), cursor });
+  /** Cuts what was captured into a chunk; `all` takes even less than the minimum (stopping). */
+  const cut = (all: boolean) => {
+    while (pendingStartSec !== null && pending.length > 0 && (all || pending.length >= MIN_PUSH_SAMPLES)) {
+      const take = Math.min(pending.length, MAX_PUSH_SAMPLES);
+      unsent.push({ seq: nextSeq++, startSec: pendingStartSec, samples: pending.slice(0, take) });
       pending = pending.slice(take);
       pendingStartSec += take / TARGET_RATE;
-      seq++;
-      cursor = response.cursor;
-      showCaptions(response);
-      if (!live) {
-        live = true;
-        opts.onStatus('live', { sessionIndex: 0 });
-      }
-    } catch (error) {
-      // Keep the chunk; the next tick retries it with the same seq.
-      live = false;
-      opts.onStatus('reconnecting', { sessionIndex: 0, error: error instanceof Error ? error.message : String(error) });
-    } finally {
-      inFlight = false;
     }
-    // A round trip takes longer than the tick: send what piled up meanwhile right away instead of idling until it.
-    if (!stopped && live && pending.length >= TARGET_RATE / 4) void pushOnce();
+    // Pushes failing for a while: drop the oldest audio past the cap (the server notes the gap).
+    let backlog = unsent.reduce((n, c) => n + c.samples.length, 0);
+    while (backlog > MAX_BACKLOG_SAMPLES && unsent.length > 1) backlog -= unsent.shift()!.samples.length;
   };
+
+  const send = (chunk: Chunk) => {
+    inFlight++;
+    pushAudio({ seq: chunk.seq, chunkStartSec: chunk.startSec, sampleRate: TARGET_RATE, pcm: floatToPcm16Base64(chunk.samples), cursor, ...(waitCaptions ? { captions: false } : {}) })
+      .then((response) => {
+        setLive(true);
+        if (!waitCaptions) onCaptions(response);
+      })
+      .catch((error: unknown) => {
+        // Back in line by seq; the next tick sends it again.
+        unsent = [...unsent, chunk].sort((a, b) => a.seq - b.seq);
+        pausedUntil = Date.now() + 1_000;
+        setLive(false, error);
+      })
+      .finally(() => {
+        inFlight--;
+        pump();
+      });
+  };
+  const pump = () => {
+    if (Date.now() < pausedUntil) return;
+    while (inFlight < maxInFlight && unsent.length > 0) send(unsent.shift()!);
+  };
+
+  const tick = () => {
+    cut(false);
+    pump();
+  };
+
 
   opts.onStatus('connecting', { sessionIndex: 0 });
   opts.onStarted(0, 0);
-  const timer = setInterval(() => void pushOnce(), PUSH_INTERVAL_MS);
+  const timer = setInterval(tick, PUSH_INTERVAL_MS);
+  if (waitCaptions) runCaptionWaits(waitCaptions, () => ({ cursor, draftRev }), onCaptions, () => closed);
 
   return {
     async stop() {
@@ -187,10 +333,18 @@ export function createLocalConnection(opts: RealtimeConnectionOptions): Realtime
       stopped = true;
       clearInterval(timer);
       // Send what is left so the last utterance is recognised.
-      for (let attempt = 0; attempt < 3 && pending.length > 0; attempt++) {
-        while (inFlight) await new Promise((resolve) => setTimeout(resolve, 50));
-        await pushOnce();
+      cut(true);
+      for (let attempt = 0; attempt < 3 && (unsent.length > 0 || inFlight > 0); attempt++) {
+        pausedUntil = 0;
+        pump();
+        const deadline = Date.now() + 5_000;
+        while (inFlight > 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
       }
+      if (waitCaptions) {
+        // The last caption, if it is still being decoded.
+        await withTimeout(waitCaptions({ cursor, draftRev, waitMs: 1_500 }).then(onCaptions), 2_500).catch(() => undefined);
+      }
+      closed = true;
       processor.disconnect();
       source.disconnect();
       mute.disconnect();
