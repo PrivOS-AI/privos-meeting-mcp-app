@@ -1,8 +1,10 @@
 /**
  * `speaker_profile_list` / `_update` / `_delete` — the workspace-wide (global,
  * room-less) speaker-identity registry. `_list` returns display data ONLY,
- * never a vector, and is readable by any verified user (plan.md: showing the
- * roster workspace-wide is an accepted, documented trade-off). `_update`/
+ * never a vector, and is readable by any verified person in a room of the
+ * workspace (plan.md: showing the roster workspace-wide is an accepted,
+ * documented trade-off) — never by an agent or another app, and only with a
+ * room the Hub signed (`requirePersonInRoom`). `_update`/
  * `_delete` require `createdByUserId === actor.userId || isWorkspaceAdmin`.
  *
  * `_update`'s `action:'reenrol'` deliberately does NOT exist yet — it needs
@@ -18,7 +20,7 @@ import { readKnownRooms } from '../jobs/known-rooms-store.js';
 import * as profileStore from '../speaker/profile-store.js';
 import { workspaceMatchThreshold } from '../speaker/resolve-speakers.js';
 import { logEvent } from '../speaker/speaker-diagnostics-log.js';
-import { isWorkspaceAdmin, requireVerifiedActor } from './authz.js';
+import { isWorkspaceAdmin, requirePersonInRoom, requireVerifiedActor } from './authz.js';
 import type { AppTool } from './registry.js';
 import type { VerifiedActor } from '@privos_ai/app-server';
 import { DISPLAY_NAME, ID, NO_ARGUMENTS } from './schema-parts.js';
@@ -60,8 +62,8 @@ export const speakerProfileListTool: AppTool = {
   description: 'List every voiceprint profile in the workspace (name, links, sample count) — never returns the vector.',
   inputSchema: NO_ARGUMENTS,
   async execute(_args, context) {
-    const actor = requireVerifiedActor(context);
-    const db = new AppDbBotClient(actor.roomId ?? context.roomId);
+    const actor = requirePersonInRoom(context);
+    const db = new AppDbBotClient(actor.roomId);
     // Profile health uses the workspace-default match threshold, not this
     // room's tuned value: profiles are workspace-global and `pruneOutliers`
     // (workspace-wide) removes outliers on that same workspace-default

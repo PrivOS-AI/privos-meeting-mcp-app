@@ -34,6 +34,26 @@ export function requireVerifiedActor(context: ToolCallContext): VerifiedActor {
 }
 
 /**
+ * For private tools that need no meeting ownership but must not serve
+ * automation (the workspace's voiceprint roster, the bot credential status):
+ * a verified actor, signed into a room (`actor.roomId` — the Hub signs it only
+ * for a member, never the unsigned `context.roomId`), and not an agent or
+ * another app when the Hub says so. The caller policy already keeps those
+ * tools from agents; this holds on its own. On App Cluster dispatch an agent
+ * cannot be told apart (no `principalType`), so it passes as a person there.
+ */
+export function requirePersonInRoom(context: ToolCallContext): VerifiedActor & { roomId: string } {
+  const actor = requireVerifiedActor(context);
+  if (typeof actor.roomId !== 'string' || !actor.roomId) {
+    throw new AppError('Request denied: open the app in a room.', 'FORBIDDEN');
+  }
+  if (isAutomatedCaller(actor)) {
+    throw new AppError('This tool is not available to agents or other apps.', 'CALLER_NOT_ALLOWED');
+  }
+  return actor as VerifiedActor & { roomId: string };
+}
+
+/**
  * Loads `meetingId` and asserts: it belongs to `roomId`, `roomId` matches the
  * verified actor's own room (confused-deputy guard — a bot credential has no
  * per-user room boundary of its own), and the actor is the meeting's owner.

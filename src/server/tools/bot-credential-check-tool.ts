@@ -9,7 +9,11 @@
  * over the pairing/standalone-control channel, so an env-only check would
  * report "not-configured" even though the bot works. `GET /api/v1/me` succeeds
  * for any authenticated bot and carries its own identity.
+ *
+ * For a person in a room only (`requirePersonInRoom`): the bot's status is
+ * setup information for the app's own banner, not for agents or other apps.
  */
+import { requirePersonInRoom } from './authz.js';
 import type { AppTool } from './registry.js';
 import { NO_ARGUMENTS } from './schema-parts.js';
 
@@ -23,7 +27,8 @@ export const botCredentialCheckTool: AppTool = {
   title: 'Check bot credential',
   description: "Check the installation bot's credential against the Hub.",
   inputSchema: NO_ARGUMENTS,
-  async execute(_args, _context, runtime) {
+  async execute(_args, context, runtime) {
+    requirePersonInRoom(context);
     try {
       const response = await runtime.agentBotHub.authorizedFetch('/api/v1/me', {
         requiredScope: 'basic:information',
