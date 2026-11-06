@@ -14,10 +14,13 @@ const STATUS_EVERY_MS = 3_000;
 
 export type BrowserAudioState = 'connecting' | 'listening' | 'waiting' | 'stopped';
 export type BrowserAudioProblem = 'no_browser' | 'no_audio' | 'busy' | 'unavailable' | 'unauthorized';
+/** Why the server's listener stopped by itself (the meeting is then ended and processed on the server). */
+export type BrowserAudioEndReason = 'max_duration' | 'silence' | 'unreachable';
 
 export interface BrowserAudioResponse extends AudioPushResponse {
   state: BrowserAudioState;
   problem?: BrowserAudioProblem;
+  endReason?: BrowserAudioEndReason;
   heardSec: number;
   partsUploaded: number;
 }
@@ -28,7 +31,7 @@ export interface BrowserAudioConnectionOptions extends Pick<RealtimeConnectionCa
   poll: (cursor: number) => Promise<BrowserAudioResponse>;
   waitCaptions: (request: CaptionsWaitRequest) => Promise<AudioPushResponse>;
   /** The listener's state, for the "waiting for the Room browser" notice. */
-  onBrowserState: (state: BrowserAudioState, problem: BrowserAudioProblem | undefined) => void;
+  onBrowserState: (state: BrowserAudioState, problem: BrowserAudioProblem | undefined, endReason?: BrowserAudioEndReason) => void;
 }
 
 export function createBrowserAudioConnection(opts: BrowserAudioConnectionOptions): RealtimeConnection {
@@ -45,10 +48,17 @@ export function createBrowserAudioConnection(opts: BrowserAudioConnectionOptions
     measure(response);
   };
 
+  let timer: ReturnType<typeof setInterval> | undefined;
   const pollStatus = async (): Promise<void> => {
     try {
       const response = await opts.poll(cursor);
-      opts.onBrowserState(response.state, response.problem);
+      opts.onBrowserState(response.state, response.problem, response.endReason);
+      if (response.endReason) {
+        // Stopped by itself on the server: nothing more to poll for.
+        clearInterval(timer);
+        opts.onStatus('off', { sessionIndex: 0 });
+        return;
+      }
       opts.onStatus(response.state === 'listening' ? 'live' : 'reconnecting', { sessionIndex: 0, ...(response.problem ? { error: response.problem } : {}) });
     } catch (error) {
       opts.onStatus('reconnecting', { sessionIndex: 0, error: error instanceof Error ? error.message : String(error) });
@@ -59,7 +69,7 @@ export function createBrowserAudioConnection(opts: BrowserAudioConnectionOptions
   opts.onStatus('connecting', { sessionIndex: 0 });
   opts.onStarted(0, 0);
   void pollStatus();
-  const timer = setInterval(() => void pollStatus(), STATUS_EVERY_MS);
+  timer = setInterval(() => void pollStatus(), STATUS_EVERY_MS);
   runCaptionWaits(opts.waitCaptions, () => ({ cursor, draftRev }), onCaptions, () => closed);
 
   return {

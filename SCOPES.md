@@ -20,7 +20,7 @@ before `meeting_bootstrap`.
 | `sandbox:skills:use` | optional | user | `src/ui/data/agent-skill.ts` (`rooms.listPrivOSSandboxSkills`, `rooms.syncPrivOSSandboxSkills`: enable the Meeting skill for the Room's agent, Settings > Room agent) | The Room's agent cannot record calls; people still record from the app |
 | `sandbox:agent-sets:upload` | optional | user (workspace admin) | `src/ui/data/agent-skill.ts` (`agents.sandbox.agentSets.preview` / `.confirm` / `.delete`: upload the read-only Meeting skill to Agent Factory, only when this version is not there yet) | A workspace admin adds the skill to Agent Factory another way |
 | `rooms:read` | optional | user | `src/ui/data/room-members.ts` (`groups.members` / `channels.members` for the speaker member picker, and the room's member list for avatars in `src/ui/data/people.tsx`); `src/ui/data/open-in-files.ts` (`rooms.info`, the room type and name for the **Open in Files** link) | The user types a speaker name instead of picking a member; avatars show initials instead of photos; **Open in Files** assumes a private group named as the host reports it |
-| `rooms:roles:read` | optional | user | No API call: the Hub adds the signed `room_roles` / `workspace_roles` claims to the caller's identity; read in `src/server/tools/can-manage-room-settings.ts` (`meeting_settings_set`, full view of `meeting_stt_status`) and `src/server/tools/is-workspace-admin.ts` (admin access to any voiceprint profile) | Nobody can change the room's settings in the app (fail closed); the room keeps its current values or the defaults, and Settings shows them read-only. Workspace admins lose admin access to other people's voiceprints; creators keep access to their own |
+| `rooms:roles:read` | optional | user | No API call: the Hub adds the signed `room_roles` / `workspace_roles` claims to the caller's identity; read in `src/server/tools/can-manage-room-settings.ts` (`meeting_settings_set`, full view of `meeting_stt_status`; `meeting_listen_stop` through `authz.requireMeetingOwnerOrRoomModerator`: the room's owners and moderators may stop a Room-browser recording someone else, often the Room's agent, started) and `src/server/tools/is-workspace-admin.ts` (admin access to any voiceprint profile) | Nobody can change the room's settings in the app (fail closed); the room keeps its current values or the defaults, and Settings shows them read-only. Only whoever started a Room-browser recording can stop it (it still stops by itself, see below). Workspace admins lose admin access to other people's voiceprints; creators keep access to their own |
 | `lists:read` | optional | user | `src/ui/data/action-list-provisioner.ts` (`lists.listByRoomId`, `lists.info`) | The "Push to Smart List" button is hidden |
 | `lists:write` | optional | user | `src/ui/data/action-list-provisioner.ts` (`lists.create`, `lists.fields.create`, item create); gated in `src/ui/components/action-items-card.tsx` | The "Push to Smart List" button is hidden |
 | `bot:room:join` | optional | user | `src/ui/app.tsx` (`mcpapp.bot.joinCurrentRoom` before `meeting_bootstrap`) | An admin adds the bot to the room; processing pauses until it joins |
@@ -35,8 +35,27 @@ results; `meeting_agent_bot_credential_check` reports only valid/invalid.
 
 The Meeting skill (`agent-sets/privos-meeting`, packaged by
 `npm run package:agent-set`) runs in the Room's PrivOS Sandbox. It calls this
-app's `meeting_listen_start` / `_status` / `_stop` (and `meeting_ask`) through
-the Hub's `mcp-apps.tool-call` as the person the agent works for: the verified
-actor is that person, every tool keeps its owner and room checks, and the skill
-holds no credential. The app adds no permission for it beyond the two above.
+app's shared tools (`toolAccess`: `meeting_listen_start` / `_status` /
+`_stop`, `meeting_ask`, `meeting_status`) through the Hub with the
+`privos-mcp-apps` skill (or its bundled script). The Hub signs the call as the
+agent's own bot (`principalType: 'bot'`), not as the person who asked, so:
+
+- `tools/caller-policy.ts` lets the agent call only those five tools, only in the
+  room of its session; every other tool is refused (`CALLER_NOT_ALLOWED`);
+- a recording the agent starts belongs to its bot: the agent can read its live
+  status and stop it, and the room's owners and moderators can stop it too
+  (`rooms:roles:read` above), from the banner every room member sees;
+- `meeting_ask` and `meeting_status` read any meeting of the room, as any
+  room member can in the app (the history, summaries and questions are
+  room-wide);
+- a Room-browser recording stops by itself after `BROWSER_RECORDING_MAX_MIN`
+  (180), `BROWSER_RECORDING_SILENCE_STOP_MIN` (15) without sound, or
+  `BROWSER_RECORDING_UNREACHABLE_STOP_MIN` (10) without the Room browser's
+  audio, so a lost `meetingId` never leaves it recording.
+
+The skill holds no credential, and the app adds no permission for it beyond the
+two above. On App Cluster dispatch the Hub does not sign `principalType` yet:
+an agent then passes as a person, so the private tools that check no meeting
+owner (`speaker_profile_list`, `meeting_agent_bot_credential_check`) also
+require a Hub-signed room and refuse automation whenever it is marked.
 

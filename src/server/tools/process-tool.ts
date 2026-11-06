@@ -12,7 +12,7 @@ import { meetingId8 } from '../../shared/meeting-slug.js';
 import { DEFAULT_WORKSPACE_SETTINGS } from '../../shared/app-settings.js';
 import { finishLiveSession } from '../asr/live-asr-session.js';
 import { stopBrowserAudio } from '../browser-audio/browser-audio-listener.js';
-import { AppDbBotClient } from '../hub/app-db-bot-client.js';
+import { AppDbBotClient, type DbRow } from '../hub/app-db-bot-client.js';
 import { getSetting } from '../hub/app-settings.js';
 import { upsertMeeting } from '../jobs/meeting-repository.js';
 import type { PartRef } from '../media/concat-parts.js';
@@ -53,6 +53,7 @@ async function discoverParts(runtime: ToolRuntime, roomId: string, folderId: str
   return parts.sort((a, b) => a.seq - b.seq);
 }
 
+
 export const processTool: AppTool = {
   name: 'meeting_process',
   title: 'Process meeting',
@@ -66,50 +67,65 @@ export const processTool: AppTool = {
 
     const db = new AppDbBotClient(roomId);
     const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
-
-    const jobRepo = new JobRepository(db);
-    const existing = await jobRepo.findByMeeting(meetingId);
-    if (existing) {
-      if (existing.status === 'completed') return { jobId: existing.jobId, status: existing.status };
-      if (existing.status === 'queued') return { jobId: existing.jobId, status: existing.status };
-      if (existing.status === 'processing' && !isStale(existing.heartbeatAt)) {
-        return { jobId: existing.jobId, status: existing.status };
-      }
-      // failed, or a stale processing job — fall through to reset + re-run.
-    }
-
-    const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
-    if (!folderId) throw new AppError('Meeting has no storage folder yet — cannot process.', 'INVALID_STATE');
-    // A meeting recorded from the Room browser: its last part is uploaded before the parts are listed.
-    await stopBrowserAudio(meetingId);
-    const parts = await discoverParts(runtime, roomId, folderId, meetingId);
-    if (parts.length === 0) throw new AppError('Meeting has no recording parts to process.', 'INVALID_STATE');
-
-    const asyncVendor = await resolveAsyncVendor(db);
-    const sttProvider = asyncVendor === 'local' ? ('local' as const) : asyncVendor === 'elevenlabs' ? ('elevenlabs-batch' as const) : ('soniox-async' as const);
-    // The room's setting decides, read here on the server: the `keepAudio` the iframe wrote on the meeting row is ignored.
-    const keepAudio = (await getSetting<boolean>(db, 'keepOriginalAudio')) ?? DEFAULT_WORKSPACE_SETTINGS.keepOriginalAudio;
-    await upsertMeeting(db, meetingId, { keepAudio });
-
-    const job = await jobRepo.claim({
-      meetingId,
-      roomId,
-      partFileIds: parts.map((p) => p.fileId),
-      sttProvider,
-      language: typeof meeting.language === 'string' && meeting.language ? meeting.language : 'vi',
-      title: typeof meeting.title === 'string' ? meeting.title : '',
-      keepAudio,
-    });
-
-    // Recording is over: write the live speakers it found, then drop the live caption session
-    // (the transcript itself comes from the parts).
-    await finishLiveSession(meetingId);
-    void meetingQueue
-      .enqueue(meetingId, (signal) => runMeetingJob({ job, roomId, folderId, parts, agentBotHub: runtime.agentBotHub, signal }), JOB_TIMEOUT_MS)
-      .catch((error) => {
-        console.error('[meeting_process] job failed', { jobId: job.jobId, meetingId, error: error instanceof Error ? error.message : error });
-      });
-
-    return { jobId: job.jobId, status: 'queued' };
+    return startMeetingProcessing(db, runtime, roomId, meetingId, meeting);
   },
 };
+
+/**
+ * Queues the processing of a meeting whose caller is already authorized: the
+ * owner through `meeting_process`, a room moderator through
+ * `meeting_listen_stop`, or this server when a Room-browser recording stopped
+ * by itself. Idempotent by `meetingId`, as described at the top.
+ */
+export async function startMeetingProcessing(
+  db: AppDbBotClient,
+  runtime: ToolRuntime,
+  roomId: string,
+  meetingId: string,
+  meeting: DbRow,
+): Promise<{ jobId: string; status: string }> {
+  const jobRepo = new JobRepository(db);
+  const existing = await jobRepo.findByMeeting(meetingId);
+  if (existing) {
+    if (existing.status === 'completed') return { jobId: existing.jobId, status: existing.status };
+    if (existing.status === 'queued') return { jobId: existing.jobId, status: existing.status };
+    if (existing.status === 'processing' && !isStale(existing.heartbeatAt)) {
+      return { jobId: existing.jobId, status: existing.status };
+    }
+    // failed, or a stale processing job — fall through to reset + re-run.
+  }
+
+  const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
+  if (!folderId) throw new AppError('Meeting has no storage folder yet — cannot process.', 'INVALID_STATE');
+  // A meeting recorded from the Room browser: its last part is uploaded before the parts are listed.
+  await stopBrowserAudio(meetingId);
+  const parts = await discoverParts(runtime, roomId, folderId, meetingId);
+  if (parts.length === 0) throw new AppError('Meeting has no recording parts to process.', 'INVALID_STATE');
+
+  const asyncVendor = await resolveAsyncVendor(db);
+  const sttProvider = asyncVendor === 'local' ? ('local' as const) : asyncVendor === 'elevenlabs' ? ('elevenlabs-batch' as const) : ('soniox-async' as const);
+  // The room's setting decides, read here on the server: the `keepAudio` the iframe wrote on the meeting row is ignored.
+  const keepAudio = (await getSetting<boolean>(db, 'keepOriginalAudio')) ?? DEFAULT_WORKSPACE_SETTINGS.keepOriginalAudio;
+  await upsertMeeting(db, meetingId, { keepAudio });
+
+  const job = await jobRepo.claim({
+    meetingId,
+    roomId,
+    partFileIds: parts.map((p) => p.fileId),
+    sttProvider,
+    language: typeof meeting.language === 'string' && meeting.language ? meeting.language : 'vi',
+    title: typeof meeting.title === 'string' ? meeting.title : '',
+    keepAudio,
+  });
+
+  // Recording is over: write the live speakers it found, then drop the live caption session
+  // (the transcript itself comes from the parts).
+  await finishLiveSession(meetingId);
+  void meetingQueue
+    .enqueue(meetingId, (signal) => runMeetingJob({ job, roomId, folderId, parts, agentBotHub: runtime.agentBotHub, signal }), JOB_TIMEOUT_MS)
+    .catch((error) => {
+      console.error('[meeting_process] job failed', { jobId: job.jobId, meetingId, error: error instanceof Error ? error.message : error });
+    });
+
+  return { jobId: job.jobId, status: 'queued' };
+}

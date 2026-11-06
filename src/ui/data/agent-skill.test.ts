@@ -88,6 +88,11 @@ describe('installing the skill for the Room agent', () => {
     expect(calls.at(-1)!.body).toEqual({ rid: 'room-1', addAgentSetIds: ['new'] });
   });
 
+  it('reads a refusal the Hub returns as an answer (success: false) as the error it is', async () => {
+    const { app } = fakeApp({ 'rooms.listPrivOSSandboxSkills': () => ({ success: false, error: 'Scope sandbox:skills:use not granted' }) });
+    await expect(checkAgentSkill(app, 'room-1')).rejects.toMatchObject({ problem: 'not-allowed', message: expect.stringContaining('sandbox:skills:use') });
+  });
+
   it('says when PrivOS refuses (not an admin) or the Sandbox cannot load skills', async () => {
     const refuse = (message: string) => fakeApp({ 'rooms.listPrivOSSandboxSkills': () => { throw new Error(message); } }).app;
     await expect(installAgentSkill(refuse('Not allowed [error-not-allowed]'), 'room-1', archive)).rejects.toMatchObject({ problem: 'not-allowed' });

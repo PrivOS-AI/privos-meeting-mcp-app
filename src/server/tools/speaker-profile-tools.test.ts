@@ -163,4 +163,12 @@ describe('speaker_profile_list/_update/_delete', () => {
     expect(store.speaker_profiles).toHaveLength(0);
     expect(store.meeting_speakers.every((r) => r.profileId === '' && r.pendingEmbedding === '')).toBe(true);
   });
+  it('list is for people in a room the Hub signed — never an agent, another app, or a call without a room', async () => {
+    const base = ctx('anyone');
+    const as = (over: Record<string, unknown>): ToolCallContext => ({ ...base, actor: { ...base.actor!, ...over } as never });
+    await expect(speakerProfileListTool.execute({}, as({ principalType: 'bot' }), {} as never)).rejects.toMatchObject({ code: 'CALLER_NOT_ALLOWED' });
+    await expect(speakerProfileListTool.execute({}, as({ callerApp: 'ai.privos.other' }), {} as never)).rejects.toMatchObject({ code: 'CALLER_NOT_ALLOWED' });
+    await expect(speakerProfileListTool.execute({}, { ...as({ roomId: undefined }), roomId: 'room-1' } as ToolCallContext, {} as never)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(speakerProfileListTool.execute({}, { transport: 'direct', identityState: 'missing', sessionScope: 'test' }, {} as never)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
 });

@@ -20,3 +20,6 @@
 /resources export-ignore
 /scripts/spikes export-ignore
 /dist-source export-ignore
+
+# Platform guides and review notes are internal, not app source.
+/docs/platform-guides export-ignore

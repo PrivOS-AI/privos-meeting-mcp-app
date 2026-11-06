@@ -51,6 +51,8 @@ let fakeHub: ReturnType<typeof installFakeHub>;
 const { askTool, saveAnswerTool } = await import('./ask-tool.js');
 const { notesTool } = await import('./notes-tool.js');
 const { resetRateLimits } = await import('./rate-limiter.js');
+const { statusTool } = await import('./status-tool.js');
+const { applyCallerPolicy } = await import('./caller-policy.js');
 
 function ctx(userId = 'u-ngan', roomId = 'room-1'): ToolCallContext {
   return { transport: 'direct', identityState: 'verified', sessionScope: 'test', actor: { userId, roomId, claims: {}, provenance: 'user-token' } };
@@ -136,5 +138,22 @@ describe('meeting_notes_save', () => {
 
   it('is for the meeting owner only', async () => {
     await expect(notesTool.execute({ roomId: 'room-1', meetingId: 'm1', text: 'x', revision: 1 }, ctx('u-other'), {} as never)).rejects.toMatchObject({ code: 'NOT_MEETING_OWNER' });
+  });
+  it("the Room's agent reads any meeting of its own room, as a room member does in the app — never another room's", async () => {
+    // Read rule for agents = the app's own: the history, a meeting's summary and Ask are room-wide.
+    const agent = (roomId: string): ToolCallContext => ({ ...ctx('agent-bot', roomId), actor: { ...ctx('agent-bot', roomId).actor!, principalType: 'bot' } });
+    aiReplies.push('{"answer":"Quỳnh.","citations":["L2"],"insufficient":false}');
+    const args = applyCallerPolicy('meeting_ask', agent('room-1').actor!, { meetingId: 'm1', question: 'Ai gửi báo giá?' });
+    await expect(askTool.execute(args, agent('room-1'), {} as never)).resolves.toMatchObject({ answer: 'Quỳnh.' });
+    await expect(statusTool.execute(applyCallerPolicy('meeting_status', agent('room-1').actor!, { meetingId: 'm1' }), agent('room-1'), {} as never)).resolves.toMatchObject({ status: 'not_found' });
+
+    // An agent of another room: refused by the caller policy (signed room ≠ argument) or by the tool (no such meeting there).
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      expect(() => applyCallerPolicy('meeting_status', agent('room-2').actor!, { roomId: 'room-1', meetingId: 'm1' })).toThrow(expect.objectContaining({ code: 'ROOM_MISMATCH' }));
+    } finally {
+      warn.mockRestore();
+    }
+    await expect(statusTool.execute(applyCallerPolicy('meeting_status', agent('room-2').actor!, { meetingId: 'm1' }), agent('room-2'), {} as never)).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });

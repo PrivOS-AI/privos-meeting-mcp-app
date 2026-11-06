@@ -2,7 +2,7 @@
   "schemaVersion": 3,
   "kind": "mcp-app",
   "name": "ai.privos.meeting-agent",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "title": "PrivOS Meeting App",
   "description": "A PrivOS MCP app for offline meeting capture: bilingual live captions with speaker labels, cross-session speaker identity via voiceprints, Hub-AI summaries, and transcript storage in PrivOS Files.",
   "icon": "/public/icon.svg",
@@ -22,7 +22,9 @@
     }
   ],
   "capabilities": {
-    "verifiedActor": true
+    "verifiedActor": true,
+    "caller_app": true,
+    "cross_room": true
   },
   "agentBot": {
     "name": "PrivOS Meeting App",
@@ -508,7 +510,7 @@
     {
       "name": "meeting_status",
       "title": "Meeting processing status",
-      "description": "View meeting processing progress: current step, percent complete, and the result when finished.",
+      "description": "View meeting processing progress: current step, percent complete, and the result when finished. Read-only.",
       "inputSchema": {
         "type": "object",
         "required": [
@@ -1010,7 +1012,7 @@
     {
       "name": "meeting_listen_start",
       "title": "Start recording the Room browser",
-      "description": "Start recording a meeting from the Room's shared browser (PrivOS Remote Browser) after it joined the call (e.g. Google Meet): live captions, then transcript and summary at the end. Only after the user confirmed the participants were told the meeting is recorded.",
+      "description": "Start recording a meeting from the Room's shared browser (PrivOS Remote Browser) after it joined the call (e.g. Google Meet): live captions, then transcript and summary at the end. Only after the user confirmed the participants were told the meeting is recorded. Calling it again while that recording runs returns the same meeting.",
       "inputSchema": {
         "type": "object",
         "required": [
@@ -1053,7 +1055,7 @@
     {
       "name": "meeting_listen_status",
       "title": "Room browser recording status",
-      "description": "Whether a meeting recorded from the Room browser hears the call (and the latest captions), or its summary once processed — only the meeting owner.",
+      "description": "Whether a meeting recorded from the Room browser hears the call (and the latest captions), or its summary once processed — only the meeting owner. Read-only.",
       "inputSchema": {
         "type": "object",
         "required": [
@@ -1077,7 +1079,7 @@
     {
       "name": "meeting_listen_stop",
       "title": "Stop recording the Room browser",
-      "description": "Stop recording a meeting from the Room browser, save the last audio and start the transcript and summary — only the meeting owner. Poll meeting_listen_status for the summary.",
+      "description": "Stop recording a meeting from the Room browser, save the last audio and start the transcript and summary — the meeting owner, or the room's owners and moderators. Poll meeting_listen_status for the summary.",
       "inputSchema": {
         "type": "object",
         "required": [
@@ -1101,7 +1103,7 @@
     {
       "name": "meeting_ask",
       "title": "Ask about a meeting",
-      "description": "Answer a question about one meeting from its transcript (or, while it runs, the captions so far), citing the lines that support the answer. Nothing is stored.",
+      "description": "Answer a question about one meeting from its transcript (or, while it runs, the captions so far), citing the lines that support the answer. Read-only: nothing is stored.",
       "inputSchema": {
         "type": "object",
         "required": [
@@ -1292,6 +1294,13 @@
       }
     }
   ],
+  "toolAccess": {
+    "meeting_listen_start": "shared",
+    "meeting_listen_status": "shared",
+    "meeting_listen_stop": "shared",
+    "meeting_ask": "shared",
+    "meeting_status": "shared"
+  },
   "ui": {
     "distDir": "dist/ui"
   },
@@ -1453,6 +1462,27 @@
       "secret": true
     },
     {
+      "key": "BROWSER_RECORDING_MAX_MIN",
+      "description": "Optional. A meeting recorded from the Room browser stops by itself after this many minutes, then is processed.",
+      "required": false,
+      "secret": false,
+      "default": "180"
+    },
+    {
+      "key": "BROWSER_RECORDING_SILENCE_STOP_MIN",
+      "description": "Optional. A Room-browser recording stops by itself after this many minutes without sound (a silent or ended call).",
+      "required": false,
+      "secret": false,
+      "default": "15"
+    },
+    {
+      "key": "BROWSER_RECORDING_UNREACHABLE_STOP_MIN",
+      "description": "Optional. A Room-browser recording stops by itself when the Room browser's audio cannot be reached for this many minutes.",
+      "required": false,
+      "secret": false,
+      "default": "10"
+    },
+    {
       "key": "SUMMARY_MODEL",
       "description": "Hub AI model used for summaries.",
       "required": false,
@@ -1500,6 +1530,12 @@
     {
       "key": "ALLOW_UNVERIFIED_ACTOR",
       "description": "Dev only: allow tool calls with an unverified actor. Production always fails closed.",
+      "required": false,
+      "secret": false
+    },
+    {
+      "key": "ALLOWED_CALLER_APPS",
+      "description": "Optional. Comma-separated app ids (e.g. ai.privos.vibe-flow) whose servers may call this app's shared tools. Unset: no other app may.",
       "required": false,
       "secret": false
     }

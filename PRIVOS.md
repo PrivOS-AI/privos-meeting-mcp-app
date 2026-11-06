@@ -59,12 +59,33 @@ PrivOS has no app-to-app call yet; `src/server/browser-audio/`. To turn it on:
 
 Unset, the "Audio source" choice is hidden and nothing changes.
 
+Such a recording stops by itself (then is processed) after
+`BROWSER_RECORDING_MAX_MIN` (default 180), `BROWSER_RECORDING_SILENCE_STOP_MIN`
+(15) without sound, or `BROWSER_RECORDING_UNREACHABLE_STOP_MIN` (10) without
+reaching the Room browser's audio; the reason is kept as `captureEndReason`.
+Its owner, or the room's owners and moderators, can stop it from the banner.
+While the browser cannot be reached the log shows one `[browser-audio] cannot
+hear the Room browser` line, then at most one a minute: a steady stream of
+them means the two containers are not on one network.
+
 The Room's agent can do the same from the Room chat ("@agent vào <Meet link> và
 ghi lại cuộc họp") once the Meeting skill is installed (Settings → Room agent):
 it joins with Remote Browser's skill, then calls `meeting_listen_*` through the
 Hub. After editing `agent-sets/privos-meeting/`, run `npm run package:agent-set`
 (a test fails if the archive is stale) — the archive is part of the UI, so it
 needs a version bump like any UI change.
+
+### Agents and other apps
+
+Only the tools in the manifest's `toolAccess` (`shared`) are for agents and
+other apps; `tools/caller-policy.ts` enforces that before any tool runs, pins
+an automated caller to the signed room (`actor.roomId`, never the `roomId`
+argument), and refuses other apps' servers unless listed in
+`ALLOWED_CALLER_APPS` (unset: none) and always from outside the room. Sharing
+one more tool needs the owner to approve the upgrade again. Every refusal logs
+one line, `[caller-policy] refused <code> room=… callerApp=… ptype=… tool=…`
+(`CALLER_NOT_ALLOWED`, `CROSS_ROOM_NOT_ALLOWED` or `ROOM_MISMATCH`): grep for it
+when an agent's call fails on Dev.
 
 ## Settings
 

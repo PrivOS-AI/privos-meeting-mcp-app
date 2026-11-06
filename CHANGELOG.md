@@ -1,5 +1,86 @@
 # Changelog
 
+## [1.5.0] — 2026-11-06
+
+Fixes from the shared-tools review (2026-11-04). The manifest changes (version,
+`meeting_listen_stop` description, three optional env keys): an admin clicks
+Refresh after the deploy.
+
+A recording the Room's agent starts can always be stopped, and stops by itself:
+- The meeting belongs to the agent's bot (the Hub does not sign which person
+  asked), so the room's owners and moderators (and workspace admins) may now
+  stop a Room-browser recording too: `meeting_listen_stop` reads their roles
+  from the signed claims (`rooms:roles:read`, already declared optional;
+  without it only the owner can). An agent's roles never count.
+- The banner shows a running Room-browser recording to everyone in the room,
+  with how long it has run; its owner keeps Watch live / End, room owners and
+  moderators get **Stop** (stopping → stopped, or why it failed with Try
+  again).
+- The server stops such a recording by itself after
+  `BROWSER_RECORDING_MAX_MIN` (default 180), after
+  `BROWSER_RECORDING_SILENCE_STOP_MIN` (15) without sound, or after
+  `BROWSER_RECORDING_UNREACHABLE_STOP_MIN` (10) without reaching the Room
+  browser's audio, then processes what it saved. With nothing saved the
+  meeting is `failed` ("The Room's browser audio could not be reached.").
+  The reason is kept on the meeting (`captureEndReason`, a new App DB field
+  registered at the next `meeting_bootstrap`), shown on the banner for an hour
+  and on the live screen, and returned by `meeting_listen_status`
+  (`endReason`).
+- Reconnects to the Room browser back off from 2 s to 60 s, and the failure is
+  logged once and then at most once a minute (Dev had logged one line every
+  4 s for two days). A listener whose meeting was deleted or ended elsewhere
+  stops; an ended one is never restarted.
+- Two `meeting_listen_start` calls at the same moment make one meeting.
+
+Agents and other apps:
+- Caller-policy refusals have their own codes (`CALLER_NOT_ALLOWED`,
+  `CROSS_ROOM_NOT_ALLOWED`, `ROOM_MISMATCH`) and log one line each:
+  `[caller-policy] refused <code> room=… callerApp=… ptype=… tool=…`.
+- `speaker_profile_list` and `meeting_agent_bot_credential_check` are for a
+  person in a Hub-signed room only, also on App Cluster dispatch, which does
+  not tell an agent from a person yet.
+- The Meeting skill: after a timed-out `meeting_listen_start`, call it again
+  (it continues the recording); `meeting_ask` and `meeting_status` read any
+  meeting of the Room, as members can in the app; the automatic stop and its
+  `endReason`.
+
+Housekeeping: `privos-standalone-identity*.json` (also the pairing's
+`.pending.json`) is ignored by git and Docker; `npm audit fix` (`qs` 6.16.2,
+`source-map-js`, `vite` 6.4.5).
+
+## [1.4.4] — 2026-11-04
+
+Agents and other apps, per the platform guide of 2026-11-03 (SDK
+`@privos_ai/app-server` 0.12.3 → 0.13.2):
+- The manifest shares five tools with agents (`toolAccess`):
+  `meeting_listen_start`, `meeting_listen_status`, `meeting_listen_stop`,
+  `meeting_ask` and `meeting_status` — what the Room agent's Meeting skill
+  uses. Every other tool (bot credential check, realtime token, audio and part
+  ingest, settings, voiceprint edits and deletes, …) stays for people and this
+  app's own server. `capabilities` adds `caller_app` and `cross_room`, so the
+  Hub signs who is calling on App Cluster dispatch too.
+- Every tool call passes one check before it runs (`tools/caller-policy.ts`):
+  another app's server is refused unless its id is in the new optional
+  `ALLOWED_CALLER_APPS` (unset: none), and always from outside the room; an
+  agent or another app may call only the shared tools, and only in the room
+  signed on the call: a different `roomId` argument is refused
+  (`ROOM_MISMATCH`), a missing one is filled in. Refusals carry the new code
+  `CALLER_NOT_ALLOWED`.
+- The Room agent's Meeting skill calls the app through the default
+  `privos-mcp-apps` skill (`apps.py call`), the bundled script staying as the
+  fallback for a Sandbox without it. The shared read tools say "Read-only" in
+  their description.
+
+## [1.4.3] — 2026-10-30
+
+- Settings → Room agent says why installing the skill fails instead of only
+  "Installing the skill failed": the Hub's own error text is shown under the
+  message (and logged to the console), and a missing `sandbox:skills:use` /
+  `sandbox:agent-sets:upload` grant is named up front with where an admin
+  approves it. A refusal the Hub returns as an answer (`success: false`, or an
+  HTTP error status) is read as an error, and `data`/`body` wrapping is
+  unwrapped as Remote Browser does. A "Check again" button retries the check.
+
 ## [1.4.2] — 2026-10-30
 
 Smoother interface, checked in the mock host (light and dark):

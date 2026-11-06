@@ -98,7 +98,7 @@ export function LiveScreen({ onEnded }: LiveScreenProps) {
     <>
       {!state.wakeLock.supported || state.wakeLock.error ? <KeepAwakeNotice /> : null}
       {state.captionStatus === 'capacity' ? <CapacityNotice /> : null}
-      {state.browserAudio?.problem ? <BrowserAudioNotice problem={state.browserAudio.problem} /> : null}
+      {state.browserAudio?.problem || state.browserAudio?.endReason ? <BrowserAudioNotice problem={state.browserAudio.problem} endReason={state.browserAudio.endReason} title={state.title} /> : null}
       <UploadStatusNotice pendingParts={state.pendingParts} lostParts={state.lostParts} issue={state.uploadIssue} />
       {state.capabilities && !(state.capabilities.liveSpeakers ?? state.capabilities.speakerLabels) ? <DegradedLabelsNotice /> : null}
     </>

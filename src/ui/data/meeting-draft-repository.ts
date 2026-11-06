@@ -91,6 +91,10 @@ export interface ActiveRecordingMeeting {
   language?: string;
   /** `browser`: the app server records it from the Room's shared browser (maybe started by the Room's agent); it is live, not stuck. */
   captureSource?: string;
+  /** Whose it is: for a recording the Room's agent started, the agent's bot. */
+  ownerUserId?: string;
+  /** Set when a Room-browser recording stopped by itself: `max_duration` | `silence` | `unreachable`. */
+  captureEndReason?: string;
 }
 
 /** Meetings owned by the current user that look abandoned — drives the recovery banner. */
@@ -105,4 +109,22 @@ export async function listActiveRecordingMeetings(app: McpApp, roomId: string, o
     limit: 20,
   });
   return (records as unknown as ActiveRecordingMeeting[]).filter((m) => !m.endedAt);
+}
+
+/**
+ * The room's latest meetings recorded from the Room's shared browser, whoever
+ * owns them (the room's history is room-wide already): the banner shows a
+ * running one to everyone, and one that stopped by itself.
+ */
+export async function listRoomBrowserRecordings(app: McpApp, roomId: string): Promise<ActiveRecordingMeeting[]> {
+  const { records } = await new AppDbClient(app).query({
+    collection: 'meetings',
+    where: [
+      { field: 'roomId', op: '==', value: roomId },
+      { field: 'captureSource', op: '==', value: 'browser' },
+    ],
+    orderBy: [{ field: 'startedAt', direction: 'desc' }],
+    limit: 10,
+  });
+  return records as unknown as ActiveRecordingMeeting[];
 }

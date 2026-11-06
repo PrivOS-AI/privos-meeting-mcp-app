@@ -21,5 +21,6 @@ resources
 *.tsbuildinfo
 *credentials*
 **/privos-standalone-identity.json*
+**/privos-standalone-identity*.json
 runtime
 coverage

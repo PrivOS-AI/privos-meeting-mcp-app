@@ -86,7 +86,7 @@ async function askHubAi(runtime: ToolRuntime, roomId: string, prompt: string, se
 export const askTool: AppTool = {
   name: 'meeting_ask',
   title: 'Ask about a meeting',
-  description: 'Answer a question about one meeting from its transcript (or, while it runs, the captions so far), citing the lines that support the answer. Nothing is stored.',
+  description: 'Answer a question about one meeting from its transcript (or, while it runs, the captions so far), citing the lines that support the answer. Read-only: nothing is stored.',
   inputSchema: {
     type: 'object',
     required: ['roomId', 'meetingId', 'question'],

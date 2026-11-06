@@ -13,8 +13,9 @@ dist-source/
 *.local
 .DS_Store
 # Written by `npm run pair` (SDK's DEFAULT_STANDALONE_IDENTITY_FILE) — a live
-# dispatch-trust credential, never committed.
-/privos-standalone-identity.json
+# dispatch-trust credential, never committed; the wildcard also covers the
+# pairing's `privos-standalone-identity.pending.json`.
+/privos-standalone-identity*.json
 /privos-standalone-identity.json.*
 # Container deploy: identity dir mounted into the container (a credential).
 /runtime/

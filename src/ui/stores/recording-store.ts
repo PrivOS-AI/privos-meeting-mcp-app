@@ -23,7 +23,7 @@ import { listParts, notifyChunkReady, uploadPart } from '../data/meeting-part-up
 import { uploadLiveCaptions, type CaptionExportLine } from '../data/meeting-caption-upload.js';
 import { PartUploadQueue } from '../data/part-upload-queue.js';
 import { isLanguageCode } from '../../shared/languages.js';
-import { createBrowserAudioConnection, type BrowserAudioProblem, type BrowserAudioResponse, type BrowserAudioState } from '../data/browser-audio-client.js';
+import { createBrowserAudioConnection, type BrowserAudioEndReason, type BrowserAudioProblem, type BrowserAudioResponse, type BrowserAudioState } from '../data/browser-audio-client.js';
 import { createRealtimeClient, type CaptionEvent, type CaptionStatus, type LiveTurn, type RealtimeConnection } from '../data/realtime-client.js';
 import { LiveSpeakerPoll, type LiveSpeaker, type ServerTurn } from '../data/live-speaker-poll.js';
 import { speakerResolve, type RealtimeAssignChoice } from '../data/speaker-api.js';
@@ -100,8 +100,8 @@ export interface RecordingState {
   bookmarkRev: number;
   /** Where the audio comes from: this device's microphone, or the Room's shared browser (a Google Meet call it joined). */
   captureSource: CaptureSource;
-  /** Room-browser recordings: the server listener's state and, while it cannot hear the browser, why. */
-  browserAudio?: { state: BrowserAudioState; problem?: BrowserAudioProblem };
+  /** Room-browser recordings: the server listener's state and, while it cannot hear the browser, why; once it stopped by itself, why. */
+  browserAudio?: { state: BrowserAudioState; problem?: BrowserAudioProblem; endReason?: BrowserAudioEndReason };
   error?: string;
 }
 
@@ -703,9 +703,11 @@ export class RecordingStore {
         }
       },
       onStatus: (status) => this.setState({ captionStatus: status }),
-      onBrowserState: (state, problem) => {
+      onBrowserState: (state, problem, endReason) => {
         const current = this.state.browserAudio;
-        if (current?.state !== state || current?.problem !== problem) this.setState({ browserAudio: { state, ...(problem ? { problem } : {}) } });
+        if (current?.state !== state || current?.problem !== problem || current?.endReason !== endReason) {
+          this.setState({ browserAudio: { state, ...(problem ? { problem } : {}), ...(endReason ? { endReason } : {}) } });
+        }
       },
     });
   }
