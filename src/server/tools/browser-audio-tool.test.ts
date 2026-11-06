@@ -12,6 +12,7 @@ vi.mock('../hub/resolve-own-mcp-app-id.js', () => ({ resolveOwnMcpAppId: async (
 // The listener itself is covered by browser-audio-listener.test.ts; here only who may drive it.
 const started: Array<{ roomId: string; folderId: string; meetingId: string }> = [];
 let running = false;
+let ended: Record<string, unknown> | undefined;
 vi.mock('../browser-audio/browser-audio-listener.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../browser-audio/browser-audio-listener.js')>();
   const listener = { status: () => ({ state: 'listening', heardSec: 3, partsUploaded: 0 }), captionsSince: () => ({ captions: [], cursor: 0, draft: null, degraded: false }) };
@@ -23,6 +24,7 @@ vi.mock('../browser-audio/browser-audio-listener.js', async (importOriginal) => 
       return listener;
     },
     browserAudioFor: () => (running ? listener : undefined),
+    browserAudioEnded: () => ended,
     stopBrowserAudio: async () => {
       const was = running;
       running = false;
@@ -50,6 +52,7 @@ describe('meeting_browser_audio', () => {
     resetBrowserAudioOwnerChecksForTests();
     started.length = 0;
     running = false;
+    ended = undefined;
     env.remoteBrowserAudioUrl = 'http://remote-browser:8787';
     env.remoteBrowserAudioTapKey = 'k'.repeat(40);
     store = { meetings: [{ _id: 'meeting-1', roomId: 'room-1', ownerUserId: 'owner-1', status: 'recording', folderId: 'folder-1' }] };
@@ -83,5 +86,14 @@ describe('meeting_browser_audio', () => {
   it('says when a meeting is not listening to the Room browser', async () => {
     await expect(browserAudioTool.execute(args('poll'), ctx(), runtime)).rejects.toMatchObject({ code: 'INVALID_STATE' });
     await expect(browserAudioTool.execute({ ...args('start'), action: 'listen' }, ctx(), runtime)).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+  });
+  it('a poll after the listener stopped by itself says why instead of failing, to the owner only', async () => {
+    await browserAudioTool.execute(args('start'), ctx(), runtime);
+    running = false;
+    ended = { state: 'stopped', heardSec: 900, partsUploaded: 15, endReason: 'silence' };
+    store.meetings[0].status = 'uploading';
+    resetBrowserAudioOwnerChecksForTests();
+    await expect(browserAudioTool.execute(args('poll'), ctx(), runtime)).resolves.toMatchObject({ state: 'stopped', endReason: 'silence', captions: [] });
+    await expect(browserAudioTool.execute(args('poll'), ctx('someone-else'), runtime)).rejects.toMatchObject({ code: 'NOT_MEETING_OWNER' });
   });
 });

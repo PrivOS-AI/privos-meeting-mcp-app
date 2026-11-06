@@ -1,18 +1,25 @@
 /**
  * Recording a Google Meet call on behalf of the Room's agent: three tools the
- * agent calls through the Hub (`mcp-apps.tool-call`, as the person who asked,
- * so the verified actor is that person) after it joined the call with the
- * Room's shared browser (PrivOS Remote Browser). The server does everything the
- * app tab would: the meeting row, its Files folder, listening to the browser
- * (`browser-audio/`), and processing at the end. No app tab needs to be open.
+ * agent calls through the Hub (`mcp-apps.tool-call`, signed as the agent's own
+ * bot, `principalType: 'bot'` — the Hub does not say which person asked) after
+ * it joined the call with the Room's shared browser (PrivOS Remote Browser).
+ * The server does everything the app tab would: the meeting row, its Files
+ * folder, listening to the browser (`browser-audio/`), and processing at the
+ * end. No app tab needs to be open.
  *
  *  - `meeting_listen_start`: refuses until the caller confirms the participants
  *    were told the meeting is recorded (`participantsInformed`); a retry while
- *    that person's earlier start is still recording returns the same meeting.
+ *    that caller's earlier start is still recording returns the same meeting,
+ *    also when two starts arrive at once (one at a time per room and caller).
  *  - `meeting_listen_status`: what it hears, or the result once processed.
  *  - `meeting_listen_stop`: saves the last part and starts processing.
  *
- * Owner-only like every recording tool; the meeting belongs to the caller.
+ * The meeting belongs to the caller (for the agent: its bot). Its owner may
+ * read and stop it; the room's owners and moderators may stop it too
+ * (`requireMeetingOwnerOrRoomModerator`), from the app's banner. Nobody has to:
+ * the listener stops by itself after the longest allowed recording, a stretch
+ * without sound, or when the Room browser cannot be reached
+ * (`end-browser-recording.ts`).
  */
 import { AppError } from '../../shared/app-error.js';
 import { asLanguageCode, defaultTranslationTarget, SUPPORTED_LANGUAGES } from '../../shared/languages.js';
@@ -20,8 +27,9 @@ import { folderName, slugify } from '../../shared/meeting-slug.js';
 import { browserAudioConfigured, browserAudioFor, startBrowserAudio, stopBrowserAudio } from '../browser-audio/browser-audio-listener.js';
 import { ensureRoomFolderPath } from '../files/hub-folders.js';
 import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
-import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
-import { processTool } from './process-tool.js';
+import { requireMeetingOwner, requireMeetingOwnerOrRoomModerator, requireVerifiedActor } from './authz.js';
+import { endOnAutoStop } from './end-browser-recording.js';
+import { startMeetingProcessing } from './process-tool.js';
 import { checkRateLimit } from './rate-limiter.js';
 import type { AppTool } from './registry.js';
 import { ROOM_AND_MEETING } from './schema-parts.js';
@@ -38,6 +46,23 @@ function text(value: unknown, max: number): string {
 
 function notConfigured(): AppError {
   return new AppError('Listening through the Room browser is not set up on this deployment.', 'PROVIDER_NOT_CONFIGURED');
+}
+
+/**
+ * One start at a time per room and caller: the "already recording?" check and
+ * the create below are two Hub calls, so two parallel starts would otherwise
+ * both miss the running meeting and make two. In memory, like the listeners
+ * (one replica).
+ */
+const starting = new Map<string, Promise<unknown>>();
+async function oneStartAtATime<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const current = (starting.get(key) ?? Promise.resolve()).catch(() => undefined).then(run);
+  starting.set(key, current);
+  try {
+    return await current;
+  } finally {
+    if (starting.get(key) === current) starting.delete(key);
+  }
 }
 
 export const listenStartTool: AppTool = {
@@ -70,52 +95,54 @@ export const listenStartTool: AppTool = {
     const db = new AppDbBotClient(roomId);
     const hub = runtime.agentBotHub;
 
-    // A retry (the agent ran the step twice, or the app restarted) continues this person's running recording.
-    const running = extractDbRecords(
-      await db.query('meetings', 'room', {
-        where: [
-          { field: 'ownerUserId', op: '==', value: actor.userId },
-          { field: 'status', op: '==', value: 'recording' },
-          { field: 'captureSource', op: '==', value: 'browser' },
-        ],
-        limit: 5,
-      }),
-    ).find((row) => row.roomId === roomId && typeof row.folderId === 'string' && row.folderId);
-    if (running) {
-      const listener = startBrowserAudio({ db, hub, roomId, folderId: running.folderId as string, meetingId: running._id });
-      return { meetingId: running._id, title: running.title ?? '', continued: true, ...listener.status() };
-    }
+    return oneStartAtATime(`${roomId}:${actor.userId}`, async () => {
+      // A retry (the agent ran the step twice, or the app restarted) continues this caller's running recording.
+      const running = extractDbRecords(
+        await db.query('meetings', 'room', {
+          where: [
+            { field: 'ownerUserId', op: '==', value: actor.userId },
+            { field: 'status', op: '==', value: 'recording' },
+            { field: 'captureSource', op: '==', value: 'browser' },
+          ],
+          limit: 5,
+        }),
+      ).find((row) => row.roomId === roomId && typeof row.folderId === 'string' && row.folderId);
+      if (running) {
+        const listener = startBrowserAudio({ db, hub, roomId, folderId: running.folderId as string, meetingId: running._id, onAutoStop: endOnAutoStop(db, runtime, roomId, running._id) });
+        return { meetingId: running._id, title: running.title ?? '', continued: true, ...listener.status() };
+      }
 
-    const language = asLanguageCode(args.language);
-    const startedAt = new Date();
-    const title = text(args.title, 200) || `Google Meet ${startedAt.toISOString().slice(0, 16).replace('T', ' ')}`;
-    const created = (await db.create('meetings', 'room', {
-      roomId,
-      title,
-      slug: slugify(title),
-      language,
-      translationEnabled: false,
-      translationLang: defaultTranslationTarget(language),
-      voiceprintNoticeAt: startedAt.toISOString(),
-      ownerUserId: actor.userId,
-      startedAt: startedAt.toISOString(),
-      status: 'recording',
-      partCount: 0,
-      lastPartAt: startedAt.toISOString(),
-      captureSource: 'browser',
-    })) as { _id?: unknown } | null;
-    const meetingId = typeof created?._id === 'string' ? created._id : '';
-    if (!meetingId) throw new AppError('App DB did not return the new meeting.', 'HUB_ERROR');
-    try {
-      const folderId = await ensureRoomFolderPath(hub, roomId, folderName(title, meetingId, startedAt));
-      await db.update('meetings', 'room', meetingId, { folderId });
-      const listener = startBrowserAudio({ db, hub, roomId, folderId, meetingId });
-      return { meetingId, title, continued: false, ...listener.status() };
-    } catch (error) {
-      // Nothing was recorded: do not leave a half-made meeting in the history.
-      await db.delete('meetings', 'room', meetingId).catch(() => undefined);
-      throw error;
-    }
+      const language = asLanguageCode(args.language);
+      const startedAt = new Date();
+      const title = text(args.title, 200) || `Google Meet ${startedAt.toISOString().slice(0, 16).replace('T', ' ')}`;
+      const created = (await db.create('meetings', 'room', {
+        roomId,
+        title,
+        slug: slugify(title),
+        language,
+        translationEnabled: false,
+        translationLang: defaultTranslationTarget(language),
+        voiceprintNoticeAt: startedAt.toISOString(),
+        ownerUserId: actor.userId,
+        startedAt: startedAt.toISOString(),
+        status: 'recording',
+        partCount: 0,
+        lastPartAt: startedAt.toISOString(),
+        captureSource: 'browser',
+      })) as { _id?: unknown } | null;
+      const meetingId = typeof created?._id === 'string' ? created._id : '';
+      if (!meetingId) throw new AppError('App DB did not return the new meeting.', 'HUB_ERROR');
+      try {
+        const folderId = await ensureRoomFolderPath(hub, roomId, folderName(title, meetingId, startedAt));
+        await db.update('meetings', 'room', meetingId, { folderId });
+        const listener = startBrowserAudio({ db, hub, roomId, folderId, meetingId, onAutoStop: endOnAutoStop(db, runtime, roomId, meetingId) });
+        return { meetingId, title, continued: false, ...listener.status() };
+      } catch (error) {
+        // Nothing was recorded: do not leave a half-made meeting in the history.
+        await db.delete('meetings', 'room', meetingId).catch(() => undefined);
+        throw error;
+      }
+    });
   },
 };
 
@@ -143,6 +170,8 @@ export const listenStatusTool: AppTool = {
     return {
       meetingId,
       status: typeof meeting.status === 'string' ? meeting.status : 'unknown',
+      // It stopped by itself: `max_duration`, `silence` or `unreachable`.
+      ...(typeof meeting.captureEndReason === 'string' && meeting.captureEndReason ? { endReason: meeting.captureEndReason } : {}),
       ...(typeof meeting.summaryText === 'string' && meeting.summaryText ? { summary: meeting.summaryText.slice(0, SUMMARY_CHARS) } : {}),
       ...(Array.isArray(meeting.keyTopics) ? { keyTopics: meeting.keyTopics.slice(0, 10) } : {}),
       ...(typeof meeting.summaryError === 'string' && meeting.summaryError ? { summaryError: meeting.summaryError.slice(0, 500) } : {}),
@@ -153,7 +182,7 @@ export const listenStatusTool: AppTool = {
 export const listenStopTool: AppTool = {
   name: 'meeting_listen_stop',
   title: 'Stop recording the Room browser',
-  description: 'Stop recording a meeting from the Room browser, save the last audio and start the transcript and summary — only the meeting owner. Poll meeting_listen_status for the summary.',
+  description: "Stop recording a meeting from the Room browser, save the last audio and start the transcript and summary — the meeting owner, or the room's owners and moderators. Poll meeting_listen_status for the summary.",
   inputSchema: { type: 'object', required: ['roomId', 'meetingId'], properties: { ...ROOM_AND_MEETING } },
   async execute(args, context, runtime) {
     const actor = requireVerifiedActor(context);
@@ -161,14 +190,15 @@ export const listenStopTool: AppTool = {
     const meetingId = text(args.meetingId, 128);
     if (!roomId || !meetingId) throw new AppError('Invalid meeting_listen_stop parameters.', 'INVALID_INPUT');
     const db = new AppDbBotClient(roomId);
-    const meeting = await requireMeetingOwner(db, actor, roomId, meetingId);
+    const meeting = await requireMeetingOwnerOrRoomModerator(db, actor, roomId, meetingId);
+    if (meeting.ownerUserId !== actor.userId) console.warn(`[meeting_listen_stop] meeting=${meetingId} stopped by a room manager, not its owner`);
     // Stopped already (a retry): processing is idempotent, so just report it again.
     const heard = await stopBrowserAudio(meetingId);
     if (meeting.status === 'recording') {
       const durationSec = heard ? Math.round(heard.heardSec) : Math.round((Date.now() - Date.parse(String(meeting.startedAt))) / 1000);
       await db.update('meetings', 'room', meetingId, { endedAt: new Date().toISOString(), durationSec, status: 'uploading' });
     }
-    const processing = (await processTool.execute({ roomId, meetingId }, context, runtime)) as { jobId?: string; status?: string };
+    const processing = await startMeetingProcessing(db, runtime, roomId, meetingId, meeting);
     return { meetingId, heardSec: heard?.heardSec ?? null, jobId: processing.jobId, processing: processing.status };
   },
 };

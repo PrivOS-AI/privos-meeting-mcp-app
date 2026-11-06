@@ -22,6 +22,12 @@ function num(key: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/** A limit that cannot be switched off: zero, negative or unparsable falls back to the default. */
+function positive(key: string, fallback: number): number {
+  const n = num(key, fallback);
+  return n > 0 ? n : fallback;
+}
+
 function vendor(key: string, fallback: SttVendor): SttVendor {
   const v = str(key)?.toLowerCase();
   return v === 'local' || v === 'soniox' || v === 'elevenlabs' ? v : fallback;
@@ -95,6 +101,12 @@ export interface AppEnv {
   remoteBrowserAudioUrl?: string;
   /** The operator secret Remote Browser's `REMOTE_BROWSER_AUDIO_TAP_KEY` is set to. Both unset: the option is hidden. */
   remoteBrowserAudioTapKey?: string;
+  /** A Room-browser recording stops by itself after this many minutes (`BROWSER_RECORDING_MAX_MIN`, default 180). */
+  browserRecordingMaxMin: number;
+  /** …after this many minutes without sound: a silent call, nothing playing, or no stream (`BROWSER_RECORDING_SILENCE_STOP_MIN`, default 15). */
+  browserRecordingSilenceStopMin: number;
+  /** …after this many minutes without reaching the Room browser's audio at all (`BROWSER_RECORDING_UNREACHABLE_STOP_MIN`, default 10). */
+  browserRecordingUnreachableStopMin: number;
   summaryModel?: string;
   /** Hub AI provider id paired with `summaryModel` (Hub default when unset). */
   summaryProvider?: string;
@@ -163,6 +175,9 @@ export function loadEnv(): AppEnv {
     voiceprintEncKey: str('VOICEPRINT_ENC_KEY'),
     remoteBrowserAudioUrl: str('REMOTE_BROWSER_AUDIO_URL'),
     remoteBrowserAudioTapKey: str('REMOTE_BROWSER_AUDIO_TAP_KEY'),
+    browserRecordingMaxMin: positive('BROWSER_RECORDING_MAX_MIN', 180),
+    browserRecordingSilenceStopMin: positive('BROWSER_RECORDING_SILENCE_STOP_MIN', 15),
+    browserRecordingUnreachableStopMin: positive('BROWSER_RECORDING_UNREACHABLE_STOP_MIN', 10),
     summaryModel: str('SUMMARY_MODEL'),
     summaryProvider: str('SUMMARY_PROVIDER'),
     translateModel: str('TRANSLATE_MODEL'),

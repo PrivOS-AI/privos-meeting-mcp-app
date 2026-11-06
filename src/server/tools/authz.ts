@@ -11,6 +11,8 @@ import { AppError } from '../../shared/app-error.js';
 import { env, isDevelopmentRuntime } from '../env.js';
 import type { AppDbBotClient, DbRow } from '../hub/app-db-bot-client.js';
 import { getFileMetadata } from '../media/hub-file-download.js';
+import { isAutomatedCaller } from './caller-policy.js';
+import { canManageRoomSettings } from './can-manage-room-settings.js';
 import { isWorkspaceAdmin } from './is-workspace-admin.js';
 
 /** Re-exported so every existing `import { isWorkspaceAdmin } from './authz.js'` keeps working — the implementation lives in `is-workspace-admin.ts` (plan.md P8 file ownership). */
@@ -54,6 +56,28 @@ export async function requireMeetingOwner(
     throw new AppError('Only the meeting owner can perform this action.', 'NOT_MEETING_OWNER');
   }
   return meeting;
+}
+
+/**
+ * Like `requireMeetingOwner`, except that a meeting recorded from the Room's
+ * shared browser (`captureSource: 'browser'`) may also be stopped by the room's
+ * owners and moderators and by workspace admins — the people
+ * `can-manage-room-settings.ts` names. Such a meeting is often started by the
+ * Room's agent, whose bot then owns it, so without this nobody in the room
+ * could end it. Roles come from the Hub-signed claims (`rooms:roles:read`,
+ * optional): without that grant, or on App Cluster dispatch (no roles), only
+ * the owner may. An agent's or another app's roles never count.
+ */
+export async function requireMeetingOwnerOrRoomModerator(
+  db: AppDbBotClient,
+  actor: VerifiedActor,
+  roomId: string,
+  meetingId: string,
+): Promise<DbRow> {
+  const meeting = await requireRoomMeeting(db, actor, roomId, meetingId);
+  if (meeting.ownerUserId === actor.userId) return meeting;
+  if (meeting.captureSource === 'browser' && !isAutomatedCaller(actor) && canManageRoomSettings(actor)) return meeting;
+  throw new AppError("Only whoever started this recording, or the room's owners and moderators, can stop it.", 'NOT_MEETING_OWNER');
 }
 
 /**

@@ -1079,7 +1079,7 @@
     {
       "name": "meeting_listen_stop",
       "title": "Stop recording the Room browser",
-      "description": "Stop recording a meeting from the Room browser, save the last audio and start the transcript and summary — only the meeting owner. Poll meeting_listen_status for the summary.",
+      "description": "Stop recording a meeting from the Room browser, save the last audio and start the transcript and summary — the meeting owner, or the room's owners and moderators. Poll meeting_listen_status for the summary.",
       "inputSchema": {
         "type": "object",
         "required": [
@@ -1460,6 +1460,27 @@
       "description": "Optional. The same secret Remote Browser has in REMOTE_BROWSER_AUDIO_TAP_KEY (32+ chars). Both unset: the Room-browser option is hidden.",
       "required": false,
       "secret": true
+    },
+    {
+      "key": "BROWSER_RECORDING_MAX_MIN",
+      "description": "Optional. A meeting recorded from the Room browser stops by itself after this many minutes, then is processed.",
+      "required": false,
+      "secret": false,
+      "default": "180"
+    },
+    {
+      "key": "BROWSER_RECORDING_SILENCE_STOP_MIN",
+      "description": "Optional. A Room-browser recording stops by itself after this many minutes without sound (a silent or ended call).",
+      "required": false,
+      "secret": false,
+      "default": "15"
+    },
+    {
+      "key": "BROWSER_RECORDING_UNREACHABLE_STOP_MIN",
+      "description": "Optional. A Room-browser recording stops by itself when the Room browser's audio cannot be reached for this many minutes.",
+      "required": false,
+      "secret": false,
+      "default": "10"
     },
     {
       "key": "SUMMARY_MODEL",

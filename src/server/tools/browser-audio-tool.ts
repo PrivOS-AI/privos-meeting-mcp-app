@@ -6,11 +6,15 @@
  * captions since `cursor` (the iframe has no audio to push, so it asks), `stop`
  * ends it once the last part is saved. Only the meeting owner, only while the
  * meeting records (except `stop`, which also runs from `meeting_process`).
+ * A listener that stopped by itself (`browser-audio-listener.ts` limits) ends
+ * the meeting on the server (`end-browser-recording.ts`); `poll` then answers
+ * `state: 'stopped'` with its `endReason` instead of an error.
  */
 import { AppError } from '../../shared/app-error.js';
-import { browserAudioConfigured, browserAudioFor, startBrowserAudio, stopBrowserAudio } from '../browser-audio/browser-audio-listener.js';
+import { browserAudioConfigured, browserAudioEnded, browserAudioFor, startBrowserAudio, stopBrowserAudio } from '../browser-audio/browser-audio-listener.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { requireMeetingOwner, requireVerifiedActor } from './authz.js';
+import { endOnAutoStop } from './end-browser-recording.js';
 import { checkRateLimit } from './rate-limiter.js';
 import type { AppTool } from './registry.js';
 import { ROOM_AND_MEETING } from './schema-parts.js';
@@ -66,7 +70,7 @@ export const browserAudioTool: AppTool = {
       const meeting = await checkOwner(true);
       const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
       if (!folderId) throw new AppError('The meeting has no Files folder yet.', 'INVALID_STATE');
-      const listener = startBrowserAudio({ db, hub: runtime.agentBotHub, roomId, folderId, meetingId });
+      const listener = startBrowserAudio({ db, hub: runtime.agentBotHub, roomId, folderId, meetingId, onAutoStop: endOnAutoStop(db, runtime, roomId, meetingId) });
       return { ...listener.status(), ...listener.captionsSince(cursor) };
     }
 
@@ -76,11 +80,15 @@ export const browserAudioTool: AppTool = {
       return status ?? { state: 'stopped', heardSec: 0, partsUploaded: 0 };
     }
 
-    if ((ownerChecks.get(checkKey) ?? 0) < Date.now()) await checkOwner(true);
+    const listener = browserAudioFor(meetingId);
+    // Stopped by itself: the meeting is not recording any more, and the poll says why.
+    const ended = listener ? undefined : browserAudioEnded(meetingId);
+    const stoppedByItself = Boolean(ended?.endReason);
+    if ((ownerChecks.get(checkKey) ?? 0) < Date.now()) await checkOwner(!stoppedByItself);
     if (!checkRateLimit('meeting_browser_audio', meetingId, POLL_LIMIT, POLL_WINDOW_MS)) {
       throw new AppError('Too many polls for this meeting — slow down.', 'RATE_LIMITED');
     }
-    const listener = browserAudioFor(meetingId);
+    if (ended && stoppedByItself) return { ...ended, captions: [], cursor, draft: null, degraded: false };
     if (!listener) throw new AppError('This meeting is not listening to the Room browser.', 'INVALID_STATE');
     return { ...listener.status(), ...listener.captionsSince(cursor) };
   },

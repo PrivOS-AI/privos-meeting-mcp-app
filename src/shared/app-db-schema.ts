@@ -111,6 +111,8 @@ export const SCHEMAS: readonly CollectionSchema[] = [
       { name: 'notesRevision', type: 'number' },
       /** `browser`: recorded from the Room's shared browser by the app server (the UI or the Room's agent started it); absent = this device's microphone. */
       { name: 'captureSource', type: 'string', maxLength: 20 },
+      /** Set when a Room-browser recording stopped by itself: `max_duration` | `silence` | `unreachable` (`end-browser-recording.ts`). */
+      { name: 'captureEndReason', type: 'string', maxLength: 20 },
     ],
     indexes: [{ fields: { startedAt: -1 } }, { fields: { status: 1 } }],
   },
