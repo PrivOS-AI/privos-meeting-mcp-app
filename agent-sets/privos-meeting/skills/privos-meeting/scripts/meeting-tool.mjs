@@ -1,8 +1,9 @@
 // Calls the PrivOS Meeting app's tools for the Room's agent, through the Hub
-// (`mcp-apps.tool-call`, as the person the Sandbox works for). Nothing here
-// holds a credential: the Sandbox's own skill SDK signs the call. Fallback for
-// a Sandbox without the `privos-mcp-apps` skill (SKILL.md); it never calls the
-// platform's `mcpapp.*` tools and always names the room.
+// (`mcp-apps.tool-call`, signed as the Room agent's own bot, not as the person
+// who asked). Nothing here holds a credential: the Sandbox's own skill SDK
+// signs the call. Fallback for a Sandbox without the `privos-mcp-apps` skill
+// (SKILL.md); it never calls the platform's `mcpapp.*` tools and always names
+// the room.
 //
 //   node meeting-tool.mjs APP_ID|auto ROOM_ID|auto TOOL_NAME JSON_ARGUMENTS
 //

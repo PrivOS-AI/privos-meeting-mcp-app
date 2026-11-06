@@ -34,9 +34,14 @@ app only works in the Room of your session and refuses any other
 (`[CALLER_NOT_ALLOWED]`).
 
 Exit codes of `apps.py call`: 0 is a result. 2 is a tool error with its reason:
-say it. 4 means the result is unknown (a timeout): never call
-`meeting_listen_start` or `meeting_listen_stop` again unchanged; check with
-`meeting_listen_status` first. A reading tool may be called again once.
+say it. 4 means the result is unknown (a timeout):
+- after `meeting_listen_start`, call `meeting_listen_start` again with the same
+  arguments: it continues the recording the first call started
+  (`continued: true`) or starts it, never a second one (you have no
+  `meetingId` yet to check with);
+- after `meeting_listen_stop`, check with `meeting_listen_status`; stop again
+  only if it still says `recording`;
+- a reading tool may be called again once.
 
 When `apps.py` is not in this Sandbox, or `apps.py tools` lists no
 `meeting_listen_*` tools (an older PrivOS or an older app), use the bundled
@@ -49,6 +54,14 @@ node .claude/skills/privos-meeting/scripts/meeting-tool.mjs auto auto meeting_li
 
 The steps below name each tool and its arguments; call them either way (with
 `apps.py`, add `"roomId":"<room_id>"` to the arguments; the script adds it).
+
+## What you may read and stop
+
+- `meeting_ask` and `meeting_status` read any meeting of this Room, as any Room
+  member can in the app (its History, summaries and questions are room-wide).
+- `meeting_listen_status` and `meeting_listen_stop` work only on the recording
+  you started (`[NOT_MEETING_OWNER]` otherwise). The Room's owners and
+  moderators can also stop it with **Stop** on the banner in the app.
 
 ## Record a call ("vào Meet … và ghi lại", "record this meeting")
 
@@ -76,7 +89,11 @@ The steps below name each tool and its arguments; call them either way (with
    - Still waiting in the lobby: the Meet host must admit "PrivOS Note-taker".
 
 Recording continues on its own: there is nothing to keep doing while the call
-runs. Answer "what are they saying?" with `meeting_listen_status`.
+runs. Answer "what are they saying?" with `meeting_listen_status`. It also
+stops by itself (by default after 3 hours, after 15 minutes without sound, or
+when the Room browser cannot be heard for 10 minutes); `meeting_listen_status`
+then gives `endReason` (`max_duration`, `silence`, `unreachable`) and the
+summary follows as after a stop: tell the user why it stopped.
 
 ## Stop ("kết thúc", "stop recording")
 
@@ -86,7 +103,8 @@ runs. Answer "what are they saying?" with `meeting_listen_status`.
    privos-remote-browser.
 3. Poll `meeting_listen_status` every ~30 s until `status` is `summarized`
    (a long meeting takes a few minutes), then give the user `summary` and
-   `keyTopics`. On `failed`, quote `summaryError`.
+   `keyTopics`. On `failed`, quote `summaryError`. `meeting_status` tells how
+   far processing has got (`step`, `progress`).
 
 ## Questions about a recorded meeting
 
@@ -98,7 +116,8 @@ processed.
 
 The app's message comes with its code in brackets:
 `[PROVIDER_NOT_CONFIGURED]` — the deployment has not linked Remote Browser;
-`[NOT_MEETING_OWNER]` — only whoever started the recording can stop it or
-read it; `[RATE_LIMITED]` — wait a minute; `[ROOM_MISMATCH]` — use this
-Room's id; `[CALLER_NOT_ALLOWED]` — that tool is not for agents. Do not retry a
-refused step unchanged.
+`[NOT_MEETING_OWNER]` — only whoever started the recording (or the Room's
+owners and moderators, in the app) can stop it or read its live status;
+`[RATE_LIMITED]` — wait a minute; `[ROOM_MISMATCH]` — use this Room's id;
+`[CALLER_NOT_ALLOWED]` — that tool is not for agents. Do not retry a refused
+step unchanged.
