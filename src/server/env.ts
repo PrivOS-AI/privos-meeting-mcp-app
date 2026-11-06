@@ -105,6 +105,8 @@ export interface AppEnv {
   meetingJobConcurrency: number;
   meetingJobTimeoutMs: number;
   allowUnverifiedActor: boolean;
+  /** Other apps whose servers may call this app's shared tools (`ALLOWED_CALLER_APPS`, comma-separated app ids). Empty: none may. */
+  allowedCallerApps: ReadonlySet<string>;
   /**
    * Calibration-only, ENV-ONLY (never `app_settings` — this is an operator
    * toggle, not a per-room setting): while `true`, `meeting-job.ts` skips
@@ -170,6 +172,7 @@ export function loadEnv(): AppEnv {
     meetingJobConcurrency: num('MEETING_JOB_CONCURRENCY', 1),
     meetingJobTimeoutMs: num('MEETING_JOB_TIMEOUT_MS', 3_600_000),
     allowUnverifiedActor: str('ALLOW_UNVERIFIED_ACTOR') === '1',
+    allowedCallerApps: new Set((str('ALLOWED_CALLER_APPS') ?? '').split(',').map((id) => id.trim()).filter(Boolean)),
     keepPartsForCalibration: str('MEETING_KEEP_PARTS_FOR_CALIBRATION') === '1',
   };
 }

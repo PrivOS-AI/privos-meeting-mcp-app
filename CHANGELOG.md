@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.4.4] — 2026-11-04
+
+Agents and other apps, per the platform guide of 2026-11-03 (SDK
+`@privos_ai/app-server` 0.12.3 → 0.13.2):
+- The manifest shares five tools with agents (`toolAccess`):
+  `meeting_listen_start`, `meeting_listen_status`, `meeting_listen_stop`,
+  `meeting_ask` and `meeting_status` — what the Room agent's Meeting skill
+  uses. Every other tool (bot credential check, realtime token, audio and part
+  ingest, settings, voiceprint edits and deletes, …) stays for people and this
+  app's own server. `capabilities` adds `caller_app` and `cross_room`, so the
+  Hub signs who is calling on App Cluster dispatch too.
+- Every tool call passes one check before it runs (`tools/caller-policy.ts`):
+  another app's server is refused unless its id is in the new optional
+  `ALLOWED_CALLER_APPS` (unset: none), and always from outside the room; an
+  agent or another app may call only the shared tools, and only in the room
+  signed on the call: a different `roomId` argument is refused
+  (`ROOM_MISMATCH`), a missing one is filled in. Refusals carry the new code
+  `CALLER_NOT_ALLOWED`.
+- The Room agent's Meeting skill calls the app through the default
+  `privos-mcp-apps` skill (`apps.py call`), the bundled script staying as the
+  fallback for a Sandbox without it. The shared read tools say "Read-only" in
+  their description.
+
 ## [1.4.3] — 2026-10-30
 
 - Settings → Room agent says why installing the skill fails instead of only

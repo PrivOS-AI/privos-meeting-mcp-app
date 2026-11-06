@@ -23,6 +23,8 @@ export type AppErrorCode =
   | 'ASSISTANT_NOT_IN_ROOM'
   /** The admin has not granted the scope — fix: Admin > Apps. */
   | 'PERMISSION_NOT_GRANTED'
+  /** An agent or another app called a tool it may not (`tools/caller-policy.ts`). */
+  | 'CALLER_NOT_ALLOWED'
   | 'HUB_ERROR';
 
 export class AppError extends Error {

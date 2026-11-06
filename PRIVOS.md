@@ -66,6 +66,15 @@ Hub. After editing `agent-sets/privos-meeting/`, run `npm run package:agent-set`
 (a test fails if the archive is stale) — the archive is part of the UI, so it
 needs a version bump like any UI change.
 
+### Agents and other apps
+
+Only the tools in the manifest's `toolAccess` (`shared`) are for agents and
+other apps; `tools/caller-policy.ts` enforces that before any tool runs, pins
+an automated caller to the signed room (`actor.roomId`, never the `roomId`
+argument), and refuses other apps' servers unless listed in
+`ALLOWED_CALLER_APPS` (unset: none) and always from outside the room. Sharing
+one more tool needs the owner to approve the upgrade again.
+
 ## Settings
 
 - STT provider (built-in by default; Soniox/ElevenLabs, realtime + async) is switched from Settings

@@ -44,7 +44,7 @@ export const listenStartTool: AppTool = {
   name: 'meeting_listen_start',
   title: 'Start recording the Room browser',
   description:
-    "Start recording a meeting from the Room's shared browser (PrivOS Remote Browser) after it joined the call (e.g. Google Meet): live captions, then transcript and summary at the end. Only after the user confirmed the participants were told the meeting is recorded.",
+    "Start recording a meeting from the Room's shared browser (PrivOS Remote Browser) after it joined the call (e.g. Google Meet): live captions, then transcript and summary at the end. Only after the user confirmed the participants were told the meeting is recorded. Calling it again while that recording runs returns the same meeting.",
   inputSchema: {
     type: 'object',
     required: ['roomId', 'participantsInformed'],
@@ -122,7 +122,7 @@ export const listenStartTool: AppTool = {
 export const listenStatusTool: AppTool = {
   name: 'meeting_listen_status',
   title: 'Room browser recording status',
-  description: 'Whether a meeting recorded from the Room browser hears the call (and the latest captions), or its summary once processed — only the meeting owner.',
+  description: 'Whether a meeting recorded from the Room browser hears the call (and the latest captions), or its summary once processed — only the meeting owner. Read-only.',
   inputSchema: { type: 'object', required: ['roomId', 'meetingId'], properties: { ...ROOM_AND_MEETING } },
   async execute(args, context) {
     const actor = requireVerifiedActor(context);

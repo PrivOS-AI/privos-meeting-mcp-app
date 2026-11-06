@@ -45,4 +45,9 @@ describe('mcp-handler tool errors', () => {
     const unverified: ToolCallContext = { transport: 'direct', identityState: 'missing', sessionScope: 'test' };
     await expect(call('test_internal_error', unverified)).resolves.toMatchObject({ isError: true, structuredContent: { error: { code: 'FORBIDDEN' } } });
   });
+
+  it('refuses an agent a tool that is not shared, before the tool runs', async () => {
+    const agent: ToolCallContext = { ...verified, actor: { ...verified.actor!, principalType: 'bot' } };
+    await expect(call('test_internal_error', agent)).resolves.toMatchObject({ isError: true, structuredContent: { error: { code: 'CALLER_NOT_ALLOWED' } } });
+  });
 });

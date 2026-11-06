@@ -4,14 +4,17 @@
  * advertising its tools (from `tools/registry.ts`) and executing them.
  *
  * Feature tools FAIL CLOSED: a call is refused unless the caller has a verified
- * actor, except in development with `ALLOW_UNVERIFIED_ACTOR=1`. The UI tool
- * (`meeting_agent`) is exempt — it only returns the app document.
+ * actor, except in development with `ALLOW_UNVERIFIED_ACTOR=1`. Agents and
+ * other apps then pass `tools/caller-policy.ts` (shared tools only, the signed
+ * room only). The UI tool (`meeting_agent`) is exempt — it only returns the app
+ * document, and the Hub never lets an agent call it.
  */
 import type { AppMcpHandler, ServeAppHandlerContext, ToolCallContext } from '@privos_ai/app-server';
 
 import { AppError } from '../shared/app-error.js';
 import { env, isDevelopmentRuntime } from './env.js';
 import { UI_RESOURCE_URI, manifest, resolveFilesOrigin } from './manifest.js';
+import { applyCallerPolicy } from './tools/caller-policy.js';
 import { listToolDefinitions, resolveTool, type ToolRuntime } from './tools/registry.js';
 import { renderUiHtml } from './ui-resource.js';
 
@@ -83,7 +86,8 @@ export function createMcpHandler(ctx: ServeAppHandlerContext): AppMcpHandler {
         }
         try {
           assertVerifiedActor(context);
-          const result = await tool.execute(params.arguments ?? {}, context, runtime);
+          const args = context.actor ? applyCallerPolicy(tool.name, context.actor, params.arguments ?? {}) : (params.arguments ?? {});
+          const result = await tool.execute(args, context, runtime);
           return { content: [{ type: 'text', text: JSON.stringify(result) }] };
         } catch (error) {
           console.error(`[tool:${params.name}] failed`, error);

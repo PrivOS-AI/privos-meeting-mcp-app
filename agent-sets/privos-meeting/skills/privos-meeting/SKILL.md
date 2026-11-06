@@ -8,24 +8,57 @@ description: Record a Google Meet (or any web) call through the Room's shared br
 Scope: this skill records calls that the Room's shared browser (PrivOS Remote
 Browser) has joined, and answers questions about recorded meetings. Joining
 the call is a browser action: do it with the `privos-remote-browser` skill.
-For anything else, say that the Room's regular AI chat can do it.
-
-Use the bundled script for every step. From the Room's chat pass `auto` for
-both ids; it finds the Room's Meeting app and fills in the room. Never print
+For anything else, say that the Room's regular AI chat can do it. Never print
 tokens or credentials.
+
+## Calling the Meeting app
+
+Call its tools through the Room's apps with the `privos-mcp-apps` skill, the
+same way in a chat and in a scheduled run:
+
+```bash
+apps.py list                         # the Room's apps
+apps.py tools <app>                  # the Meeting tools you may call
+apps.py call <app> meeting_listen_status --args-json '{"roomId":"<room_id>","meetingId":"…"}'
+```
+
+`apps.py` is the `privos-mcp-apps` skill's script: run it with `python3` from
+that skill's `scripts/` folder, as that skill describes. `<app>` is the Meeting
+app in `apps.py list`: the app whose id starts with `ai.privos.meeting-agent`.
+If the Room has more than one, ask which one to use. If it is not callable, say
+the reason it gives. `<room_id>` is this Room's id from `[ACTIVE_CONTEXT]`; the
+app only works in the Room of your session and refuses any other
+(`[ROOM_MISMATCH]`). You may call `meeting_listen_start`,
+`meeting_listen_status`, `meeting_listen_stop`, `meeting_ask` and
+`meeting_status`; the app refuses its other tools to agents
+(`[CALLER_NOT_ALLOWED]`).
+
+Exit codes of `apps.py call`: 0 is a result. 2 is a tool error with its reason:
+say it. 4 means the result is unknown (a timeout): never call
+`meeting_listen_start` or `meeting_listen_stop` again unchanged; check with
+`meeting_listen_status` first. A reading tool may be called again once.
+
+When `apps.py` is not in this Sandbox, or `apps.py tools` lists no
+`meeting_listen_*` tools (an older PrivOS or an older app), use the bundled
+script instead, with `auto` for both ids (it finds the Room's Meeting app and
+fills in the room):
 
 ```bash
 node .claude/skills/privos-meeting/scripts/meeting-tool.mjs auto auto meeting_listen_status '{"meetingId":"…"}'
 ```
 
+The steps below name each tool and its arguments; call them either way (with
+`apps.py`, add `"roomId":"<room_id>"` to the arguments; the script adds it).
+
 ## Record a call ("vào Meet … và ghi lại", "record this meeting")
 
-1. **Join with the Room's MAIN browser** (privos-remote-browser, no `"browser": N`):
-   navigate to the Meet link; if asked for a name, type `PrivOS Note-taker`;
-   turn the microphone and camera off; click "Join now" / "Tham gia ngay", or
-   "Ask to join" / "Yêu cầu tham gia". The Meeting app hears only the main
-   browser. If Meet asks to sign in, tell the user to sign in once in the
-   Remote Browser tab; never type a password.
+1. **Join with the Room's MAIN browser** (privos-remote-browser: its agent
+   tools drive the main browser; with its bundled script, pass no
+   `"browser": N`): navigate to the Meet link; if asked for a name, type
+   `PrivOS Note-taker`; turn the microphone and camera off; click "Join now" /
+   "Tham gia ngay", or "Ask to join" / "Yêu cầu tham gia". The Meeting app hears
+   only the main browser. If Meet asks to sign in, tell the user to sign in once
+   in the Remote Browser tab; never type a password.
 2. **Ask for consent before recording.** Unless the user already said so in
    this request, ask: "Mọi người trong cuộc họp đã được báo là cuộc họp đang
    được ghi âm chưa?" Start only after they confirm.
@@ -63,8 +96,9 @@ processed.
 
 ## Errors
 
-The script prints the app's message with its code in brackets:
+The app's message comes with its code in brackets:
 `[PROVIDER_NOT_CONFIGURED]` — the deployment has not linked Remote Browser;
-`[NOT_MEETING_OWNER]` — only the person who started the recording can stop it
-or read it; `[RATE_LIMITED]` — wait a minute. Do not retry a refused step
-unchanged.
+`[NOT_MEETING_OWNER]` — only whoever started the recording can stop it or
+read it; `[RATE_LIMITED]` — wait a minute; `[ROOM_MISMATCH]` — use this
+Room's id; `[CALLER_NOT_ALLOWED]` — that tool is not for agents. Do not retry a
+refused step unchanged.

@@ -18,7 +18,7 @@ function asString(value: unknown): string {
 export const statusTool: AppTool = {
   name: 'meeting_status',
   title: 'Meeting processing status',
-  description: 'View meeting processing progress: current step, percent complete, and the result when finished.',
+  description: 'View meeting processing progress: current step, percent complete, and the result when finished. Read-only.',
   inputSchema: { type: 'object', required: ['roomId', 'meetingId'], properties: { ...ROOM_AND_MEETING } },
   async execute(args, context) {
     const actor = requireVerifiedActor(context);
