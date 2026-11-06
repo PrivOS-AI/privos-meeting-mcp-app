@@ -73,7 +73,10 @@ other apps; `tools/caller-policy.ts` enforces that before any tool runs, pins
 an automated caller to the signed room (`actor.roomId`, never the `roomId`
 argument), and refuses other apps' servers unless listed in
 `ALLOWED_CALLER_APPS` (unset: none) and always from outside the room. Sharing
-one more tool needs the owner to approve the upgrade again.
+one more tool needs the owner to approve the upgrade again. Every refusal logs
+one line, `[caller-policy] refused <code> room=… callerApp=… ptype=… tool=…`
+(`CALLER_NOT_ALLOWED`, `CROSS_ROOM_NOT_ALLOWED` or `ROOM_MISMATCH`): grep for it
+when an agent's call fails on Dev.
 
 ## Settings
 

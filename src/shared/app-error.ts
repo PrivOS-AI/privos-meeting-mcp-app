@@ -23,8 +23,10 @@ export type AppErrorCode =
   | 'ASSISTANT_NOT_IN_ROOM'
   /** The admin has not granted the scope — fix: Admin > Apps. */
   | 'PERMISSION_NOT_GRANTED'
-  /** An agent or another app called a tool it may not (`tools/caller-policy.ts`). */
+  /** An agent or another app called a tool it may not, or an app this one does not accept called (`tools/caller-policy.ts`). */
   | 'CALLER_NOT_ALLOWED'
+  /** Another app's server called from a room its bot cannot access (`actor.crossRoom`, `tools/caller-policy.ts`). */
+  | 'CROSS_ROOM_NOT_ALLOWED'
   | 'HUB_ERROR';
 
 export class AppError extends Error {

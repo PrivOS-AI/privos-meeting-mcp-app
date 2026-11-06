@@ -14,7 +14,7 @@ import type { AppMcpHandler, ServeAppHandlerContext, ToolCallContext } from '@pr
 import { AppError } from '../shared/app-error.js';
 import { env, isDevelopmentRuntime } from './env.js';
 import { UI_RESOURCE_URI, manifest, resolveFilesOrigin } from './manifest.js';
-import { applyCallerPolicy } from './tools/caller-policy.js';
+import { CallerRefusedError, applyCallerPolicy } from './tools/caller-policy.js';
 import { listToolDefinitions, resolveTool, type ToolRuntime } from './tools/registry.js';
 import { renderUiHtml } from './ui-resource.js';
 
@@ -90,7 +90,8 @@ export function createMcpHandler(ctx: ServeAppHandlerContext): AppMcpHandler {
           const result = await tool.execute(args, context, runtime);
           return { content: [{ type: 'text', text: JSON.stringify(result) }] };
         } catch (error) {
-          console.error(`[tool:${params.name}] failed`, error);
+          // A caller-policy refusal already logged its one line.
+          if (!(error instanceof CallerRefusedError)) console.error(`[tool:${params.name}] failed`, error);
           // An AppError is meant for the user: return it as an MCP tool error with
           // its stable code. `serveApp` does not forward a `mapAppError`, so a
           // thrown one would reach the iframe as a bare "-32603 Internal error".

@@ -14,6 +14,11 @@
  *    tool's `roomId` argument: a different one is refused, a missing one is
  *    filled in, so every tool's own room checks run against the signed room.
  *
+ * Each refusal has its own code (`CALLER_NOT_ALLOWED`, `CROSS_ROOM_NOT_ALLOWED`,
+ * `ROOM_MISMATCH`) and one log line (`[caller-policy] refused <code> room=…
+ * callerApp=… ptype=… tool=…`), so a caller refused by mistake shows on the
+ * operator's log. Ids only: never an argument value or a token.
+ *
  * `principalType` is absent on App Cluster dispatch (its assertion carries no
  * principal type), so those calls fall through to each tool's own checks
  * (meeting owner, room match), which a bot passes only for its own meetings.
@@ -31,6 +36,21 @@ export const SHARED_TOOLS: ReadonlySet<string> = new Set(
     .map(([name]) => name),
 );
 
+export type CallerRefusalCode = 'CALLER_NOT_ALLOWED' | 'CROSS_ROOM_NOT_ALLOWED' | 'ROOM_MISMATCH';
+
+/** A call the caller policy refused: already logged, and the tool never ran. */
+export class CallerRefusedError extends AppError {
+  constructor(message: string, code: CallerRefusalCode, details?: Readonly<Record<string, unknown>>) {
+    super(message, code, details);
+    this.name = 'CallerRefusedError';
+  }
+}
+
+/** An agent or another app's server, as far as the signed actor tells. */
+export function isAutomatedCaller(actor: VerifiedActor): boolean {
+  return actor.principalType === 'bot' || Boolean(actor.callerApp);
+}
+
 /**
  * Throws unless `actor` may call `toolName`; returns the arguments the tool
  * runs with (for automation, `roomId` is the signed room).
@@ -41,23 +61,27 @@ export function applyCallerPolicy(
   args: Record<string, unknown>,
   allowedCallerApps: ReadonlySet<string> = env.allowedCallerApps,
 ): Record<string, unknown> {
+  const refuse = (code: CallerRefusalCode, message: string, details?: Record<string, unknown>): never => {
+    console.warn(`[caller-policy] refused ${code} room=${actor.roomId ?? '-'} callerApp=${actor.callerApp ?? '-'} ptype=${actor.principalType ?? '-'} tool=${toolName}`);
+    throw new CallerRefusedError(message, code, details);
+  };
+
   if (actor.callerApp) {
     if (!allowedCallerApps.has(actor.callerApp)) {
-      throw new AppError('This app does not accept calls from that app.', 'CALLER_NOT_ALLOWED', { callerApp: actor.callerApp });
+      refuse('CALLER_NOT_ALLOWED', 'This app does not accept calls from that app.', { callerApp: actor.callerApp });
     }
     if (actor.crossRoom) {
-      throw new AppError('Calls from outside the room are not accepted.', 'CALLER_NOT_ALLOWED', { callerApp: actor.callerApp });
+      refuse('CROSS_ROOM_NOT_ALLOWED', 'Calls from outside the room are not accepted.', { callerApp: actor.callerApp });
     }
   }
-  const automated = actor.principalType === 'bot' || Boolean(actor.callerApp);
-  if (!automated) return args;
+  if (!isAutomatedCaller(actor)) return args;
 
   if (!SHARED_TOOLS.has(toolName)) {
-    throw new AppError(`${toolName} is not available to agents or other apps.`, 'CALLER_NOT_ALLOWED');
+    refuse('CALLER_NOT_ALLOWED', `${toolName} is not available to agents or other apps.`);
   }
-  if (!actor.roomId) throw new AppError('Invalid request for this room.', 'ROOM_MISMATCH');
+  if (!actor.roomId) refuse('ROOM_MISMATCH', 'Invalid request for this room.');
   if (args.roomId !== undefined && args.roomId !== actor.roomId) {
-    throw new AppError('Invalid request for this room.', 'ROOM_MISMATCH');
+    refuse('ROOM_MISMATCH', 'Invalid request for this room.');
   }
   return { ...args, roomId: actor.roomId };
 }
