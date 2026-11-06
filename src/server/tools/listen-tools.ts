@@ -108,7 +108,15 @@ export const listenStartTool: AppTool = {
         }),
       ).find((row) => row.roomId === roomId && typeof row.folderId === 'string' && row.folderId);
       if (running) {
-        const listener = startBrowserAudio({ db, hub, roomId, folderId: running.folderId as string, meetingId: running._id, onAutoStop: endOnAutoStop(db, runtime, roomId, running._id) });
+        const listener = startBrowserAudio({
+          db,
+          hub,
+          roomId,
+          folderId: running.folderId as string,
+          meetingId: running._id,
+          recordingStartedAt: Date.parse(String(running.startedAt)),
+          onAutoStop: endOnAutoStop(db, runtime, roomId, running._id),
+        });
         return { meetingId: running._id, title: running.title ?? '', continued: true, ...listener.status() };
       }
 
@@ -135,7 +143,7 @@ export const listenStartTool: AppTool = {
       try {
         const folderId = await ensureRoomFolderPath(hub, roomId, folderName(title, meetingId, startedAt));
         await db.update('meetings', 'room', meetingId, { folderId });
-        const listener = startBrowserAudio({ db, hub, roomId, folderId, meetingId, onAutoStop: endOnAutoStop(db, runtime, roomId, meetingId) });
+        const listener = startBrowserAudio({ db, hub, roomId, folderId, meetingId, recordingStartedAt: startedAt.getTime(), onAutoStop: endOnAutoStop(db, runtime, roomId, meetingId) });
         return { meetingId, title, continued: false, ...listener.status() };
       } catch (error) {
         // Nothing was recorded: do not leave a half-made meeting in the history.

@@ -180,6 +180,19 @@ describe('browser audio listener', () => {
       expect(() => startBrowserAudio(ctx as never)).toThrow(expect.objectContaining({ code: 'INVALID_STATE' }));
     });
 
+    it('counts the longest recording from the meeting start, also for a listener resumed later', async () => {
+      const clock = { t: 170 * MIN };
+      vi.stubGlobal('fetch', tapStream().fetchMock);
+      const { ctx, stops } = guarded(clock, { recordingStartedAt: 0, limits: { ...limits, silenceMs: 1_000 * MIN, unreachableMs: 1_000 * MIN } });
+      const listener = startBrowserAudio(ctx as never);
+      clock.t = 179 * MIN;
+      await listener.check();
+      expect(stops).toEqual([]);
+      clock.t = 180 * MIN;
+      await listener.check();
+      expect(stops.map((s) => s.reason)).toEqual(['max_duration']);
+    });
+
     it('after a stretch without sound; sound pushes the stop back', async () => {
       const clock = { t: 0 };
       const tap = tapStream();

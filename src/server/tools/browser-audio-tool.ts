@@ -70,7 +70,15 @@ export const browserAudioTool: AppTool = {
       const meeting = await checkOwner(true);
       const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
       if (!folderId) throw new AppError('The meeting has no Files folder yet.', 'INVALID_STATE');
-      const listener = startBrowserAudio({ db, hub: runtime.agentBotHub, roomId, folderId, meetingId, onAutoStop: endOnAutoStop(db, runtime, roomId, meetingId) });
+      const listener = startBrowserAudio({
+        db,
+        hub: runtime.agentBotHub,
+        roomId,
+        folderId,
+        meetingId,
+        recordingStartedAt: Date.parse(String(meeting.startedAt)),
+        onAutoStop: endOnAutoStop(db, runtime, roomId, meetingId),
+      });
       return { ...listener.status(), ...listener.captionsSince(cursor) };
     }
 

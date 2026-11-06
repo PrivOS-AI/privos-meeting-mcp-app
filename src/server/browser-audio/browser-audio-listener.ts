@@ -98,6 +98,8 @@ export interface BrowserAudioContext {
   meetingId: string;
   /** The wall clock the meeting clock and the limits are kept on; tests pass their own. */
   now?: () => number;
+  /** When the meeting started recording (ms): the longest-recording limit counts from there, also for a listener resumed later. Default: now. */
+  recordingStartedAt?: number;
   /** Runs once when the listener stopped by itself, after its last part is saved: end the meeting there. */
   onAutoStop?: (reason: BrowserAudioEndReason, status: BrowserAudioStatus) => Promise<void> | void;
   limits?: Partial<BrowserAudioLimits>;
@@ -161,6 +163,8 @@ export class BrowserAudioListener {
   private readonly limits: BrowserAudioLimits;
   private readonly timing: BrowserAudioTiming;
   private readonly startedAt: number;
+  /** Where the longest-recording limit counts from. */
+  private readonly recordingStartedAt: number;
   /** Bytes of meeting audio fed so far: the meeting clock. */
   private fedBytes = 0;
   private pushSeq = 0;
@@ -195,6 +199,7 @@ export class BrowserAudioListener {
     this.limits = { ...defaultLimits(), ...ctx.limits };
     this.timing = { ...DEFAULT_TIMING, ...ctx.timing };
     this.startedAt = this.now();
+    this.recordingStartedAt = Number.isFinite(ctx.recordingStartedAt) ? Math.min(ctx.recordingStartedAt!, this.startedAt) : this.startedAt;
     this.lastSoundAt = this.startedAt;
     this.unreachableSince = this.startedAt;
     this.lastRowCheckAt = this.startedAt;
@@ -250,7 +255,7 @@ export class BrowserAudioListener {
     try {
       const now = this.now();
       const reason: BrowserAudioEndReason | null =
-        now - this.startedAt >= this.limits.maxMs
+        now - this.recordingStartedAt >= this.limits.maxMs
           ? 'max_duration'
           : this.unreachableSince !== null && now - this.unreachableSince >= this.limits.unreachableMs
             ? 'unreachable'
