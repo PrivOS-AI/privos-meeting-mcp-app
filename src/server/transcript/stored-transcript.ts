@@ -8,7 +8,7 @@ import { text as streamToText } from 'node:stream/consumers';
 import type { RoomBoundHubClient } from '@privos_ai/app-server';
 
 import { AppError } from '../../shared/app-error.js';
-import { extractDbRecords, type AppDbBotClient, type DbRow } from '../hub/app-db-bot-client.js';
+import type { AppDbBotClient, DbRow } from '../hub/app-db-bot-client.js';
 import { fetchFileReadable } from '../media/hub-file-download.js';
 import type { TranscriptJson } from './transcript-json.js';
 
@@ -37,9 +37,7 @@ export async function loadStoredTranscript(db: AppDbBotClient, hub: RoomBoundHub
   }
   if (!isTranscriptJson(doc)) throw new AppError('transcript.json is not in the expected format.', 'INVALID_INPUT');
 
-  const speakerRows = extractDbRecords(
-    await db.query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meeting._id }], limit: 1000 }),
-  );
+  const speakerRows = await db.queryAll('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meeting._id }] });
   const displayNameBySpeaker: Record<string, string> = {};
   for (const row of speakerRows) {
     if (typeof row.speakerId === 'string' && typeof row.displayName === 'string' && row.displayName) {

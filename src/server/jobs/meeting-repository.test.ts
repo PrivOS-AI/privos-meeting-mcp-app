@@ -191,3 +191,39 @@ describe('action items, decisions and meeting deletion', () => {
     expect(store.processing_jobs.map((r) => r.meetingId)).toEqual(['m2']);
   });
 });
+
+describe('deleteMeetingRecords — paging', () => {
+  function seed(count: number): void {
+    store = {
+      action_items: Array.from({ length: count }, (_, i) => ({ _id: `a-${i}`, meeting: 'm1' })),
+      decisions: [],
+      bookmarks: [],
+      meeting_speakers: [],
+      processing_jobs: [],
+    };
+  }
+
+  it('deletes every row on a Hub with paging, past one page of 200', async () => {
+    seed(450);
+    fakeHub = installFakeHub({ store, paginates: true });
+
+    await deleteMeetingRecords(db(), 'm1');
+
+    expect(store.action_items).toEqual([]);
+    const queries = vi
+      .mocked(fakeHub.authorizedFetch)
+      .mock.calls.map(([, init]) => JSON.parse(String(init?.body)) as { toolName: string; arguments: Record<string, unknown> })
+      .filter((body) => body.toolName === 'mcpapp.db.query' && body.arguments.collection === 'action_items');
+    expect(queries.map((q) => q.arguments.offset)).toEqual([0, 200, 400]);
+    expect(queries.every((q) => q.arguments.paginate === true)).toBe(true);
+  });
+
+  it('on a Hub without paging reads its one answer of up to 1000 rows, as before', async () => {
+    seed(1200);
+    fakeHub = installFakeHub({ store });
+
+    await deleteMeetingRecords(db(), 'm1');
+
+    expect(store.action_items).toHaveLength(200);
+  });
+});

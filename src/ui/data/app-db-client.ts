@@ -16,9 +16,15 @@
  * to total a number). Both mirror `mcpapp.db.*` tools documented in
  * `privos-dev-docs/mcp-app-platform/apis/tools-database.md` and already used
  * server-side by `AppDbBotClient` (`delete`) — same tool names, user context.
+ *
+ * `queryAll` / `queryPage` use the Hub's opt-in paging (`paginate: true`,
+ * `shared/list-pages.ts`) and still read the old `{ records, total }` answer
+ * of a Hub without it; `query` stays one plain answer for bounded lookups.
  */
 import { parseToolResult } from '@privos_ai/app-react';
 import type { McpApp } from '@privos_ai/app-react';
+
+import { pagedBody, readAllPages } from '../../shared/list-pages.js';
 
 export interface DbRecord {
   _id: string;
@@ -31,6 +37,34 @@ export interface DbWhereClause {
   field: string;
   op: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'in' | 'not-in' | 'array-contains' | 'array-contains-any';
   value: unknown;
+}
+
+export interface DbQueryInput {
+  collection: string;
+  where?: DbWhereClause[];
+  orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
+  limit?: number;
+  offset?: number;
+  populate?: string[];
+}
+
+/** One page of `queryPage`. */
+export interface DbQueryPage {
+  records: DbRecord[];
+  /** Matching rows, `null` when the Hub did not count them; with `totalCapped` the Hub stopped counting (10,000) and the real number is higher. */
+  total: number | null;
+  totalCapped: boolean;
+  /** Exact on a paging Hub; on an older one, `offset + records < total` (a capped total: a full page). */
+  hasMore: boolean;
+}
+
+/** `mcpapp.db.query`'s own maximum on a Hub without paging. */
+const LEGACY_QUERY_LIMIT = 1000;
+
+/** The rows of an old-Hub `{ records }` answer, or a page's bare `items` (`readAllPages`); `null` (no envelope) reads as none. */
+function recordsOf(body: unknown): DbRecord[] {
+  if (Array.isArray(body)) return body as DbRecord[];
+  return (body as { records?: DbRecord[] } | null)?.records ?? [];
 }
 
 async function callTool<T>(app: McpApp, name: string, args: Record<string, unknown>): Promise<T> {
@@ -50,18 +84,37 @@ export class AppDbClient {
     return callTool(this.app, 'mcpapp.db.get', { collection, id });
   }
 
-  async query(input: {
-    collection: string;
-    where?: DbWhereClause[];
-    orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
-    limit?: number;
-    offset?: number;
-    populate?: string[];
-  }): Promise<{ records: DbRecord[]; total: number }> {
-    return callTool(this.app, 'mcpapp.db.query', input);
+  /** One plain answer — for lookups that read a bounded page (`limit: 1`, "latest N"). */
+  async query(input: DbQueryInput): Promise<{ records: DbRecord[]; total: number }> {
+    return callTool(this.app, 'mcpapp.db.query', { ...input });
   }
 
-  async count(input: { collection: string; where?: DbWhereClause[] }): Promise<{ count: number }> {
+  /** Every matching row, page by page. A Hub without paging answers once with up to `limit` rows (default 1000, its old cap), as `query` did. */
+  async queryAll(input: Omit<DbQueryInput, 'offset'>): Promise<DbRecord[]> {
+    const { limit = LEGACY_QUERY_LIMIT, ...rest } = input;
+    return readAllPages((paging) => callTool(this.app, 'mcpapp.db.query', { ...rest, ...paging }), recordsOf, limit);
+  }
+
+  /** One page for a table: `hasMore` drives "Load more", never `total` (it can be `null` or capped). */
+  async queryPage(input: DbQueryInput & { limit: number }): Promise<DbQueryPage> {
+    const offset = input.offset ?? 0;
+    const body = await callTool<unknown>(this.app, 'mcpapp.db.query', { ...input, offset, paginate: true });
+    const page = pagedBody(body);
+    if (page) {
+      const { total, totalCapped, hasMore } = page.pagination;
+      return { records: page.items as DbRecord[], total: typeof total === 'number' ? total : null, totalCapped: totalCapped === true, hasMore };
+    }
+    // Older Hub: `{ records, total, totalCapped }`, as before.
+    const old = body as { total?: unknown; totalCapped?: unknown } | null;
+    const records = recordsOf(body);
+    const total = typeof old?.total === 'number' ? old.total : null;
+    const totalCapped = old?.totalCapped === true;
+    const hasMore = totalCapped || total === null ? records.length === input.limit : offset + records.length < total;
+    return { records, total, totalCapped, hasMore };
+  }
+
+  /** `capped`: the Hub stopped counting at its cap — `count` is a lower bound, not the number. */
+  async count(input: { collection: string; where?: DbWhereClause[] }): Promise<{ count: number; capped?: boolean }> {
     return callTool(this.app, 'mcpapp.db.count', input);
   }
 

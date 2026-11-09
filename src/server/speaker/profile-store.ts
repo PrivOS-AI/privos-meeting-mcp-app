@@ -156,8 +156,7 @@ function rowToProfile(row: DbRow): SpeakerProfile {
 
 /** Every profile in the workspace, decoded — HMAC-invalid embeddings are silently dropped per profile (they never block a match against the profile's OTHER embeddings). */
 export async function listProfiles(db: AppDbBotClient): Promise<SpeakerProfile[]> {
-  const result = await db.query(COLLECTION, SCOPE, { limit: 1000 });
-  return extractDbRecords(result).map(rowToProfile);
+  return (await db.queryAll(COLLECTION, SCOPE)).map(rowToProfile);
 }
 
 // ---- workspace-global speaker_profiles cache (shared across meetings/callers, TTL 10min) ----
@@ -516,11 +515,7 @@ export async function deleteProfile(db: AppDbBotClient, profileId: string, known
   for (const roomId of knownRooms) {
     try {
       const roomDb = new AppDbBotClient(roomId);
-      const result = await roomDb.query('meeting_speakers', 'room', {
-        where: [{ field: 'profileId', op: '==', value: profileId }],
-        limit: 1000,
-      });
-      for (const row of extractDbRecords(result)) {
+      for (const row of await roomDb.queryAll('meeting_speakers', 'room', { where: [{ field: 'profileId', op: '==', value: profileId }] })) {
         await roomDb.update('meeting_speakers', 'room', row._id, { profileId: '', pendingEmbedding: '' });
       }
     } catch (error) {

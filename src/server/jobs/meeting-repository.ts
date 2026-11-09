@@ -3,7 +3,7 @@
  * once a job has results — the counterpart to the iframe-owned fields in
  * `meeting-draft-repository.ts` (see plan.md's field-ownership table).
  */
-import { extractDbRecords, type AppDbBotClient } from '../hub/app-db-bot-client.js';
+import type { AppDbBotClient } from '../hub/app-db-bot-client.js';
 
 export interface MeetingPatch {
   status?: 'processing' | 'summarized' | 'failed' | 'interrupted';
@@ -59,11 +59,7 @@ export interface SpeakerUpsertInput {
  */
 export async function upsertMeetingSpeakers(db: AppDbBotClient, meetingId: string, speakers: readonly SpeakerUpsertInput[]): Promise<void> {
   if (speakers.length === 0) return;
-  const existingResult = await db.query('meeting_speakers', 'room', {
-    where: [{ field: 'meeting', op: '==', value: meetingId }],
-    limit: 1000,
-  });
-  const existing = extractDbRecords(existingResult);
+  const existing = await db.queryAll('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }] });
   const bySpeakerId = new Map(existing.filter((row) => typeof row.speakerId === 'string').map((row) => [row.speakerId as string, row]));
 
   for (const speaker of speakers) {
@@ -111,8 +107,7 @@ function nameSourceRank(nameSource: unknown): number {
  * or live auto-match rather than staying "Speaker N" forever.
  */
 export async function mergeLiveIntoAsyncSpeaker(db: AppDbBotClient, meetingId: string, speakerId: string, sessionSpeakerId: string): Promise<void> {
-  const result = await db.query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 });
-  const rows = extractDbRecords(result);
+  const rows = await db.queryAll('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }] });
   const asyncRow = rows.find((r) => r.speakerId === speakerId);
   if (!asyncRow) return;
   const liveRow = rows.find((r) => r.sessionSpeakerId === sessionSpeakerId && r._id !== asyncRow._id);
@@ -151,8 +146,7 @@ export async function mergeLiveIntoAsyncSpeaker(db: AppDbBotClient, meetingId: s
  * quick-assign lookup).
  */
 export async function deleteUnmappedLiveSpeakers(db: AppDbBotClient, meetingId: string, mappedSessionSpeakerIds: ReadonlySet<string>): Promise<void> {
-  const result = await db.query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 });
-  for (const row of extractDbRecords(result)) {
+  for (const row of await db.queryAll('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }] })) {
     const isLiveOnly = typeof row.sessionSpeakerId === 'string' && row.sessionSpeakerId && !(typeof row.speakerId === 'string' && row.speakerId);
     if (isLiveOnly && row.nameSource !== 'user' && !mappedSessionSpeakerIds.has(row.sessionSpeakerId as string)) {
       await db.delete('meeting_speakers', 'room', row._id);
@@ -175,9 +169,8 @@ export interface LiveIdentity {
  * or not it has been folded into an async row yet.
  */
 export async function loadLiveIdentities(db: AppDbBotClient, meetingId: string): Promise<Map<string, LiveIdentity>> {
-  const result = await db.query('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 });
   const out = new Map<string, LiveIdentity>();
-  for (const row of extractDbRecords(result)) {
+  for (const row of await db.queryAll('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }] })) {
     if (typeof row.sessionSpeakerId !== 'string' || !row.sessionSpeakerId) continue;
     out.set(row.sessionSpeakerId, {
       displayName: typeof row.displayName === 'string' && row.displayName ? row.displayName : undefined,
@@ -222,11 +215,7 @@ export interface DecisionInput {
  * function used to have (P3's summarize stub never called it with items).
  */
 export async function replaceActionItems(db: AppDbBotClient, meetingId: string, items: readonly ActionItemInput[]): Promise<void> {
-  const existingResult = await db.query('action_items', 'room', {
-    where: [{ field: 'meeting', op: '==', value: meetingId }],
-    limit: 1000,
-  });
-  for (const row of extractDbRecords(existingResult)) {
+  for (const row of await db.queryAll('action_items', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }] })) {
     await db.delete('action_items', 'room', row._id);
   }
   for (const item of items) {
@@ -249,8 +238,7 @@ export async function replaceActionItems(db: AppDbBotClient, meetingId: string, 
 
 /** True replace of a meeting's `decisions` rows, like {@link replaceActionItems}. */
 export async function replaceDecisions(db: AppDbBotClient, meetingId: string, decisions: readonly DecisionInput[]): Promise<void> {
-  const existing = await db.query('decisions', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 });
-  for (const row of extractDbRecords(existing)) await db.delete('decisions', 'room', row._id);
+  for (const row of await db.queryAll('decisions', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }] })) await db.delete('decisions', 'room', row._id);
   for (const decision of decisions) {
     await db.create('decisions', 'room', {
       meeting: meetingId,
@@ -272,9 +260,9 @@ export const MEETING_CHILD_COLLECTIONS = ['action_items', 'decisions', 'bookmark
  */
 export async function deleteMeetingRecords(db: AppDbBotClient, meetingId: string): Promise<void> {
   for (const collection of MEETING_CHILD_COLLECTIONS) {
-    const rows = await db.query(collection, 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }], limit: 1000 });
-    for (const row of extractDbRecords(rows)) await db.delete(collection, 'room', row._id);
+    for (const row of await db.queryAll(collection, 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }] })) await db.delete(collection, 'room', row._id);
   }
-  const jobs = await db.query('processing_jobs', 'room', { where: [{ field: 'meetingId', op: '==', value: meetingId }], limit: 100 });
-  for (const row of extractDbRecords(jobs)) await db.delete('processing_jobs', 'room', row._id);
+  for (const row of await db.queryAll('processing_jobs', 'room', { where: [{ field: 'meetingId', op: '==', value: meetingId }], limit: 100 })) {
+    await db.delete('processing_jobs', 'room', row._id);
+  }
 }

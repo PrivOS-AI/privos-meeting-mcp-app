@@ -16,6 +16,13 @@ export interface MeetingStats {
   totalDurationSec: number;
   openActionItems: number;
   bookmarkCount: number;
+  /** Counts the Hub stopped at its cap (`db.count` → `capped: true`): the number shown is a lower bound. */
+  capped: Partial<Record<'meetingsThisWeek' | 'openActionItems' | 'bookmarkCount', true>>;
+}
+
+/** A stat count as shown on its card — a capped one reads "10000+", never as the exact number. */
+export function formatCount(count: number, capped?: boolean): string {
+  return capped ? `${count}+` : String(count);
 }
 
 /** Monday 00:00 local time of the week containing `now` — "this week" (the spec leaves the exact week-start convention to the implementation). */
@@ -47,10 +54,16 @@ export async function loadMeetingStats(app: McpApp, roomId: string, now: Date = 
     db.count({ collection: 'bookmarks' }),
   ]);
 
+  const capped: MeetingStats['capped'] = {};
+  if (thisWeek.capped === true) capped.meetingsThisWeek = true;
+  if (openItems.capped === true) capped.openActionItems = true;
+  if (bookmarks.capped === true) capped.bookmarkCount = true;
+
   return {
     meetingsThisWeek: thisWeek.count,
     totalDurationSec: asAggregateNumber(durationAgg.result),
     openActionItems: openItems.count,
     bookmarkCount: bookmarks.count,
+    capped,
   };
 }

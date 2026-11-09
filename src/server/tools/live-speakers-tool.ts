@@ -20,7 +20,7 @@
  * stop polling.
  */
 import { AppError } from '../../shared/app-error.js';
-import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
+import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { resolveRealtimeVendor, realtimeProviderFor } from '../stt/stt-provider-registry.js';
 import { ensureRegistry } from '../live-speakers/live-speaker-repository.js';
 import { requireRoomMeeting, requireVerifiedActor } from './authz.js';
@@ -91,11 +91,8 @@ export const liveSpeakersTool: AppTool = {
       return { sessionSpeakers: [], turns: [], labelsSupported: false, updatedAt: new Date().toISOString() };
     }
 
-    const result = await db.query('meeting_speakers', 'room', {
-      where: [{ field: 'meeting', op: '==', value: meetingId }],
-      limit: 1000,
-    });
-    const sessionSpeakers: LiveSpeakerDto[] = extractDbRecords(result)
+    const rows = await db.queryAll('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }] });
+    const sessionSpeakers: LiveSpeakerDto[] = rows
       .filter((row) => typeof row.sessionSpeakerId === 'string' && row.sessionSpeakerId)
       .map((row) => ({
         sessionSpeakerId: row.sessionSpeakerId as string,

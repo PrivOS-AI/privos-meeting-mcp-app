@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { McpApp } from '@privos_ai/app-react';
 
-import { loadMeetingStats, startOfWeekIso } from './meeting-stats.js';
+import { formatCount, loadMeetingStats, startOfWeekIso } from './meeting-stats.js';
 
 function fakeApp(handlers: Record<string, (args: Record<string, unknown>) => unknown>): McpApp {
   return {
@@ -46,7 +46,7 @@ describe('loadMeetingStats', () => {
 
     const stats = await loadMeetingStats(app, 'room-1', new Date(2026, 8, 16));
 
-    expect(stats).toEqual({ meetingsThisWeek: 3, totalDurationSec: 7200, openActionItems: 5, bookmarkCount: 8 });
+    expect(stats).toEqual({ meetingsThisWeek: 3, totalDurationSec: 7200, openActionItems: 5, bookmarkCount: 8, capped: {} });
     // Never pages full record sets — only count/aggregate tools are called.
     expect(calls.every((c) => c.name === 'mcpapp.db.count' || c.name === 'mcpapp.db.aggregate')).toBe(true);
   });
@@ -59,5 +59,17 @@ describe('loadMeetingStats', () => {
 
     const stats = await loadMeetingStats(app, 'room-1');
     expect(stats.totalDurationSec).toBe(0);
+  });
+
+  it('marks a count the Hub capped, so the card never shows it as exact', async () => {
+    const app = fakeApp({
+      'mcpapp.db.count': (args) => (args.collection === 'bookmarks' ? { count: 10_000, capped: true } : { count: 2 }),
+      'mcpapp.db.aggregate': () => ({ result: 0 }),
+    });
+
+    const stats = await loadMeetingStats(app, 'room-1');
+    expect(stats.capped).toEqual({ bookmarkCount: true });
+    expect(formatCount(stats.bookmarkCount, stats.capped.bookmarkCount)).toBe('10000+');
+    expect(formatCount(stats.openActionItems, stats.capped.openActionItems)).toBe('2');
   });
 });

@@ -272,11 +272,8 @@ export class JobRepository {
   }
 
   async listQueued(): Promise<JobRecord[]> {
-    const result = await this.db.query(COLLECTION, SCOPE, {
-      where: [{ field: 'status', op: '==', value: 'queued' }],
-      limit: 1000,
-    });
-    return extractDbRecords(result).map(fromRow);
+    const rows = await this.db.queryAll(COLLECTION, SCOPE, { where: [{ field: 'status', op: '==', value: 'queued' }] });
+    return rows.map(fromRow);
   }
 
   /**
@@ -286,11 +283,7 @@ export class JobRepository {
    * `failed(interrupted)` and waits for the owner's explicit retry.
    */
   async sweepStale(olderThanMs: number): Promise<{ requeued: JobRecord[]; failed: JobRecord[] }> {
-    const result = await this.db.query(COLLECTION, SCOPE, {
-      where: [{ field: 'status', op: '==', value: 'processing' }],
-      limit: 1000,
-    });
-    const rows = extractDbRecords(result).map(fromRow);
+    const rows = (await this.db.queryAll(COLLECTION, SCOPE, { where: [{ field: 'status', op: '==', value: 'processing' }] })).map(fromRow);
     const cutoff = Date.now() - olderThanMs;
     const stale = rows.filter((row) => new Date(row.heartbeatAt).getTime() < cutoff);
     const requeued: JobRecord[] = [];

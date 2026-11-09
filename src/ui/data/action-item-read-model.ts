@@ -66,11 +66,7 @@ function asActionItem(record: { _id: string; [key: string]: unknown }): ActionIt
 
 /** A meeting's decisions, in creation (= summary) order. */
 export async function listDecisions(app: McpApp, meetingId: string): Promise<DecisionRecord[]> {
-  const { records } = await new AppDbClient(app).query({
-    collection: 'decisions',
-    where: [{ field: 'meeting', op: '==', value: meetingId }],
-    limit: 1000,
-  });
+  const records = await new AppDbClient(app).queryAll({ collection: 'decisions', where: [{ field: 'meeting', op: '==', value: meetingId }] });
   return records.map((r) => ({ id: r._id, text: typeof r.text === 'string' ? r.text : '', by: str(r.by), atSec: typeof r.atSec === 'number' ? r.atSec : null }));
 }
 
@@ -83,11 +79,7 @@ export function peopleOf(items: readonly ActionItemRecord[]): string[] {
 
 /** Every action item for one meeting, in creation order. */
 export async function listActionItems(app: McpApp, meetingId: string): Promise<ActionItemRecord[]> {
-  const { records } = await new AppDbClient(app).query({
-    collection: 'action_items',
-    where: [{ field: 'meeting', op: '==', value: meetingId }],
-    limit: 1000,
-  });
+  const records = await new AppDbClient(app).queryAll({ collection: 'action_items', where: [{ field: 'meeting', op: '==', value: meetingId }] });
   return records.map(asActionItem);
 }
 

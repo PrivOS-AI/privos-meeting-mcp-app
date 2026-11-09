@@ -18,7 +18,7 @@
  */
 import type { RoomBoundHubClient } from '@privos_ai/app-server';
 
-import { extractDbRecords, type AppDbBotClient, type DbRow } from '../hub/app-db-bot-client.js';
+import type { AppDbBotClient, DbRow } from '../hub/app-db-bot-client.js';
 import { readLiveTurns } from '../media/live-turns-store.js';
 import { openEmbedding, openEmbeddingWithMeta, type SealedEmbedding } from '../speaker/voiceprint-crypto.js';
 import { sealPendingEmbedding } from '../speaker/resolve-speakers.js';
@@ -85,11 +85,8 @@ function rowToLoadable(row: DbRow, meetingId: string): LoadableSpeakerRow | null
 
 /** Every `meeting_speakers` row for `meetingId` that carries a `sessionSpeakerId` — used to rebuild the in-memory registry after a restart/eviction. */
 export async function loadForMeeting(db: AppDbBotClient, meetingId: string): Promise<LoadableSpeakerRow[]> {
-  const result = await db.query(COLLECTION, SCOPE, {
-    where: [{ field: 'meeting', op: '==', value: meetingId }],
-    limit: 1000,
-  });
-  return extractDbRecords(result)
+  const rows = await db.queryAll(COLLECTION, SCOPE, { where: [{ field: 'meeting', op: '==', value: meetingId }] });
+  return rows
     .map((row) => rowToLoadable(row, meetingId))
     .filter((row): row is LoadableSpeakerRow => row !== null);
 }
@@ -158,11 +155,7 @@ export async function upsertAll(db: AppDbBotClient, meetingId: string, registry:
     return;
   }
 
-  const existingResult = await db.query(COLLECTION, SCOPE, {
-    where: [{ field: 'meeting', op: '==', value: meetingId }],
-    limit: 1000,
-  });
-  const existing = extractDbRecords(existingResult);
+  const existing = await db.queryAll(COLLECTION, SCOPE, { where: [{ field: 'meeting', op: '==', value: meetingId }] });
   const bySessionId = new Map(existing.filter((r) => typeof r.sessionSpeakerId === 'string').map((r) => [r.sessionSpeakerId as string, r]));
 
   const createdAt = new Date().toISOString();

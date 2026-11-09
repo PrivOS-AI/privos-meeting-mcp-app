@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.5.1] — 2026-11-09
+
+App DB reads use the Hub's opt-in paging (`paginate: true`, privos-hub#692),
+and still work unchanged on a Hub without it. The manifest changes only in its
+version: an admin clicks Refresh after the deploy.
+- Reads that need every row (a meeting's speakers, action items, decisions and
+  bookmarks; the cleanup of a deleted meeting; the startup and retention
+  sweeps; the voiceprint list) follow `hasMore` page by page instead of
+  stopping at the Hub's old 1000-row answer. The retention sweeps no longer
+  get stuck on the oldest 1000 meetings (meetings already cleaned still match
+  their filter). A Hub without paging answers once, as before.
+- History: "Load more" follows the Hub's `hasMore`, so it no longer disappears
+  at 10,000 meetings, where the Hub stops counting. A stat card whose count
+  the Hub capped (`db.count` → `capped: true`) shows "10000+", not an exact
+  number.
+- Lookups that read one bounded page (`limit: 1`, the latest 5–20 recordings,
+  the live-recording count) are unchanged.
+
 ## [1.5.0] — 2026-11-06
 
 Fixes from the shared-tools review (2026-11-04). The manifest changes (version,

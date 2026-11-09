@@ -30,11 +30,10 @@ function asBookmark(record: { _id: string; [key: string]: unknown }): BookmarkRe
 
 /** Every bookmark for one meeting, ordered by time. */
 export async function listBookmarks(app: McpApp, meetingId: string): Promise<BookmarkRecord[]> {
-  const { records } = await new AppDbClient(app).query({
+  const records = await new AppDbClient(app).queryAll({
     collection: 'bookmarks',
     where: [{ field: 'meeting', op: '==', value: meetingId }],
     orderBy: [{ field: 'atSec', direction: 'asc' }],
-    limit: 1000,
   });
   return records.map(asBookmark);
 }
