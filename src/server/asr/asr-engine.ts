@@ -13,16 +13,23 @@
  * Models are baked into the image under `ASR_MODEL_DIR` (default
  * `models/asr`) and loaded lazily, once per process; a load failure is a
  * catchable AppError and does not poison the singleton.
+ *
+ * A meeting's vocabulary (names, the Room's own terms) biases each decode
+ * towards those phrases (`hotwords.ts`) when the model has its `bpe.vocab`;
+ * without one the vocabulary is ignored.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { AppError } from '../../shared/app-error.js';
+import { hotwordList, tokenAlphabet } from './hotwords.js';
 import type { OfflineRecognizer, OfflineRecognizerConfig, Vad } from 'sherpa-onnx-node';
 
 export const SAMPLE_RATE = 16000;
 /** A close call stays Vietnamese: English must score this much higher (mean log-prob per token). */
 const ENGLISH_MARGIN = 0.05;
+/** Boost per token of a hotword (sherpa-onnx `hotwordsScore`), from scripts/eval-asr-set.ts. */
+const HOTWORDS_SCORE = 1.5;
 
 export type AsrLanguage = 'vi' | 'en';
 
@@ -50,6 +57,8 @@ export function asrModelDir(): string {
 export const ASR_MODEL_FILES = {
   vi: { encoder: 'vi/encoder.int8.onnx', decoder: 'vi/decoder.onnx', joiner: 'vi/joiner.int8.onnx', tokens: 'vi/tokens.txt' },
   en: { encoder: 'en/encoder.int8.onnx', decoder: 'en/decoder.int8.onnx', joiner: 'en/joiner.int8.onnx', tokens: 'en/tokens.txt' },
+  /** Optional: without it a language decodes without hotwords (`scripts/bpe-vocab.mjs` writes it at image build). */
+  bpeVocab: { vi: 'vi/bpe.vocab', en: 'en/bpe.vocab' },
   vad: 'silero_vad.onnx',
   segmentation: 'segmentation/model.onnx',
 } as const;
@@ -78,7 +87,7 @@ async function sherpa(): Promise<SherpaModule> {
   return sherpaModule;
 }
 
-function recognizerConfig(files: { encoder: string; decoder: string; joiner: string; tokens: string }): OfflineRecognizerConfig {
+function recognizerConfig(files: { encoder: string; decoder: string; joiner: string; tokens: string }, bpeVocab: string | null): OfflineRecognizerConfig {
   const dir = asrModelDir();
   return {
     featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
@@ -88,11 +97,43 @@ function recognizerConfig(files: { encoder: string; decoder: string; joiner: str
       numThreads: 1,
       provider: 'cpu',
       debug: 0,
+      ...(bpeVocab ? { modelingUnit: 'bpe', bpeVocab } : {}),
     },
     // Beam search over 4 paths: fewer word errors than greedy for a small extra cost (scripts/eval-asr.ts).
     decodingMethod: 'modified_beam_search',
     maxActivePaths: 4,
+    ...(bpeVocab ? { hotwordsScore: HOTWORDS_SCORE } : {}),
   };
+}
+
+/** The model's `bpe.vocab`, or null when this image has none for the language (no hotwords then). */
+function bpeVocabFile(lang: AsrLanguage): string | null {
+  const file = path.join(asrModelDir(), ASR_MODEL_FILES.bpeVocab[lang]);
+  return existsSync(file) ? file : null;
+}
+
+const alphabets = new Map<AsrLanguage, ReadonlySet<string> | null>();
+/** The letters the model can spell, or null when it takes no hotwords. */
+function alphabetOf(lang: AsrLanguage): ReadonlySet<string> | null {
+  if (!alphabets.has(lang)) {
+    alphabets.set(lang, bpeVocabFile(lang) ? tokenAlphabet(readFileSync(path.join(asrModelDir(), ASR_MODEL_FILES[lang].tokens), 'utf8')) : null);
+  }
+  return alphabets.get(lang) ?? null;
+}
+
+/** A meeting's vocabulary as each model's hotword list, worked out once per vocabulary array. */
+const hotwordCache = new WeakMap<readonly string[], Map<AsrLanguage, string>>();
+export function hotwordsFor(lang: AsrLanguage, vocabulary: readonly string[] | undefined): string {
+  if (!vocabulary?.length) return '';
+  let byLang = hotwordCache.get(vocabulary);
+  if (!byLang) hotwordCache.set(vocabulary, (byLang = new Map()));
+  let list = byLang.get(lang);
+  if (list === undefined) {
+    const alphabet = alphabetOf(lang);
+    list = alphabet ? hotwordList(vocabulary, alphabet, lang) : '';
+    byLang.set(lang, list);
+  }
+  return list;
 }
 
 /** Target speech level (~-20 dBFS RMS) and the most an utterance is boosted (+30 dB). */
@@ -129,7 +170,7 @@ async function recognizer(lang: AsrLanguage): Promise<OfflineRecognizer> {
     if (missing.length) {
       throw new AppError(`Speech recognition models are missing from the image: ${missing.join(', ')}.`, 'PROVIDER_NOT_CONFIGURED');
     }
-    pending = sherpa().then((mod) => mod.OfflineRecognizer.createAsync(recognizerConfig(ASR_MODEL_FILES[lang])));
+    pending = sherpa().then((mod) => mod.OfflineRecognizer.createAsync(recognizerConfig(ASR_MODEL_FILES[lang], bpeVocabFile(lang))));
     pending.catch(() => recognizers.delete(lang));
     recognizers.set(lang, pending);
   }
@@ -165,9 +206,10 @@ interface Decoded {
   meanLogProb: number;
 }
 
-async function decodeWith(lang: AsrLanguage, samples: Float32Array): Promise<Decoded> {
+async function decodeWith(lang: AsrLanguage, samples: Float32Array, vocabulary?: readonly string[]): Promise<Decoded> {
   const rec = await recognizer(lang);
-  const stream = rec.createStream();
+  const hotwords = hotwordsFor(lang, vocabulary);
+  const stream = hotwords ? rec.createStream(hotwords) : rec.createStream();
   stream.acceptWaveform({ samples, sampleRate: SAMPLE_RATE });
   await rec.decodeAsync(stream);
   const result = rec.getResult(stream);
@@ -211,10 +253,10 @@ export function sentenceCase(words: AsrWord[], lang: AsrLanguage): AsrWord[] {
   });
 }
 
-/** Recognises one utterance (a VAD segment) that starts at `offsetSec` on the caller's clock. */
-export async function recognizeUtterance(raw: Float32Array, offsetSec = 0): Promise<AsrUtterance> {
+/** Recognises one utterance (a VAD segment) that starts at `offsetSec` on the caller's clock, preferring the phrases of `vocabulary`. */
+export async function recognizeUtterance(raw: Float32Array, offsetSec = 0, vocabulary?: readonly string[]): Promise<AsrUtterance> {
   const samples = normalizeLevel(raw);
-  const [vi, en] = await Promise.all([decodeWith('vi', samples), decodeWith('en', samples)]);
+  const [vi, en] = await Promise.all([decodeWith('vi', samples, vocabulary), decodeWith('en', samples, vocabulary)]);
   const best = pickLanguage(vi, en) === 'en' ? en : vi;
   const words = sentenceCase(tokensToWords(best.tokens, best.timestamps, offsetSec, samples.length / SAMPLE_RATE), best.lang);
   return {
@@ -230,9 +272,9 @@ export async function recognizeUtterance(raw: Float32Array, offsetSec = 0): Prom
  * Decoded with ONE model (the language the meeting last used) — half the cost of
  * `recognizeUtterance`, which decides the language once the utterance is complete.
  */
-export async function recognizeDraft(raw: Float32Array, lang: AsrLanguage): Promise<string> {
+export async function recognizeDraft(raw: Float32Array, lang: AsrLanguage, vocabulary?: readonly string[]): Promise<string> {
   const samples = normalizeLevel(raw);
-  const decoded = await decodeWith(lang, samples);
+  const decoded = await decodeWith(lang, samples, vocabulary);
   return sentenceCase(tokensToWords(decoded.tokens, decoded.timestamps, 0, samples.length / SAMPLE_RATE), lang)
     .map((word) => word.text)
     .join('')

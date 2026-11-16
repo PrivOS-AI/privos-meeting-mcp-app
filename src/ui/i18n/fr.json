@@ -338,6 +338,14 @@
   "settings.agent.exampleStart": "@agent rejoins https://meet.google.com/abc-defg-hij et enregistre la réunion",
 
   "settings.adminOnlyNote": "Seuls les propriétaires et modérateurs du salon, ou un administrateur de l'espace, peuvent modifier ce paramètre.",
+  "settings.vocabulary.title": "Vocabulaire",
+  "settings.vocabulary.intro": "Noms et termes utilisés dans vos réunions : produits, projets, clients. La reconnaissance vocale intégrée les préfère aux mots qui se ressemblent. Les noms des personnes que l’app reconnaît à la voix sont ajoutés automatiquement.",
+  "settings.vocabulary.label": "Un terme par ligne (ou séparés par des virgules)",
+  "settings.vocabulary.placeholder": "PrivOS\nRemote Browser\nNguyễn Văn An",
+  "settings.vocabulary.count": "{count}/{max} termes",
+  "settings.vocabulary.save": "Enregistrer le vocabulaire",
+  "settings.vocabulary.saving": "Enregistrement…",
+  "settings.vocabulary.localOnly": "Utilisé par le fournisseur intégré pour le vietnamien, y compris les termes anglais dans une phrase vietnamienne. S’applique aux sous-titres et transcriptions dès la phrase suivante.",
 
   "settings.language.title": "Langue et traduction",
   "settings.language.uiLanguage": "Langue de l'interface",

@@ -14,6 +14,7 @@ import { PrivacyPanel } from './settings/privacy-panel.js';
 import { RoomAgentPanel } from './settings/room-agent-panel.js';
 import { SpeakerIdentificationPanel } from './settings/speaker-identification-panel.js';
 import { SpeechRecognitionPanel } from './settings/speech-recognition-panel.js';
+import { VocabularyPanel } from './settings/vocabulary-panel.js';
 
 type SettingsSection = 'language' | 'speech' | 'microphone' | 'speaker' | 'summary' | 'privacy' | 'caption' | 'agent';
 
@@ -40,7 +41,12 @@ export function SettingsScreen() {
       <div className="ma-settings-content">
         <p className="ma-settings-screen__subtitle">{t('screen.settings.subtitle')}</p>
         {section === 'language' ? <LanguagePanel /> : null}
-        {section === 'speech' ? <SpeechRecognitionPanel /> : null}
+        {section === 'speech' ? (
+          <>
+            <SpeechRecognitionPanel />
+            <VocabularyPanel />
+          </>
+        ) : null}
         {section === 'microphone' ? <MicrophonePanel /> : null}
         {section === 'speaker' ? <SpeakerIdentificationPanel /> : null}
         {section === 'summary' ? <AiSummaryPanel /> : null}

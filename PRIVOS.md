@@ -99,5 +99,12 @@ when an agent's call fails on Dev.
   Never requires a redeploy or manifest republish; CSP already declares both
   vendor WS origins. After adding `rooms:roles:read`, an admin must approve it
   (Admin → Apps → this app) before roles reach the app.
+- Vocabulary (Settings › Speech recognition, key `vocabulary`): the room's own
+  names and terms, plus the names of voice profiles, are given to the built-in
+  Vietnamese model as hotwords (`asr/hotwords.ts`, `asr/meeting-vocabulary.ts`).
+  It needs `models/asr/vi/bpe.vocab`, written at image build by
+  `scripts/bpe-vocab.mjs`; the English release has no `bpe.model`, so English
+  decodes without. Measure a change with `scripts/eval-asr-set.ts` (WER, term
+  recall and false terms on a labelled set, e.g. FLEURS vi).
 - Backup/rotation of `VOICEPRINT_ENC_KEY` and first-deploy steps:
   `docs/deployment-guide.md` (its pm2 sections predate the container).

@@ -340,6 +340,14 @@
   "settings.agent.exampleStart": "@agent https://meet.google.com/abc-defg-hij toplantısına katıl ve kaydet",
 
   "settings.adminOnlyNote": "Bu ayarı yalnızca odanın sahipleri ve moderatörleri ya da bir çalışma alanı yöneticisi değiştirebilir.",
+  "settings.vocabulary.title": "Sözlük",
+  "settings.vocabulary.intro": "Toplantılarınızda geçen adlar ve terimler: ürünler, projeler, müşteriler. Yerleşik konuşma tanıma bunları benzer sesli kelimelere tercih eder. Uygulamanın sesinden tanıdığı kişilerin adları otomatik eklenir.",
+  "settings.vocabulary.label": "Her satıra bir terim (veya virgülle ayırın)",
+  "settings.vocabulary.placeholder": "PrivOS\nRemote Browser\nNguyễn Văn An",
+  "settings.vocabulary.count": "{count}/{max} terim",
+  "settings.vocabulary.save": "Sözlüğü kaydet",
+  "settings.vocabulary.saving": "Kaydediliyor…",
+  "settings.vocabulary.localOnly": "Yerleşik sağlayıcı bunu Vietnamca konuşma için kullanır (Vietnamca cümlelerdeki İngilizce terimler dahil). Bir sonraki cümleden itibaren altyazı ve dökümlere uygulanır.",
 
   "settings.language.title": "Dil ve çeviri",
   "settings.language.uiLanguage": "Arayüz dili",

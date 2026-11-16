@@ -34,6 +34,7 @@ import type { RoomBoundHubClient } from '@privos_ai/app-server';
 import { AppError } from '../../shared/app-error.js';
 import { partFileName } from '../../shared/meeting-slug.js';
 import { liveSessionFor, type LiveAsrSession } from '../asr/live-asr-session.js';
+import { loadSessionVocabulary } from '../asr/meeting-vocabulary.js';
 import { env } from '../env.js';
 import { uploadBotFile } from '../files/hub-file-upload.js';
 import type { AppDbBotClient } from '../hub/app-db-bot-client.js';
@@ -209,6 +210,7 @@ export class BrowserAudioListener {
       throw new AppError(`The app is already captioning the maximum of ${env.liveMaxConcurrentRecordings} meetings.`, 'CAPACITY_REACHED');
     }
     this.session.attributeSpeaker ??= createLocalSpeakerAttributor(ctx);
+    loadSessionVocabulary(this.session, ctx.db, ctx.roomId);
     this.startEncoder();
     this.watchdog = setInterval(() => {
       this.check().catch((error) => console.warn('[browser-audio] check failed:', ctx.meetingId, error instanceof Error ? error.message : error));

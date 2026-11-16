@@ -141,7 +141,7 @@ export const localAsyncProvider: AsyncSttProvider = {
       if (input.signal?.aborted) throw new AppError('Transcription was cancelled.', 'INVALID_STATE');
       const slice = samples.subarray(Math.floor(segment.startSec * SAMPLE_RATE), Math.ceil(segment.endSec * SAMPLE_RATE));
       if (slice.length < SAMPLE_RATE / 10) continue;
-      const utterance = await recognizeUtterance(slice, segment.startSec);
+      const utterance = await recognizeUtterance(slice, segment.startSec, input.vocabulary);
       languages.set(utterance.lang, (languages.get(utterance.lang) ?? 0) + utterance.words.length);
       for (const word of utterance.words) words.push({ ...word, lang: utterance.lang, confidence: utterance.confidence });
     }
@@ -158,7 +158,7 @@ export const localAsyncProvider: AsyncSttProvider = {
       kind: 'async',
       configured: missing.length === 0,
       ok: missing.length === 0,
-      models: ['zipformer-vi-30M-int8', 'zipformer-small-en-int8', 'pyannote-segmentation-3.0'],
+      models: ['zipformer-vi-70kh-int8', 'zipformer-small-en-int8', 'pyannote-segmentation-3.0'],
       ...(missing.length ? { detail: `Missing model files: ${missing.join(', ')}.`, reason: 'not_configured' as const } : {}),
     };
   },

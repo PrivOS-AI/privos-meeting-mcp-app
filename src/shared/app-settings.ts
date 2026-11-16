@@ -39,6 +39,11 @@ export interface WorkspaceAppSettings {
   liveSummaryMinutes: number;
   /** Post the summary to the room chat (as the bot) as soon as processing finishes. */
   autoSendSummaryToChat: boolean;
+  /**
+   * Names and terms the built-in speech recognition should prefer (products, projects, people),
+   * one per line or comma-separated — {@link parseVocabulary}. `''` = none.
+   */
+  vocabulary: string;
 }
 
 /**
@@ -67,6 +72,7 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceAppSettings = {
   autoDeleteMeetingsDays: 0,
   liveSummaryMinutes: 5,
   autoSendSummaryToChat: false,
+  vocabulary: '',
 };
 
 export const WORKSPACE_SETTING_KEYS = Object.keys(DEFAULT_WORKSPACE_SETTINGS) as ReadonlyArray<keyof WorkspaceAppSettings>;
@@ -117,6 +123,34 @@ function booleanValidator(name: string): Validator {
   };
 }
 
+/** The Room's vocabulary: at most this many terms, this long in all. */
+export const VOCABULARY_MAX_TERMS = 100;
+export const VOCABULARY_MAX_CHARS = 2_000;
+const VOCABULARY_TERM_MAX_CHARS = 40;
+
+/** The terms of a `vocabulary` setting: split on new lines, commas and semicolons, trimmed, each once. */
+export function parseVocabulary(value: string): string[] {
+  const seen = new Set<string>();
+  const terms: string[] = [];
+  for (const raw of value.split(/[\n,;]+/)) {
+    const term = raw.replace(/\s+/g, ' ').trim();
+    const key = term.toLocaleLowerCase();
+    if (!term || seen.has(key)) continue;
+    seen.add(key);
+    terms.push(term);
+  }
+  return terms;
+}
+
+function vocabularyValidator(value: unknown): string {
+  if (typeof value !== 'string' || value.length > VOCABULARY_MAX_CHARS) throw new AppError(`vocabulary must be text of at most ${VOCABULARY_MAX_CHARS} characters.`);
+  const terms = parseVocabulary(value);
+  if (terms.length > VOCABULARY_MAX_TERMS) throw new AppError(`vocabulary holds at most ${VOCABULARY_MAX_TERMS} terms.`);
+  const long = terms.find((term) => term.length > VOCABULARY_TERM_MAX_CHARS);
+  if (long) throw new AppError(`"${long.slice(0, VOCABULARY_TERM_MAX_CHARS)}…" is too long: a term has at most ${VOCABULARY_TERM_MAX_CHARS} characters.`);
+  return terms.join('\n');
+}
+
 /** One validator per `WorkspaceAppSettings` key — the exact allowlist `meeting_settings_set` enforces. */
 export const WORKSPACE_SETTING_VALIDATORS: Record<keyof WorkspaceAppSettings, Validator> = {
   sttRealtimeProvider: enumValidator('sttRealtimeProvider', ['local', 'soniox', 'elevenlabs']),
@@ -131,6 +165,7 @@ export const WORKSPACE_SETTING_VALIDATORS: Record<keyof WorkspaceAppSettings, Va
   keepOriginalAudio: booleanValidator('keepOriginalAudio'),
   liveSummaryMinutes: enumNumberValidator('liveSummaryMinutes', LIVE_SUMMARY_MINUTES),
   autoSendSummaryToChat: booleanValidator('autoSendSummaryToChat'),
+  vocabulary: vocabularyValidator,
 };
 
 export function isWorkspaceSettingKey(key: string): key is keyof WorkspaceAppSettings {

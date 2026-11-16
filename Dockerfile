@@ -12,6 +12,8 @@ RUN npm run build && npm prune --omit=dev --no-audit --no-fund
 #                        chosen over the 30M/6k-hour model by scripts/eval-asr.ts: far more robust to
 #                        quiet and noisy capture)
 #   models/asr/en        Zipformer small English int8
+#   models/asr/*/bpe.vocab  the tokenizer's pieces, so hotwords can be given as words
+#                        (scripts/bpe-vocab.mjs, from each release's bpe.model)
 #   models/asr/silero_vad.onnx                VAD
 #   models/asr/segmentation/model.onnx        pyannote segmentation 3.0 (diarization)
 #   models/3dspeaker_speaker-embedding_advanced.onnx   3D-Speaker CAM++ zh/en "advanced"
@@ -19,6 +21,7 @@ RUN npm run build && npm prune --omit=dev --no-audit --no-fund
 FROM node:22-bookworm-slim AS model
 ARG SHERPA=https://github.com/k2-fsa/sherpa-onnx/releases/download
 WORKDIR /dl
+COPY scripts/bpe-vocab.mjs /dl/bpe-vocab.mjs
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl bzip2 \
     && curl -fsSLO "$SHERPA/asr-models/sherpa-onnx-zipformer-vi-int8-2025-04-20.tar.bz2" \
     && curl -fsSLO "$SHERPA/asr-models/sherpa-onnx-zipformer-small-en-2023-06-26.tar.bz2" \
@@ -39,11 +42,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && cp "$V/decoder-epoch-12-avg-8.onnx" /models/asr/vi/decoder.onnx \
     && cp "$V/joiner-epoch-12-avg-8.int8.onnx" /models/asr/vi/joiner.int8.onnx \
     && cp "$V/tokens.txt" /models/asr/vi/tokens.txt \
+    && node bpe-vocab.mjs "$V/bpe.model" /models/asr/vi/bpe.vocab \
     && E=sherpa-onnx-zipformer-small-en-2023-06-26 \
     && cp "$E/encoder-epoch-99-avg-1.int8.onnx" /models/asr/en/encoder.int8.onnx \
     && cp "$E/decoder-epoch-99-avg-1.int8.onnx" /models/asr/en/decoder.int8.onnx \
     && cp "$E/joiner-epoch-99-avg-1.int8.onnx" /models/asr/en/joiner.int8.onnx \
     && cp "$E/tokens.txt" /models/asr/en/tokens.txt \
+    && if [ -f "$E/bpe.model" ]; then node bpe-vocab.mjs "$E/bpe.model" /models/asr/en/bpe.vocab; fi \
     && cp silero_vad.onnx /models/asr/ \
     && cp sherpa-onnx-pyannote-segmentation-3-0/model.onnx /models/asr/segmentation/model.onnx \
     && cp 3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx /models/3dspeaker_speaker-embedding_advanced.onnx \

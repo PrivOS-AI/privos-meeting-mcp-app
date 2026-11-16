@@ -90,6 +90,23 @@ describe('LiveAsrSession', () => {
     expect(session.captionsSince(1).captions.map((c) => c.text)).toEqual(['Hello team']);
   });
 
+  it("decodes with the session's vocabulary once it is loaded", async () => {
+    const engine = fakeEngine();
+    const vocabularies: Array<readonly string[] | undefined> = [];
+    const recognize = engine.recognize.bind(engine);
+    engine.recognize = (samples, atSec, vocabulary) => {
+      vocabularies.push(vocabulary);
+      return recognize(samples, atSec);
+    };
+    const session = new LiveAsrSession('m1', engine);
+    await session.push(0, 0, join(speech(3), silence(2)));
+    await session.settle(100);
+    session.vocabulary = ['PrivOS'];
+    await session.push(1, (5 * WINDOW) / RATE, join(speech(3), silence(2)));
+    await session.finish();
+    expect(vocabularies).toEqual([undefined, ['PrivOS']]);
+  });
+
   it('ignores a retried chunk (same seq) instead of feeding it twice', async () => {
     const engine = fakeEngine();
     const session = new LiveAsrSession('m1', engine);

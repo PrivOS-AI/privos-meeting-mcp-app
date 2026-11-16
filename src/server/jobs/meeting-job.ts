@@ -16,6 +16,7 @@ import type { RoomBoundHubClient } from '@privos_ai/app-server';
 
 import { AppError } from '../../shared/app-error.js';
 import { env } from '../env.js';
+import { meetingVocabulary } from '../asr/meeting-vocabulary.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { getSetting } from '../hub/app-settings.js';
 import { sendSummaryToChat } from '../tools/send-to-chat-tool.js';
@@ -364,10 +365,12 @@ export async function runMeetingJob(input: RunMeetingJobInput): Promise<void> {
     const audioPath = providerVendor === 'soniox' ? webmPath : wavPath;
     // soniox-async and local tokens carry their own spacing; elevenlabs-batch tokens are bare words.
     const tokensCarrySpacing = providerVendor !== 'elevenlabs';
+    const vocabulary = providerVendor === 'local' ? await meetingVocabulary(db, roomId) : undefined;
     const sttResult = await provider.transcribeFile({
       audioPath,
       languageHints: job.language ? [job.language] : undefined,
       enableSpeakerDiarization: true,
+      vocabulary,
       signal,
       clientReferenceId: job.meetingId,
       resumeProviderFileId: job.providerFileId,

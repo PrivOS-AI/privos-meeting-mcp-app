@@ -340,6 +340,14 @@
   "settings.agent.exampleStart": "@agent tritt https://meet.google.com/abc-defg-hij bei und zeichne das Meeting auf",
 
   "settings.adminOnlyNote": "Nur Eigentümer und Moderatoren des Raums oder ein Workspace-Administrator können diese Einstellung ändern.",
+  "settings.vocabulary.title": "Vokabular",
+  "settings.vocabulary.intro": "Namen und Begriffe aus Ihren Meetings – Produkte, Projekte, Kunden. Die integrierte Spracherkennung bevorzugt sie gegenüber ähnlich klingenden Wörtern. Namen von Personen, die die App an der Stimme erkennt, werden automatisch ergänzt.",
+  "settings.vocabulary.label": "Ein Begriff pro Zeile (oder durch Kommas getrennt)",
+  "settings.vocabulary.placeholder": "PrivOS\nRemote Browser\nNguyễn Văn An",
+  "settings.vocabulary.count": "{count}/{max} Begriffe",
+  "settings.vocabulary.save": "Vokabular speichern",
+  "settings.vocabulary.saving": "Wird gespeichert…",
+  "settings.vocabulary.localOnly": "Wird vom integrierten Anbieter für Vietnamesisch genutzt, auch für englische Begriffe in vietnamesischen Sätzen. Gilt für Untertitel und Transkripte ab dem nächsten Satz.",
 
   "settings.language.title": "Sprache & Übersetzung",
   "settings.language.uiLanguage": "Oberflächensprache",

@@ -46,6 +46,8 @@ export interface TranscribeInput {
   audioPath: string;
   languageHints?: string[];
   enableSpeakerDiarization?: boolean;
+  /** Names and terms to prefer (`asr/meeting-vocabulary.ts`); only the local provider uses them. */
+  vocabulary?: readonly string[];
   /** Cooperative cancellation for the job timeout / an aborted retry (P3). Optional so pre-P3 callers still compile. */
   signal?: AbortSignal;
   /**

@@ -340,6 +340,14 @@
   "settings.agent.exampleStart": "@agent join https://meet.google.com/abc-defg-hij and record the meeting",
 
   "settings.adminOnlyNote": "Only the room's owners and moderators, or a workspace admin, can change this setting.",
+  "settings.vocabulary.title": "Vocabulary",
+  "settings.vocabulary.intro": "Names and terms your meetings use — products, projects, customers. Built-in speech recognition prefers them over similar-sounding words. Names of people the app knows by voice are added automatically.",
+  "settings.vocabulary.label": "One term per line (or separated by commas)",
+  "settings.vocabulary.placeholder": "PrivOS\nRemote Browser\nNguyễn Văn An",
+  "settings.vocabulary.count": "{count}/{max} terms",
+  "settings.vocabulary.save": "Save vocabulary",
+  "settings.vocabulary.saving": "Saving…",
+  "settings.vocabulary.localOnly": "Used by the built-in provider for Vietnamese speech, English terms inside Vietnamese sentences included. Applies to captions and transcripts from the next utterance.",
 
   "settings.language.title": "Language & translation",
   "settings.language.uiLanguage": "Interface language",

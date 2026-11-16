@@ -51,10 +51,15 @@ declare module 'sherpa-onnx-node' {
       numThreads?: number;
       provider?: string;
       debug?: boolean | number;
+      /** `'bpe'` with `bpeVocab`: hotwords are given as words, not tokens. */
+      modelingUnit?: string;
+      bpeVocab?: string;
     };
     decodingMethod?: string;
     /** Paths kept by `modified_beam_search`. */
     maxActivePaths?: number;
+    /** Boost per token of a hotword passed to `createStream`. */
+    hotwordsScore?: number;
   }
 
   export interface OfflineRecognizerResult {
@@ -73,7 +78,8 @@ declare module 'sherpa-onnx-node' {
   export class OfflineRecognizer {
     constructor(config: OfflineRecognizerConfig);
     static createAsync(config: OfflineRecognizerConfig): Promise<OfflineRecognizer>;
-    createStream(): OfflineStream;
+    /** `hotwords`: phrases joined by '/', biasing this stream only (`modified_beam_search`). */
+    createStream(hotwords?: string): OfflineStream;
     decode(stream: OfflineStream): void;
     decodeAsync(stream: OfflineStream): Promise<void>;
     getResult(stream: OfflineStream): OfflineRecognizerResult;

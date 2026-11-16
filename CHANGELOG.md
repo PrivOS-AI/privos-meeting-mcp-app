@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.6.0] — 2026-11-16
+
+Built-in speech recognition prefers the names and terms a Room uses. The
+manifest changes (version, `meeting_settings_set` accepts longer values): an
+admin clicks Refresh after the deploy.
+- Settings › Speech recognition › Vocabulary: the room's owners and moderators
+  list products, projects, customers (up to 100 terms, one per line or
+  comma-separated; new setting `vocabulary`). With the names of the people the
+  app knows by voice, they are given to the Vietnamese model as hotwords
+  (sherpa-onnx contextual biasing) for live captions, drafts and the
+  post-meeting transcript. English utterances decode as before (the English
+  model ships no tokenizer model). No extra decode time.
+- Measured on FLEURS Vietnamese (686 utterances, 140 min,
+  `scripts/eval-asr-set.ts`): word error rate 6.64 % → 6.35 %, names and
+  terms recognised word for word 54.5 % → 59.4 % with each utterance's terms
+  among 30 others; with a full list of 150 terms, 6.50 % and 58.0 %, at the
+  cost of a listed term appearing where it was not said in 33 of 686
+  utterances (4 without). A stronger boost forced terms onto similar speech
+  (3.0: 7.19 %), so the boost stays at 1.5.
+- The image writes each model's `bpe.vocab` from its `bpe.model`
+  (`scripts/bpe-vocab.mjs`, no Python). Provider status names the Vietnamese
+  model it actually runs (70k hours, not the old 30M one).
+
 ## [1.5.1] — 2026-11-09
 
 App DB reads use the Hub's opt-in paging (`paginate: true`, privos-hub#692),
