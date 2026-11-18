@@ -21,6 +21,8 @@ interface FakeHubOptions {
   store: Store;
   /** Override/extend behavior for a specific REST path (e.g. sandbox generate) or toolName. */
   handlers?: Record<string, (body: Record<string, unknown>) => unknown>;
+  /** Answer `paginate: true` with the paged envelope, as a Hub with privos-hub#692 does (pages of at most 200). Off: the older Hub, which ignores `paginate`. */
+  paginates?: boolean;
 }
 
 function compare(actual: unknown, op: string, expected: unknown): boolean {
@@ -47,13 +49,23 @@ function matches(row: Row, where: WhereClause[] = []): boolean {
 }
 
 export function installFakeHub(options: FakeHubOptions): RoomBoundHubClient & { store: Store } {
-  const { store, handlers = {} } = options;
+  const { store, handlers = {}, paginates = false } = options;
   let seq = 0;
 
   function handleDbToolCall(toolName: string, args: Record<string, unknown>): unknown {
     if (toolName === 'mcpapp.db.query') {
       const { collection, where, limit } = args as { collection: string; where?: WhereClause[]; limit?: number };
       const rows = (store[collection] ?? []).filter((row) => matches(row, where));
+      if (paginates && args.paginate === true) {
+        const pageLimit = Math.min(typeof limit === 'number' ? limit : 50, 200);
+        const offset = typeof args.offset === 'number' ? args.offset : 0;
+        const items = rows.slice(offset, offset + pageLimit);
+        const hasMore = offset + items.length < rows.length;
+        return {
+          items,
+          pagination: { limit: pageLimit, offset, total: Math.min(rows.length, 10_000), totalCapped: rows.length > 10_000, hasMore, nextOffset: hasMore ? offset + items.length : null, nextCursor: null },
+        };
+      }
       const page = typeof limit === 'number' ? rows.slice(0, limit) : rows;
       return { records: page, total: rows.length };
     }

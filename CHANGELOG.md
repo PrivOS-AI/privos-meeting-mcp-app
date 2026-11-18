@@ -1,5 +1,72 @@
 # Changelog
 
+## [1.6.1] — 2026-11-18
+
+The manifest fits the Marketplace again, and the app runs the same release
+gates as Remote Browser. The manifest changes (version, `env`): an admin
+clicks Refresh after the deploy.
+- The manifest declared 35 `env` keys; the Portal accepts at most 32. Six
+  tuning and dev-only keys are no longer declared (`SONIOX_TEMP_KEY_TTL_SEC`,
+  `SPEAKER_MODEL_PATH`, `SPEAKER_SESSION_MATCH_THRESHOLD`,
+  `SPEAKER_SESSION_MERGE_THRESHOLD`, `LIVE_CHUNK_OVERLAP_SEC`,
+  `ALLOW_UNVERIFIED_ACTOR`), like the other calibration knobs before them:
+  the server still reads them from its own `.env`, but a workspace admin no
+  longer sees them. A test keeps the list at 32 or fewer.
+- New scripts, as in Remote Browser and the demo: `readiness` (every
+  Marketplace gate in Portal order, `scripts/readiness-check.sh`),
+  `lint:publish`, `bundle:ui`, `docker:build` (labels the image with the
+  manifest and its digest), `docker:run` (hardened) and `publish:marketplace`.
+  `verify:fast-pr` also runs `lint:publish`.
+- CI (`.github/workflows/ci.yml`) runs typecheck, build, tests, the UI
+  version check, preflight, publish lint, the Portal's manifest rules, the
+  production dependency audit and the source package on every push, then
+  builds the image and smoke-tests it hardened: the served manifest is the
+  committed one, `/health` is 200, `/ready` without an identity is 503, no
+  npm/npx, user `node`.
+- The readiness audit always asks registry.npmjs.org: a mirror without the
+  advisory endpoint (npmmirror) failed it with nothing to fix.
+
+## [1.6.0] — 2026-11-16
+
+Built-in speech recognition prefers the names and terms a Room uses. The
+manifest changes (version, `meeting_settings_set` accepts longer values): an
+admin clicks Refresh after the deploy.
+- Settings › Speech recognition › Vocabulary: the room's owners and moderators
+  list products, projects, customers (up to 100 terms, one per line or
+  comma-separated; new setting `vocabulary`). With the names of the people the
+  app knows by voice, they are given to the Vietnamese model as hotwords
+  (sherpa-onnx contextual biasing) for live captions, drafts and the
+  post-meeting transcript. English utterances decode as before (the English
+  model ships no tokenizer model). No extra decode time.
+- Measured on FLEURS Vietnamese (686 utterances, 140 min,
+  `scripts/eval-asr-set.ts`): word error rate 6.64 % → 6.35 %, names and
+  terms recognised word for word 54.5 % → 59.4 % with each utterance's terms
+  among 30 others; with a full list of 150 terms, 6.50 % and 58.0 %, at the
+  cost of a listed term appearing where it was not said in 33 of 686
+  utterances (4 without). A stronger boost forced terms onto similar speech
+  (3.0: 7.19 %), so the boost stays at 1.5.
+- The image writes each model's `bpe.vocab` from its `bpe.model`
+  (`scripts/bpe-vocab.mjs`, no Python). Provider status names the Vietnamese
+  model it actually runs (70k hours, not the old 30M one).
+
+## [1.5.1] — 2026-11-09
+
+App DB reads use the Hub's opt-in paging (`paginate: true`, privos-hub#692),
+and still work unchanged on a Hub without it. The manifest changes only in its
+version: an admin clicks Refresh after the deploy.
+- Reads that need every row (a meeting's speakers, action items, decisions and
+  bookmarks; the cleanup of a deleted meeting; the startup and retention
+  sweeps; the voiceprint list) follow `hasMore` page by page instead of
+  stopping at the Hub's old 1000-row answer. The retention sweeps no longer
+  get stuck on the oldest 1000 meetings (meetings already cleaned still match
+  their filter). A Hub without paging answers once, as before.
+- History: "Load more" follows the Hub's `hasMore`, so it no longer disappears
+  at 10,000 meetings, where the Hub stops counting. A stat card whose count
+  the Hub capped (`db.count` → `capped: true`) shows "10000+", not an exact
+  number.
+- Lookups that read one bounded page (`limit: 1`, the latest 5–20 recordings,
+  the live-recording count) are unchanged.
+
 ## [1.5.0] — 2026-11-06
 
 Fixes from the shared-tools review (2026-11-04). The manifest changes (version,

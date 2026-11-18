@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_WORKSPACE_SETTINGS, isWorkspaceSettingKey, WORKSPACE_SETTING_VALIDATORS } from './app-settings.js';
+import { DEFAULT_WORKSPACE_SETTINGS, isWorkspaceSettingKey, parseVocabulary, VOCABULARY_MAX_CHARS, VOCABULARY_MAX_TERMS, WORKSPACE_SETTING_VALIDATORS } from './app-settings.js';
 
 describe('room settings allowlist', () => {
   it('defaults the summary language to the meeting\'s own language', () => {
@@ -36,5 +36,20 @@ describe('meeting follow-up settings', () => {
   it('does not post to chat unless the room turns it on', () => {
     expect(DEFAULT_WORKSPACE_SETTINGS.autoSendSummaryToChat).toBe(false);
     expect(() => WORKSPACE_SETTING_VALIDATORS.autoSendSummaryToChat('yes')).toThrow(/autoSendSummaryToChat/);
+  });
+});
+
+describe('vocabulary', () => {
+  it('is empty by default and keeps each term once, one per line', () => {
+    expect(DEFAULT_WORKSPACE_SETTINGS.vocabulary).toBe('');
+    expect(WORKSPACE_SETTING_VALIDATORS.vocabulary('PrivOS, Hà Nội;  privos \n\n Quỳnh  Anh')).toBe('PrivOS\nHà Nội\nQuỳnh Anh');
+    expect(parseVocabulary('')).toEqual([]);
+  });
+
+  it('refuses a list that is too long, has too many terms or a term that is too long', () => {
+    expect(() => WORKSPACE_SETTING_VALIDATORS.vocabulary(42)).toThrow(/vocabulary/);
+    expect(() => WORKSPACE_SETTING_VALIDATORS.vocabulary('x'.repeat(VOCABULARY_MAX_CHARS + 1))).toThrow(/vocabulary/);
+    expect(() => WORKSPACE_SETTING_VALIDATORS.vocabulary(Array.from({ length: VOCABULARY_MAX_TERMS + 1 }, (_, i) => `term${i}`).join(','))).toThrow(/at most/);
+    expect(() => WORKSPACE_SETTING_VALIDATORS.vocabulary('a'.repeat(41))).toThrow(/too long/);
   });
 });

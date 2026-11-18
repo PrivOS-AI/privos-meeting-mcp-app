@@ -7,6 +7,7 @@
  */
 import { AppError } from '../../shared/app-error.js';
 import { existingLiveSession, liveSessionFor, pcm16ToFloat32 } from '../asr/live-asr-session.js';
+import { loadSessionVocabulary } from '../asr/meeting-vocabulary.js';
 import { createLocalSpeakerAttributor } from '../live-speakers/local-attribution.js';
 import { SAMPLE_RATE } from '../asr/asr-engine.js';
 import { env } from '../env.js';
@@ -93,6 +94,7 @@ export const audioPushTool: AppTool = {
     if (!session.attributeSpeaker && check.folderId) {
       session.attributeSpeaker = createLocalSpeakerAttributor({ db, hub: runtime.agentBotHub, roomId, folderId: check.folderId, meetingId });
     }
+    loadSessionVocabulary(session, db, roomId);
 
     const bytes = Buffer.from(pcm, 'base64');
     if (bytes.length > MAX_PCM_BYTES || bytes.length % 2 !== 0) throw new AppError('Audio chunk must be whole PCM16 samples, at most 128 KB.', 'INVALID_INPUT');

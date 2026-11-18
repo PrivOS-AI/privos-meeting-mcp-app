@@ -1,6 +1,6 @@
 {
   "name": "ai.privos.meeting-agent",
-  "version": "1.5.0",
+  "version": "1.6.1",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -33,8 +33,14 @@
     "calibrate:extract": "tsx scripts/extract-calibration-slices.ts",
     "calibrate:replay": "tsx scripts/replay-meeting-speakers.ts",
     "package": "bash scripts/package-source.sh",
-    "verify:fast-pr": "npm run typecheck && npm run test && npm run build && npm run check:ui-version && npm run preflight",
-    "package:agent-set": "tsx scripts/package-agent-set.ts"
+    "verify:fast-pr": "npm run typecheck && npm run test && npm run build && npm run check:ui-version && npm run preflight && npm run lint:publish",
+    "package:agent-set": "tsx scripts/package-agent-set.ts",
+    "readiness": "bash scripts/readiness-check.sh .",
+    "lint:publish": "privos-app lint --publish privos-app.json",
+    "bundle:ui": "privos-app bundle-ui --dist dist/ui --out ui-bundle.tar",
+    "docker:build": "bash scripts/build-marketplace-image.sh ai-privos-meeting-agent:local",
+    "docker:run": "docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges --pids-limit 100 --tmpfs /tmp -e PORT=3012 -p 127.0.0.1:3012:3012 ai-privos-meeting-agent:local",
+    "publish:marketplace": "privos-app publish"
   },
   "dependencies": {
     "@elevenlabs/client": "^1.25.0",

@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      # A UI that changed under the same version leaves the Hub on the old assets ("App assets unavailable").
+      - run: npm run check:ui-version
+      - run: npm run preflight
+      - run: npm run lint:publish
+      # The Portal's own rules (e.g. at most 32 env keys), which `privos-app lint` does not check.
+      - run: node scripts/manifest-precheck.mjs privos-app.json
+      # The Portal scans production dependencies; HIGH/CRITICAL fails the submission.
+      - run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org
+      - run: npm run package
+      - name: Build the Marketplace image
+        run: bash scripts/build-marketplace-image.sh ai-privos-meeting-agent:test
+      - name: Hardened container smoke test
+        run: |
+          docker run -d --name meeting --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --pids-limit 100 --tmpfs /tmp \
+            -e PORT=3012 -p 127.0.0.1:3012:3012 ai-privos-meeting-agent:test
+          trap 'docker logs meeting; docker rm -f meeting' EXIT
+          # The build node's probe: no env, read-only root FS, manifest within 30 s.
+          for attempt in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:3012/.well-known/mcp/manifest.json > /tmp/manifest.json && break
+            sleep 1
+          done
+          # The served manifest is the committed one.
+          node -e 'const a=require("/tmp/manifest.json"),b=require("./privos-app.json");if(a.name!==b.name||a.version!==b.version)process.exit(1)'
+          curl --fail --silent http://127.0.0.1:3012/health
+          # No runtime identity (no pairing, no managed socket): ready stays 503.
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3012/ready)" = "503"
+          docker exec meeting sh -c '! command -v npm && ! command -v npx'
+          test "$(docker exec meeting id -un)" = "node"

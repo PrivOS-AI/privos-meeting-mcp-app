@@ -19,7 +19,11 @@
  */
 import type { CollectionSchema } from '../../shared/app-db-schema.js';
 import { SCHEMAS } from '../../shared/app-db-schema.js';
+import { readAllPages } from '../../shared/list-pages.js';
 import { callAppPlatformTool } from './bot-tool-call.js';
+
+/** `mcpapp.db.query`'s own maximum on a Hub without paging. */
+const LEGACY_QUERY_LIMIT = 1000;
 
 /** One App DB row — every collection carries at least `_id`. */
 export interface DbRow {
@@ -107,8 +111,19 @@ export class AppDbBotClient {
     return callAppPlatformTool('mcpapp.db.delete', { collection, id }, 'db:write', this.roomArg(scope));
   }
 
+  /** One answer of `mcpapp.db.query` — for lookups that read a bounded page (`limit: 1`, "latest N"). */
   async query(collection: string, scope: 'global' | 'room', args: Record<string, unknown> = {}): Promise<unknown> {
     return callAppPlatformTool('mcpapp.db.query', { collection, ...args }, 'db:read', this.roomArg(scope));
+  }
+
+  /**
+   * Every matching row, read page by page (`paginate: true`, see
+   * `shared/list-pages.ts`). A Hub without paging answers once with up to
+   * `limit` rows (default 1000, its old cap), as `query` did.
+   */
+  async queryAll(collection: string, scope: 'global' | 'room', args: Record<string, unknown> & { limit?: number } = {}): Promise<DbRow[]> {
+    const { limit = LEGACY_QUERY_LIMIT, ...rest } = args;
+    return readAllPages((paging) => this.query(collection, scope, { ...rest, ...paging }), extractDbRecords, limit);
   }
 
   /**

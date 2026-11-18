@@ -122,6 +122,20 @@
   color: var(--ma-fg-1);
 }
 
+.ma-settings-field--wide {
+  max-width: 560px;
+}
+
+.ma-settings-field textarea {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--ma-border-2);
+  border-radius: var(--ma-radius-sm);
+  background: var(--ma-bg-canvas);
+  color: var(--ma-fg-1);
+  font: inherit;
+  resize: vertical;
+}
+
 .ma-settings-field--checkbox {
   flex-direction: row;
   align-items: center;

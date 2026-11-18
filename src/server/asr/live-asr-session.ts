@@ -73,14 +73,14 @@ export interface SpeakerAttributor {
 /** What a session needs from the engine — injectable so tests run without models. */
 export interface LiveAsrEngine {
   createVad(): Promise<Pick<Vad, 'acceptWaveform' | 'isEmpty' | 'front' | 'pop' | 'flush' | 'reset'> & Partial<Pick<Vad, 'isDetected'>>>;
-  recognize(samples: Float32Array, offsetSec: number): Promise<{ text: string; lang: AsrLanguage }>;
+  recognize(samples: Float32Array, offsetSec: number, vocabulary?: readonly string[]): Promise<{ text: string; lang: AsrLanguage }>;
   /** Optional: without it (or a VAD without `isDetected`) the session emits no drafts. */
-  recognizeDraft?(samples: Float32Array, lang: AsrLanguage): Promise<string>;
+  recognizeDraft?(samples: Float32Array, lang: AsrLanguage, vocabulary?: readonly string[]): Promise<string>;
 }
 
 const defaultEngine: LiveAsrEngine = {
   createVad,
-  recognize: (samples, offsetSec) => recognizeUtterance(samples, offsetSec),
+  recognize: (samples, offsetSec, vocabulary) => recognizeUtterance(samples, offsetSec, vocabulary),
   recognizeDraft,
 };
 
@@ -119,6 +119,10 @@ export class LiveAsrSession {
   lastActivityMs = Date.now();
   /** Set once by the push tool; without it captions carry no speaker. */
   attributeSpeaker: SpeakerAttributor | null = null;
+  /** Names and terms to prefer (`asr/meeting-vocabulary.ts`); set once loaded, until then utterances decode without. */
+  vocabulary: readonly string[] | undefined;
+  /** The vocabulary was asked for (one load per session). */
+  vocabularyRequested = false;
 
   constructor(
     readonly meetingId: string,
@@ -221,7 +225,7 @@ export class LiveAsrSession {
     const lang = this.lastLang;
     this.lastDraftAt = this.samplesFed;
     const startedMs = Date.now();
-    this.draftRun = decodeDraft(samples, lang)
+    this.draftRun = decodeDraft(samples, lang, this.vocabulary)
       .then((text) => {
         this.lastDraftDecodeSec = (Date.now() - startedMs) / 1000;
         // The utterance may have ended (and its final been queued) while this decoded.
@@ -312,7 +316,7 @@ export class LiveAsrSession {
       this.pendingFinals++;
       this.decoding = this.decoding
         .then(async () => {
-          const result = await this.engine.recognize(samples, atSec);
+          const result = await this.engine.recognize(samples, atSec, this.vocabulary);
           this.lastLang = result.lang;
           if (!result.text) return;
           const index = this.nextIndex++;

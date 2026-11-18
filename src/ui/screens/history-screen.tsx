@@ -28,7 +28,7 @@ import {
   type MeetingReadModel,
   type MeetingSpeakerSummary,
 } from '../data/meeting-read-model.js';
-import { loadMeetingStats, type MeetingStats } from '../data/meeting-stats.js';
+import { formatCount, loadMeetingStats, type MeetingStats } from '../data/meeting-stats.js';
 import { formatDurationLong } from '../data/format-time.js';
 import { labelUnnamedSpeakers } from '../data/speaker-labels.js';
 import { useI18n } from '../i18n/i18n-provider.js';
@@ -52,7 +52,7 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
 
   const [stats, setStats] = useState<MeetingStats | null>(null);
   const [meetings, setMeetings] = useState<MeetingReadModel[]>([]);
-  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [speakersByMeeting, setSpeakersByMeeting] = useState<Record<string, MeetingSpeakerSummary[]>>({});
   const [actionCounts, setActionCounts] = useState<Record<string, ActionItemCounts>>({});
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
@@ -80,7 +80,7 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
           listActionItemCountsForMeetings(app, ids),
           listMeetingIdsWithBookmarks(app, ids),
         ]);
-        setTotal(page.total);
+        setHasMore(page.hasMore);
         setMeetings((prev) => (replace ? page.meetings : [...prev, ...page.meetings]));
         setSpeakersByMeeting((prev) => (replace ? speakers : { ...prev, ...speakers }));
         setActionCounts((prev) => (replace ? actionItemCounts : { ...prev, ...actionItemCounts }));
@@ -170,10 +170,10 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
 
       {stats ? (
         <div className="ma-history-screen__stats">
-          <StatCard icon="calendar" label={t('history.stats.thisWeek')} value={String(stats.meetingsThisWeek)} />
+          <StatCard icon="calendar" label={t('history.stats.thisWeek')} value={formatCount(stats.meetingsThisWeek, stats.capped.meetingsThisWeek)} />
           <StatCard icon="clock" label={t('history.stats.totalDuration')} value={formatDurationLong(stats.totalDurationSec)} />
-          <StatCard icon="checkmark-circle" label={t('history.stats.openActionItems')} value={String(stats.openActionItems)} tone={stats.openActionItems > 0 ? 'warning' : 'default'} />
-          <StatCard icon="bookmark" label={t('history.stats.bookmarks')} value={String(stats.bookmarkCount)} />
+          <StatCard icon="checkmark-circle" label={t('history.stats.openActionItems')} value={formatCount(stats.openActionItems, stats.capped.openActionItems)} tone={stats.openActionItems > 0 ? 'warning' : 'default'} />
+          <StatCard icon="bookmark" label={t('history.stats.bookmarks')} value={formatCount(stats.bookmarkCount, stats.capped.bookmarkCount)} />
         </div>
       ) : null}
 
@@ -226,7 +226,7 @@ export function HistoryScreen({ onStartRecording, onOpenMeeting }: HistoryScreen
         </table>
       )}
 
-      {meetings.length < total ? (
+      {hasMore ? (
         <button type="button" className="ma-history-screen__load-more" disabled={loading} onClick={() => void loadPage(meetings.length, false)}>
           {loading ? t('history.loading') : t('history.loadMore')}
         </button>

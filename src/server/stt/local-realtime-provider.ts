@@ -34,7 +34,7 @@ export const localRealtimeProvider: RealtimeTokenProvider = {
       kind: 'realtime',
       configured: missing.length === 0,
       ok: missing.length === 0,
-      models: ['zipformer-vi-30M-int8', 'zipformer-small-en-int8', 'silero-vad'],
+      models: ['zipformer-vi-70kh-int8', 'zipformer-small-en-int8', 'silero-vad'],
       activeSessions: activeLiveSessionCount(),
       ...(missing.length ? { detail: `Missing model files: ${missing.join(', ')}.`, reason: 'not_configured' as const } : {}),
     };

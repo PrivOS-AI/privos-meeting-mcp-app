@@ -338,6 +338,14 @@
   "settings.agent.exampleStart": "@agent 加入 https://meet.google.com/abc-defg-hij 并记录会议",
 
   "settings.adminOnlyNote": "只有房间所有者、房间管理员或工作区管理员可以更改此设置。",
+  "settings.vocabulary.title": "词汇表",
+  "settings.vocabulary.intro": "会议中常用的名称和术语(产品、项目、客户)。内置语音识别会优先识别它们,而不是发音相近的词。应用通过声音认出的人名会自动加入。",
+  "settings.vocabulary.label": "每行一个词(或用逗号分隔)",
+  "settings.vocabulary.placeholder": "PrivOS\nRemote Browser\nNguyễn Văn An",
+  "settings.vocabulary.count": "{count}/{max} 个词",
+  "settings.vocabulary.save": "保存词汇表",
+  "settings.vocabulary.saving": "正在保存…",
+  "settings.vocabulary.localOnly": "内置识别用于越南语语音(包括越南语句子中的英文术语)。从下一句话起应用于字幕和转录。",
 
   "settings.language.title": "语言与翻译",
   "settings.language.uiLanguage": "界面语言",

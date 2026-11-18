@@ -340,6 +340,14 @@
   "settings.agent.exampleStart": "@agent vào https://meet.google.com/abc-defg-hij và ghi lại cuộc họp",
 
   "settings.adminOnlyNote": "Chỉ chủ room, người điều hành room hoặc quản trị viên workspace mới thay đổi được cấu hình này.",
+  "settings.vocabulary.title": "Từ khoá riêng",
+  "settings.vocabulary.intro": "Tên và thuật ngữ cuộc họp hay dùng: sản phẩm, dự án, khách hàng. Nhận dạng giọng nói tích hợp sẽ ưu tiên chúng hơn các từ nghe na ná. Tên những người app đã nhận ra giọng được thêm tự động.",
+  "settings.vocabulary.label": "Mỗi dòng một từ khoá (hoặc cách nhau bằng dấu phẩy)",
+  "settings.vocabulary.placeholder": "PrivOS\nRemote Browser\nNguyễn Văn An",
+  "settings.vocabulary.count": "{count}/{max} từ khoá",
+  "settings.vocabulary.save": "Lưu từ khoá",
+  "settings.vocabulary.saving": "Đang lưu…",
+  "settings.vocabulary.localOnly": "Nhận dạng tích hợp dùng danh sách này cho tiếng Việt, kể cả từ tiếng Anh nói chen trong câu tiếng Việt. Áp dụng cho phụ đề và biên bản từ câu nói tiếp theo.",
 
   "settings.language.title": "Ngôn ngữ & dịch",
   "settings.language.uiLanguage": "Ngôn ngữ giao diện",

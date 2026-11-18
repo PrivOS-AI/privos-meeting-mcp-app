@@ -11,7 +11,7 @@
 import type { RoomBoundHubClient } from '@privos_ai/app-server';
 
 import { meetingId8 } from '../../shared/meeting-slug.js';
-import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
+import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { readKnownRooms } from './known-rooms-store.js';
 import { env } from '../env.js';
 import type { PartRef } from '../media/concat-parts.js';
@@ -113,14 +113,13 @@ export async function sweepRoom(hub: RoomBoundHubClient, roomId: string): Promis
   for (const job of stale.failed) await cleanupDeadSonioxJob({ ...job });
 
   const cutoffIso = new Date(Date.now() - ABANDONED_MEETING_MS).toISOString();
-  const abandoned = await db.query('meetings', 'room', {
+  const abandoned = await db.queryAll('meetings', 'room', {
     where: [
       { field: 'status', op: '==', value: 'recording' },
       { field: 'lastPartAt', op: '<', value: cutoffIso },
     ],
-    limit: 1000,
   });
-  for (const meeting of extractDbRecords(abandoned)) {
+  for (const meeting of abandoned) {
     await db.update('meetings', 'room', meeting._id, { status: 'interrupted' }).catch(() => undefined);
   }
 
@@ -129,8 +128,8 @@ export async function sweepRoom(hub: RoomBoundHubClient, roomId: string): Promis
   // so a prior crash between marking `interrupted` and uploading still recovers.
   // `uploadRoomCopy` is upload-replace, so re-running this for an already-
   // uploaded meeting is a harmless no-op.
-  const interrupted = await db.query('meetings', 'room', { where: [{ field: 'status', op: '==', value: 'interrupted' }], limit: 1000 });
-  for (const meeting of extractDbRecords(interrupted)) {
+  const interrupted = await db.queryAll('meetings', 'room', { where: [{ field: 'status', op: '==', value: 'interrupted' }] });
+  for (const meeting of interrupted) {
     const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
     if (!folderId) continue;
     await uploadRoomCopy(hub, roomId, folderId, meeting._id);
@@ -138,8 +137,8 @@ export async function sweepRoom(hub: RoomBoundHubClient, roomId: string): Promis
 
   // Jobs that were ALREADY `failed` before this boot (e.g. a hard crash before
   // their own `finally` ran) — sweep their remote garbage too.
-  const failed = await db.query('processing_jobs', 'room', { where: [{ field: 'status', op: '==', value: 'failed' }], limit: 1000 });
-  for (const row of extractDbRecords(failed)) await cleanupDeadSonioxJob(row);
+  const failed = await db.queryAll('processing_jobs', 'room', { where: [{ field: 'status', op: '==', value: 'failed' }] });
+  for (const row of failed) await cleanupDeadSonioxJob(row);
 }
 
 /** Node-local known-rooms registry -> sweep each room. Called at boot (room-less) and again from `meeting_bootstrap`. */

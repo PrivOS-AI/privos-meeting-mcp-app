@@ -39,10 +39,20 @@ changes:
 2. `npm run build && npm run ui:lock` (records the bundle digest for that version);
 3. after deploying, an admin clicks Refresh.
 
-`npm run check:ui-version` (part of `verify:fast-pr`) fails when the built UI
+`npm run check:ui-version` (part of `verify:fast-pr` and CI) fails when the built UI
 differs from the one locked for the current version. The container log has one
 `[ui] resources/read …` line per UI read: a Hub that reads only `shell` and
 never the assets it names is serving a stale asset set.
+
+### Release gates (Marketplace)
+
+`npm run readiness` runs every Portal gate in the Portal's order
+(`scripts/readiness-check.sh`, `--docker` adds the served-manifest probe);
+CI (`.github/workflows/ci.yml`) runs the same on every push and smoke-tests the
+image hardened. The Portal accepts at most **32 `env` keys** (`privos-app lint`
+does not check it, `scripts/manifest-precheck.mjs` does): a new tuning knob is
+read in `env.ts` and listed in `.env.example`, not declared in the manifest.
+Publishing (`npm run publish:marketplace`) is a human action.
 
 ### Recording from the Room browser (Google Meet)
 
@@ -99,5 +109,12 @@ when an agent's call fails on Dev.
   Never requires a redeploy or manifest republish; CSP already declares both
   vendor WS origins. After adding `rooms:roles:read`, an admin must approve it
   (Admin → Apps → this app) before roles reach the app.
+- Vocabulary (Settings › Speech recognition, key `vocabulary`): the room's own
+  names and terms, plus the names of voice profiles, are given to the built-in
+  Vietnamese model as hotwords (`asr/hotwords.ts`, `asr/meeting-vocabulary.ts`).
+  It needs `models/asr/vi/bpe.vocab`, written at image build by
+  `scripts/bpe-vocab.mjs`; the English release has no `bpe.model`, so English
+  decodes without. Measure a change with `scripts/eval-asr-set.ts` (WER, term
+  recall and false terms on a labelled set, e.g. FLEURS vi).
 - Backup/rotation of `VOICEPRINT_ENC_KEY` and first-deploy steps:
   `docs/deployment-guide.md` (its pm2 sections predate the container).

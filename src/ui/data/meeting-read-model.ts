@@ -79,7 +79,11 @@ export interface ListMeetingsOptions {
 
 export interface ListMeetingsResult {
   meetings: MeetingReadModel[];
-  total: number;
+  /** `null` when the Hub did not count; with `totalCapped` it stopped at 10,000 — show neither as exact. */
+  total: number | null;
+  totalCapped: boolean;
+  /** Another page exists — what "Load more" follows (a capped `total` would hide it at 10,000). */
+  hasMore: boolean;
 }
 
 const MAX_PAGE_SIZE = 200; // App DB's own `mcpapp.db.query` cap is 1000; the history screen pages 50 at a time (phase-07 § Requirements).
@@ -89,14 +93,14 @@ export async function listMeetings(app: McpApp, roomId: string, options: ListMee
   const limit = Math.min(options.limit ?? 50, MAX_PAGE_SIZE);
   const field = options.orderBy === 'durationSec_desc' ? 'durationSec' : 'startedAt';
   const direction = options.orderBy === 'startedAt_asc' ? 'asc' : 'desc';
-  const { records, total } = await new AppDbClient(app).query({
+  const { records, total, totalCapped, hasMore } = await new AppDbClient(app).queryPage({
     collection: 'meetings',
     where: [{ field: 'roomId', op: '==', value: roomId }],
     orderBy: [{ field, direction }],
     limit,
     offset: options.offset ?? 0,
   });
-  return { meetings: records.map(asMeetingReadModel), total };
+  return { meetings: records.map(asMeetingReadModel), total, totalCapped, hasMore };
 }
 
 /** Iframe-owned field — same write this app already performs elsewhere for the title (plan.md field-ownership table). */
@@ -152,8 +156,8 @@ export async function deleteMeeting(app: McpApp, meeting: MeetingReadModel): Pro
   // Its rows: no orphan action item left in the "open items" count, no parked speaker embedding.
   const db = new AppDbClient(app);
   for (const collection of ['action_items', 'decisions', 'bookmarks', 'meeting_speakers']) {
-    const result = await db.query({ collection, where: [{ field: 'meeting', op: '==', value: meeting._id }], limit: 1000 }).catch(() => null);
-    await Promise.all((result?.records ?? []).map((row) => db.delete(collection, row._id).catch(() => undefined)));
+    const rows = await db.queryAll({ collection, where: [{ field: 'meeting', op: '==', value: meeting._id }] }).catch(() => []);
+    await Promise.all(rows.map((row) => db.delete(collection, row._id).catch(() => undefined)));
   }
   await db.delete('meetings', meeting._id);
 }
@@ -175,11 +179,7 @@ export interface MeetingSpeakerSummary {
  */
 export async function listSpeakersForMeetings(app: McpApp, meetingIds: readonly string[]): Promise<Record<string, MeetingSpeakerSummary[]>> {
   if (meetingIds.length === 0) return {};
-  const { records } = await new AppDbClient(app).query({
-    collection: 'meeting_speakers',
-    where: [{ field: 'meeting', op: 'in', value: [...meetingIds] }],
-    limit: 1000,
-  });
+  const records = await new AppDbClient(app).queryAll({ collection: 'meeting_speakers', where: [{ field: 'meeting', op: 'in', value: [...meetingIds] }] });
   const byMeeting: Record<string, MeetingSpeakerSummary[]> = {};
   for (const record of records) {
     const meetingId = String(record.meeting ?? '');
@@ -204,11 +204,7 @@ export async function listSpeakersForMeetings(app: McpApp, meetingIds: readonly 
  */
 export async function listMeetingIdsWithBookmarks(app: McpApp, meetingIds: readonly string[]): Promise<Set<string>> {
   if (meetingIds.length === 0) return new Set();
-  const { records } = await new AppDbClient(app).query({
-    collection: 'bookmarks',
-    where: [{ field: 'meeting', op: 'in', value: [...meetingIds] }],
-    limit: 1000,
-  });
+  const records = await new AppDbClient(app).queryAll({ collection: 'bookmarks', where: [{ field: 'meeting', op: 'in', value: [...meetingIds] }] });
   return new Set(records.map((r) => String(r.meeting ?? '')).filter(Boolean));
 }
 
@@ -220,11 +216,7 @@ export interface ActionItemCounts {
 /** Batched action-item totals per meeting — backs the "action count" column and the "Has action item" filter chip. */
 export async function listActionItemCountsForMeetings(app: McpApp, meetingIds: readonly string[]): Promise<Record<string, ActionItemCounts>> {
   if (meetingIds.length === 0) return {};
-  const { records } = await new AppDbClient(app).query({
-    collection: 'action_items',
-    where: [{ field: 'meeting', op: 'in', value: [...meetingIds] }],
-    limit: 1000,
-  });
+  const records = await new AppDbClient(app).queryAll({ collection: 'action_items', where: [{ field: 'meeting', op: 'in', value: [...meetingIds] }] });
   const byMeeting: Record<string, ActionItemCounts> = {};
   for (const record of records) {
     const meetingId = String(record.meeting ?? '');

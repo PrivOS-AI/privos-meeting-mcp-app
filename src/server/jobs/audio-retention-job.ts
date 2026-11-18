@@ -31,7 +31,7 @@
 import type { RoomBoundHubClient } from '@privos_ai/app-server';
 
 import { DEFAULT_WORKSPACE_SETTINGS } from '../../shared/app-settings.js';
-import { AppDbBotClient, extractDbRecords } from '../hub/app-db-bot-client.js';
+import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { getSetting } from '../hub/app-settings.js';
 import { deleteRoomFile, listRoomFolderFiles } from '../media/hub-file-download.js';
 import { forgetMeetingVoiceprints } from '../speaker/profile-store.js';
@@ -57,15 +57,15 @@ function daysAgoIso(days: number): string {
 async function purgeKeptAudio(hub: RoomBoundHubClient, roomId: string, days: number): Promise<number> {
   if (days <= 0) return 0;
   const db = new AppDbBotClient(roomId);
-  const result = await db.query('meetings', 'room', {
+  // Every page: a meeting whose audio is already gone still matches, so a bounded page would stay stuck on the oldest ones.
+  const meetings = await db.queryAll('meetings', 'room', {
     where: [
       { field: 'status', op: '==', value: 'summarized' },
       { field: 'endedAt', op: '<', value: daysAgoIso(days) },
     ],
-    limit: 1000,
   });
   let deleted = 0;
-  for (const meeting of extractDbRecords(result)) {
+  for (const meeting of meetings) {
     if (typeof meeting.audioDeletedAt === 'string' && meeting.audioDeletedAt) continue;
     const audioFileId = typeof meeting.audioFileId === 'string' ? meeting.audioFileId : '';
     if (!audioFileId) continue;
@@ -87,14 +87,14 @@ async function purgeExpiredMeetings(hub: RoomBoundHubClient, roomId: string, day
   const cutoff = daysAgoIso(days);
   const expired = [];
   for (const status of ['summarized', 'failed']) {
-    const result = await db.query('meetings', 'room', {
-      where: [
-        { field: 'status', op: '==', value: status },
-        { field: 'endedAt', op: '<', value: cutoff },
-      ],
-      limit: 1000,
-    });
-    expired.push(...extractDbRecords(result));
+    expired.push(
+      ...(await db.queryAll('meetings', 'room', {
+        where: [
+          { field: 'status', op: '==', value: status },
+          { field: 'endedAt', op: '<', value: cutoff },
+        ],
+      })),
+    );
   }
   let deleted = 0;
   for (const meeting of expired) {
@@ -118,15 +118,14 @@ async function purgeExpiredMeetings(hub: RoomBoundHubClient, roomId: string, day
 async function purgeInterruptedParts(hub: RoomBoundHubClient, roomId: string, days: number): Promise<number> {
   if (days <= 0) return 0;
   const db = new AppDbBotClient(roomId);
-  const result = await db.query('meetings', 'room', {
+  const meetings = await db.queryAll('meetings', 'room', {
     where: [
       { field: 'status', op: '==', value: 'interrupted' },
       { field: 'lastPartAt', op: '<', value: daysAgoIso(days) },
     ],
-    limit: 1000,
   });
   let deleted = 0;
-  for (const meeting of extractDbRecords(result)) {
+  for (const meeting of meetings) {
     const folderId = typeof meeting.folderId === 'string' ? meeting.folderId : '';
     if (!folderId) continue;
     const files = await listRoomFolderFiles(hub, roomId, folderId).catch(() => []);
@@ -143,18 +142,15 @@ async function purgeInterruptedParts(hub: RoomBoundHubClient, roomId: string, da
 /** `pendingEmbedding` on rows whose meeting ended 30+ days ago and was never resolved. */
 async function purgeStalePendingEmbeddings(roomId: string): Promise<number> {
   const db = new AppDbBotClient(roomId);
-  const meetingsResult = await db.query('meetings', 'room', {
+  // Every page: meetings ended 30+ days ago only grow, so a bounded page would never reach the newer ones.
+  const staleMeetings = await db.queryAll('meetings', 'room', {
     where: [{ field: 'endedAt', op: '<', value: daysAgoIso(PENDING_EMBEDDING_TTL_DAYS) }],
-    limit: 1000,
   });
-  const staleMeetingIds = extractDbRecords(meetingsResult).map((m) => m._id);
+  const staleMeetingIds = staleMeetings.map((m) => m._id);
   let cleared = 0;
   for (const meetingId of staleMeetingIds) {
-    const speakersResult = await db.query('meeting_speakers', 'room', {
-      where: [{ field: 'meeting', op: '==', value: meetingId }],
-      limit: 1000,
-    });
-    for (const row of extractDbRecords(speakersResult)) {
+    const speakers = await db.queryAll('meeting_speakers', 'room', { where: [{ field: 'meeting', op: '==', value: meetingId }] });
+    for (const row of speakers) {
       if (typeof row.pendingEmbedding !== 'string' || !row.pendingEmbedding) continue;
       await db
         .update('meeting_speakers', 'room', row._id, { pendingEmbedding: '' })

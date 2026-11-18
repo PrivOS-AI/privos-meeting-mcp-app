@@ -8,7 +8,7 @@
  * sides of the Settings screen cannot drift (DRY, plan.md § Settings store).
  */
 import { AppError } from '../../shared/app-error.js';
-import { isWorkspaceSettingKey, WORKSPACE_SETTING_VALIDATORS } from '../../shared/app-settings.js';
+import { isWorkspaceSettingKey, VOCABULARY_MAX_CHARS, WORKSPACE_SETTING_VALIDATORS } from '../../shared/app-settings.js';
 import { AppDbBotClient } from '../hub/app-db-bot-client.js';
 import { setSetting } from '../hub/app-settings.js';
 import { requireVerifiedActor } from './authz.js';
@@ -18,13 +18,14 @@ import type { AppTool } from './registry.js';
 export const settingsSetTool: AppTool = {
   name: 'meeting_settings_set',
   title: 'Update room settings',
-  description: "Write a setting for the caller's room (STT provider, speaker-match thresholds, retention…) — room owners, moderators and workspace admins only.",
+  description: "Write a setting for the caller's room (STT provider, speaker-match thresholds, retention, vocabulary…) — room owners, moderators and workspace admins only.",
   inputSchema: {
     type: 'object',
     required: ['key', 'value'],
     properties: {
       key: { type: 'string', maxLength: 64 },
-      value: { type: ['string', 'number', 'boolean'], maxLength: 64 },
+      // The longest value is the Room's vocabulary (`VOCABULARY_MAX_CHARS`); each key's validator enforces its own limit.
+      value: { type: ['string', 'number', 'boolean'], maxLength: VOCABULARY_MAX_CHARS },
     },
   },
   async execute(args, context) {

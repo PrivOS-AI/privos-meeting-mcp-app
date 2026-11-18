@@ -338,6 +338,14 @@
   "settings.agent.exampleStart": "@agent https://meet.google.com/abc-defg-hij に参加して会議を記録して",
 
   "settings.adminOnlyNote": "この設定はルームのオーナーとモデレーター、またはワークスペース管理者のみが変更できます。",
+  "settings.vocabulary.title": "用語集",
+  "settings.vocabulary.intro": "会議でよく使う名前や用語(製品、プロジェクト、顧客など)。内蔵の音声認識は、似た発音の言葉よりこれらを優先します。声で識別できる人の名前は自動で追加されます。",
+  "settings.vocabulary.label": "1 行に 1 語(またはカンマ区切り)",
+  "settings.vocabulary.placeholder": "PrivOS\nRemote Browser\nNguyễn Văn An",
+  "settings.vocabulary.count": "{count}/{max} 語",
+  "settings.vocabulary.save": "用語集を保存",
+  "settings.vocabulary.saving": "保存中…",
+  "settings.vocabulary.localOnly": "内蔵プロバイダーがベトナム語の音声に使います(ベトナム語の文中の英語の用語も含む)。次の発話から字幕と文字起こしに反映されます。",
 
   "settings.language.title": "言語と翻訳",
   "settings.language.uiLanguage": "インターフェース言語",
