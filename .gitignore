@@ -32,3 +32,6 @@ dist-source/
 /.claude
 /.gemini
 /.privos-agent-sdk
+
+# `npm run bundle:ui` output
+/ui-bundle.tar

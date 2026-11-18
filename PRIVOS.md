@@ -39,10 +39,20 @@ changes:
 2. `npm run build && npm run ui:lock` (records the bundle digest for that version);
 3. after deploying, an admin clicks Refresh.
 
-`npm run check:ui-version` (part of `verify:fast-pr`) fails when the built UI
+`npm run check:ui-version` (part of `verify:fast-pr` and CI) fails when the built UI
 differs from the one locked for the current version. The container log has one
 `[ui] resources/read …` line per UI read: a Hub that reads only `shell` and
 never the assets it names is serving a stale asset set.
+
+### Release gates (Marketplace)
+
+`npm run readiness` runs every Portal gate in the Portal's order
+(`scripts/readiness-check.sh`, `--docker` adds the served-manifest probe);
+CI (`.github/workflows/ci.yml`) runs the same on every push and smoke-tests the
+image hardened. The Portal accepts at most **32 `env` keys** (`privos-app lint`
+does not check it, `scripts/manifest-precheck.mjs` does): a new tuning knob is
+read in `env.ts` and listed in `.env.example`, not declared in the manifest.
+Publishing (`npm run publish:marketplace`) is a human action.
 
 ### Recording from the Room browser (Google Meet)
 

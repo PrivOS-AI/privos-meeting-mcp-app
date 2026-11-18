@@ -55,6 +55,10 @@ describe('marketplace contract', () => {
       if (key.startsWith('PRIVOS_')) expect(allowed.has(key)).toBe(true);
     }
   });
+
+  it('declares at most 32 env keys, the Portal limit (tuning knobs stay undeclared, read by env.ts only)', () => {
+    expect(manifest.env.length).toBeLessThanOrEqual(32);
+  });
 });
 
 describe('served manifest digest', () => {

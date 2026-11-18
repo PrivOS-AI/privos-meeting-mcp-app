@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.6.1] — 2026-11-18
+
+The manifest fits the Marketplace again, and the app runs the same release
+gates as Remote Browser. The manifest changes (version, `env`): an admin
+clicks Refresh after the deploy.
+- The manifest declared 35 `env` keys; the Portal accepts at most 32. Six
+  tuning and dev-only keys are no longer declared (`SONIOX_TEMP_KEY_TTL_SEC`,
+  `SPEAKER_MODEL_PATH`, `SPEAKER_SESSION_MATCH_THRESHOLD`,
+  `SPEAKER_SESSION_MERGE_THRESHOLD`, `LIVE_CHUNK_OVERLAP_SEC`,
+  `ALLOW_UNVERIFIED_ACTOR`), like the other calibration knobs before them:
+  the server still reads them from its own `.env`, but a workspace admin no
+  longer sees them. A test keeps the list at 32 or fewer.
+- New scripts, as in Remote Browser and the demo: `readiness` (every
+  Marketplace gate in Portal order, `scripts/readiness-check.sh`),
+  `lint:publish`, `bundle:ui`, `docker:build` (labels the image with the
+  manifest and its digest), `docker:run` (hardened) and `publish:marketplace`.
+  `verify:fast-pr` also runs `lint:publish`.
+- CI (`.github/workflows/ci.yml`) runs typecheck, build, tests, the UI
+  version check, preflight, publish lint, the Portal's manifest rules, the
+  production dependency audit and the source package on every push, then
+  builds the image and smoke-tests it hardened: the served manifest is the
+  committed one, `/health` is 200, `/ready` without an identity is 503, no
+  npm/npx, user `node`.
+- The readiness audit always asks registry.npmjs.org: a mirror without the
+  advisory endpoint (npmmirror) failed it with nothing to fix.
+
 ## [1.6.0] — 2026-11-16
 
 Built-in speech recognition prefers the names and terms a Room uses. The

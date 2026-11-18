@@ -2,7 +2,7 @@
   "schemaVersion": 3,
   "kind": "mcp-app",
   "name": "ai.privos.meeting-agent",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "title": "PrivOS Meeting App",
   "description": "A PrivOS MCP app for offline meeting capture: bilingual live captions with speaker labels, cross-session speaker identity via voiceprints, Hub-AI summaries, and transcript storage in PrivOS Files.",
   "icon": "/public/icon.svg",
@@ -1367,13 +1367,6 @@
       "default": "0.22"
     },
     {
-      "key": "SONIOX_TEMP_KEY_TTL_SEC",
-      "description": "expires_in_seconds for the Soniox temporary key (≤ 3600).",
-      "required": false,
-      "secret": false,
-      "default": "900"
-    },
-    {
       "key": "LIVE_MAX_CONCURRENT_RECORDINGS",
       "description": "Workspace-wide cap on concurrent realtime sessions, shared across both providers.",
       "required": false,
@@ -1386,13 +1379,6 @@
       "required": false,
       "secret": false,
       "default": "15"
-    },
-    {
-      "key": "SPEAKER_MODEL_PATH",
-      "description": "Path to the speaker-embedding ONNX model (baked into the image at this default path).",
-      "required": false,
-      "secret": false,
-      "default": "models/3dspeaker_speaker-embedding_advanced.onnx"
     },
     {
       "key": "SPEAKER_MATCH_THRESHOLD",
@@ -1416,29 +1402,8 @@
       "default": "25"
     },
     {
-      "key": "SPEAKER_SESSION_MATCH_THRESHOLD",
-      "description": "In-session speaker match threshold.",
-      "required": false,
-      "secret": false,
-      "default": "0.40"
-    },
-    {
-      "key": "SPEAKER_SESSION_MERGE_THRESHOLD",
-      "description": "In-session speaker merge threshold.",
-      "required": false,
-      "secret": false,
-      "default": "0.60"
-    },
-    {
       "key": "LIVE_MIN_SPEECH_SEC",
       "description": "Minimum seconds of speech before attempting a profile match.",
-      "required": false,
-      "secret": false,
-      "default": "8"
-    },
-    {
-      "key": "LIVE_CHUNK_OVERLAP_SEC",
-      "description": "Ring-buffer overlap between two live chunks.",
       "required": false,
       "secret": false,
       "default": "8"
@@ -1526,12 +1491,6 @@
       "description": "The installation bot's Hub auth token. Issued/rotated by admins only.",
       "required": true,
       "secret": true
-    },
-    {
-      "key": "ALLOW_UNVERIFIED_ACTOR",
-      "description": "Dev only: allow tool calls with an unverified actor. Production always fails closed.",
-      "required": false,
-      "secret": false
     },
     {
       "key": "ALLOWED_CALLER_APPS",
