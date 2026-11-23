@@ -86,7 +86,14 @@ export function NewMeetingScreen({ onStarted }: NewMeetingScreenProps) {
       console.error('startRecording failed', error);
       const name = error instanceof DOMException ? error.name : '';
       if (name === 'NotAllowedError' || name === 'SecurityError') {
-        setMicError(t('screen.new.micDenied')); // user/policy denied the mic prompt
+        // The host says why it refused ("Microphone denied by host: <reason>"): a
+        // tap it did not see needs one more press, anything else a permission
+        // (PrivOS's prompt, or the phone's Settings for the PrivOS app). The code
+        // stays on screen, so a report from a phone says which one it was.
+        const reason = /denied by host: (\S+)/.exec((error as DOMException).message)?.[1];
+        const advice = t(reason === 'user_activation_required' ? 'screen.new.micTapAgain' : 'screen.new.micDenied');
+        const fallback = browserAudio && source === 'mic' ? t('screen.new.micTryRoomBrowser') : '';
+        setMicError([advice, fallback, reason ? `[${reason}]` : ''].filter(Boolean).join(' '));
       } else if (name === 'NotSupportedError') {
         setMicError(t('screen.new.micUnavailable')); // iframe not granted allow="microphone"
       } else if (name === 'NotFoundError') {

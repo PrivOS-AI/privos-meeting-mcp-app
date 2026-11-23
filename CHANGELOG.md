@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.6.2] — 2026-11-23
+
+The live and meeting screens fit a phone, and a refused microphone says why.
+The UI and the manifest version change: an admin clicks Refresh after the deploy.
+- On a phone the live screen and the meeting screen kept the desktop's 340px
+  column for the summary panel, though the panel is a drawer there: the
+  phone-width rule sat in app-shell.css, which loads before recording.css,
+  so the desktop rule won. The main column was squeezed past the screen's
+  right edge and cut off (search box, transcript, buttons). The rule now
+  lives after the desktop one, and the column may shrink below its content
+  (`minmax(0, 1fr)`, `min-width: 0`); every screen fits 320px.
+- The meeting screen's title bar (back, title, speaker count) is no longer
+  squeezed to one row on a phone, where it covered the date line.
+- A refused microphone names the host's reason (`[denied]`,
+  `[user_activation_required]`): a tap the host missed asks for one more
+  press; a refusal tells how to allow it, including the phone's Settings
+  for the PrivOS app, and offers the Room's shared browser when the Room
+  has one. It said "the browser denied … this page", which means nothing in
+  PrivOS's mobile app.
+
 ## [1.6.1] — 2026-11-18
 
 The manifest fits the Marketplace again, and the app runs the same release
