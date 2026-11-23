@@ -459,12 +459,6 @@
     background: rgba(0, 0, 0, 0.4);
     border: none;
   }
-
-  /* Live screen: main takes the full width; the summary/bookmarks panel becomes
-     a right-hand drawer (see recording.css for the drawer + toggles). */
-  .ma-live {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Read by screen readers, not shown. */

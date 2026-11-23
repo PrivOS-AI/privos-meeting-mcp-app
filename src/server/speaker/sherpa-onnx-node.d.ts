@@ -47,7 +47,12 @@ declare module 'sherpa-onnx-node' {
     featConfig?: { sampleRate?: number; featureDim?: number };
     modelConfig: {
       transducer?: { encoder: string; decoder: string; joiner: string };
-      tokens: string;
+      /** Qwen3-ASR (an LLM decoder; `tokenizer` is a folder, no `tokens`). */
+      qwen3Asr?: { convFrontend: string; encoder: string; decoder: string; tokenizer: string; maxNewTokens?: number; maxTotalLen?: number };
+      /** Cohere Transcribe; the language is a stream option and must be set. */
+      cohereTranscribe?: { encoder: string; decoder: string; usePunct?: number; useItn?: number };
+      moonshine?: { encoder: string; mergedDecoder: string };
+      tokens?: string;
       numThreads?: number;
       provider?: string;
       debug?: boolean | number;
@@ -73,6 +78,8 @@ declare module 'sherpa-onnx-node' {
 
   export class OfflineStream {
     acceptWaveform(obj: Waveform): void;
+    /** Per-stream decoder option, e.g. `language`, or Qwen3-ASR's `hotwords` (comma-separated). */
+    setOption(key: string, value: string): void;
   }
 
   export class OfflineRecognizer {

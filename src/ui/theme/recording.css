@@ -187,9 +187,12 @@
   overflow: hidden;
 }
 
+/* minmax(0, …) and min-width: 0: a plain `1fr` column never shrinks below its
+   content, so one wide toolbar pushed the whole screen past a phone's width and
+   .ma-body clipped its right side. */
 .ma-live {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   height: 100%;
   min-height: 0;
 }
@@ -197,6 +200,7 @@
 .ma-live__main {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
   padding: var(--space-5);
   gap: var(--space-3);
@@ -204,6 +208,9 @@
 
 .ma-live__topbar {
   display: flex;
+  /* Never squeezed by the fixed-height column: on a phone it wraps to three rows,
+     and shrunk to its 48px min-height they overlapped the meta line below. */
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
@@ -1137,6 +1144,14 @@
 /* ---------- Mobile (<=720px): title bar, right drawer, compact wave ---------- */
 
 @media (max-width: 900px) {
+  /* Live and detail screens: main takes the full width; the summary/bookmarks
+     panel becomes a right-hand drawer (below). Kept here, after the base
+     `.ma-live` rule: in app-shell.css (loaded first) it lost to that rule, and
+     phones kept an empty 340px column that pushed the screen off its right edge. */
+  .ma-live {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   /* Title bar sits at the top with the two fixed sidebar icons (left = rail /
      Meeting toggle, right = summary drawer) flanking it. */
   .ma-live__topbar {
