@@ -17,9 +17,14 @@ RUN npm run build && npm prune --omit=dev --no-audit --no-fund
 #   models/asr/silero_vad.onnx                VAD
 #   models/asr/segmentation/model.onnx        pyannote segmentation 3.0 (diarization)
 #   models/3dspeaker_speaker-embedding_advanced.onnx   3D-Speaker CAM++ zh/en "advanced"
-#                                             (voiceprints + diarization embeddings)
+#                                             (voiceprints + diarization embeddings). Its GitHub
+#                                             release asset was replaced by a re-export (2026-11),
+#                                             so it comes from the author's Hugging Face repo at
+#                                             the revision with the original bytes: every stored
+#                                             voiceprint was computed with this exact model.
 FROM node:22-bookworm-slim AS model
 ARG SHERPA=https://github.com/k2-fsa/sherpa-onnx/releases/download
+ARG SPEAKER_HF=https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/0743f301363dec56491a490f6d6cbc9d67f9a3bf
 WORKDIR /dl
 COPY scripts/bpe-vocab.mjs /dl/bpe-vocab.mjs
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl bzip2 \
@@ -27,7 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && curl -fsSLO "$SHERPA/asr-models/sherpa-onnx-zipformer-small-en-2023-06-26.tar.bz2" \
     && curl -fsSLO "$SHERPA/asr-models/silero_vad.onnx" \
     && curl -fsSLO "$SHERPA/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2" \
-    && curl -fsSLO "$SHERPA/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx" \
+    && curl -fsSLO "$SPEAKER_HF/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx" \
     && printf '%s\n' \
       "48d0fdc9b3515eb9b00c4dfec2883207ee5ebe5c95b1959e7afce87fc3391938  sherpa-onnx-zipformer-vi-int8-2025-04-20.tar.bz2" \
       "c8bff1091c26c49731cddbcd60ef18061142ea11523df1b73bf1b14451b9c15e  sherpa-onnx-zipformer-small-en-2023-06-26.tar.bz2" \
