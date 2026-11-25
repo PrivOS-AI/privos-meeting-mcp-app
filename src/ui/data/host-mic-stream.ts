@@ -28,7 +28,7 @@ export interface HostMicOptions {
 
 export type HostMicResult =
   | { kind: 'stream'; stream: MediaStream; sampleRate: number; stop: () => void }
-  /** Host predates brokered devices — caller should fall back to `navigator.mediaDevices.getUserMedia`. */
+  /** Host does not broker the mic (an older hub, or PrivOS mobile) — caller should fall back to `navigator.mediaDevices.getUserMedia`. */
   | { kind: 'unsupported' }
   /** Host refused; `reason` is a `MicrophoneDenialReason` (not_declared | user_activation_required | denied | unavailable). */
   | { kind: 'denied'; reason: string };
@@ -57,7 +57,10 @@ export async function startHostMicStream(app: McpApp, options: HostMicOptions = 
     onEnded: options.onEnded,
   });
 
-  if (!result.granted) return { kind: 'denied', reason: result.reason };
+  // A host without brokered capture (PrivOS mobile: its app documents get a
+  // secure origin and their own consent instead) is not a refusal: the caller
+  // falls back to getUserMedia.
+  if (!result.granted) return result.reason === 'unsupported_host' ? { kind: 'unsupported' } : { kind: 'denied', reason: result.reason };
 
   const ctx = new AudioContext({ sampleRate: result.sampleRate });
   // A click gesture drives this call, so resume() is allowed; ignore the promise.
