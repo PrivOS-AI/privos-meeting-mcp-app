@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.3] — 2026-11-25
+
+Recording with the phone's microphone works in PrivOS's mobile app. The UI
+and the manifest version change: an admin clicks Refresh after the deploy.
+- PrivOS mobile does not broker the microphone (`host/microphone.*`); each
+  app document there gets a secure origin and PrivOS's own consent dialog,
+  so `getUserMedia` works directly. The SDK answers such a host with
+  `unsupported_host`, which the app took for a refusal ("PrivOS was not
+  allowed to use the microphone … [unsupported_host]") and never reached
+  its `getUserMedia` fallback. `unsupported_host` now falls back, like an
+  SDK without `startMicrophone`; real refusals keep their messages
+  (reported by the PrivOS mobile team, 2026-11-25).
+
 ## [1.6.2] — 2026-11-23
 
 The live and meeting screens fit a phone, and a refused microphone says why.
